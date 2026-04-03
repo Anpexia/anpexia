@@ -1,0 +1,754 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// TENANTS & AUTH
+// ==========================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String   // Nome da empresa
+  slug      String   @unique // URL-friendly identifier
+  segment   String?  // Segmento do negócio (ex: "comercio", "clinica")
+  phone     String?
+  email     String?
+  address   String?
+  logo      String?  // URL do logo
+  smtpHost     String?  @map("smtp_host")
+  smtpPort     Int?     @map("smtp_port")
+  smtpUser     String?  @map("smtp_user")
+  smtpPass     String?  @map("smtp_pass")
+  smtpFrom     String?  @map("smtp_from")
+  isActive  Boolean  @default(true)
+  plan      Plan     @default(ESSENTIAL)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Configuração de módulos ativos
+  modules TenantModule[]
+
+  // Relacionamentos
+  users              User[]
+  customers          Customer[]
+  customerTags       CustomerTag[]
+  products           Product[]
+  productCategories  ProductCategory[]
+  inventoryMovements InventoryMovement[]
+  messageTemplates   MessageTemplate[]
+  messagesSent       MessageSent[]
+  auditLogs          AuditLog[]
+  chatbotConfig      ChatbotConfig?
+  chatbotFaqs        ChatbotFaq[]
+  chatMessages       ChatMessage[]
+  convertedFromLead  Lead?
+  scriptCategories   ScriptCategory[]
+  scripts            Script[]
+  suppliers          Supplier[]
+  supplierProducts   SupplierProduct[]
+  purchaseOrders     PurchaseOrder[]
+
+  @@map("tenants")
+}
+
+enum Plan {
+  ESSENTIAL
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+model TenantModule {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  module    Module
+  isActive  Boolean  @default(true)
+  config    Json?    // Configurações específicas do módulo para este tenant
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, module])
+  @@map("tenant_modules")
+}
+
+enum Module {
+  DASHBOARD
+  CUSTOMERS
+  INVENTORY
+  MESSAGING
+  CHATBOT
+  SCHEDULING
+  FINANCIAL
+  REPORTS
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String?  @map("tenant_id") // null para super admin
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  phone        String?  // WhatsApp para receber alertas
+  role         Role     @default(EMPLOYEE)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+enum Role {
+  SUPER_ADMIN  // Angel
+  OWNER        // Dono da empresa cliente
+  MANAGER      // Gerente
+  EMPLOYEE     // Funcionário
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("refresh_tokens")
+}
+
+// ==========================================
+// CLIENTES / CONTATOS
+// ==========================================
+
+model Customer {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  phone       String?
+  email       String?
+  cpfCnpj     String?   @map("cpf_cnpj") // Criptografado
+  birthDate   DateTime? @map("birth_date")
+  address     Json?     // { cep, street, number, neighborhood, city, state }
+  insurance   String?   // "Particular" ou "NomePlano - NumCarteirinha"
+  notes       String?
+  origin      String?   // Como chegou (indicação, redes sociais, etc.)
+  optInWhatsApp Boolean @default(false) @map("opt_in_whatsapp")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tags           CustomerTagAssignment[]
+  messagesSent   MessageSent[]
+  scheduledCalls ScheduledCall[]
+  medicalRecord  MedicalRecord?
+
+  @@index([tenantId])
+  @@map("customers")
+}
+
+model CustomerTag {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String   // Ex: "VIP", "Novo", "Inadimplente"
+  color     String   @default("#6B7280") // Cor hex para exibição
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customers CustomerTagAssignment[]
+
+  @@unique([tenantId, name])
+  @@map("customer_tags")
+}
+
+model CustomerTagAssignment {
+  id         String   @id @default(cuid())
+  customerId String   @map("customer_id")
+  tagId      String   @map("tag_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tag      CustomerTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, tagId])
+  @@map("customer_tag_assignments")
+}
+
+// ==========================================
+// PRONTUÁRIO MÉDICO
+// ==========================================
+
+model MedicalRecord {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  customerId String   @unique @map("customer_id")
+
+  // Dados clínicos fixos (atualizáveis)
+  bloodType       String?  @map("blood_type") // A+, A-, B+, B-, AB+, AB-, O+, O-
+  allergies       String?  // Texto livre
+  medications     String?  // Medicamentos em uso
+  chronicDiseases String?  @map("chronic_diseases") // Doenças crônicas
+  clinicalNotes   String?  @map("clinical_notes") // Observações clínicas gerais
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  entries  MedicalEntry[]
+
+  @@unique([tenantId, customerId])
+  @@index([tenantId])
+  @@map("medical_records")
+}
+
+model MedicalEntry {
+  id              String   @id @default(cuid())
+  medicalRecordId String   @map("medical_record_id")
+  authorName      String   @map("author_name") // Nome do médico/profissional
+  authorId        String?  @map("author_id") // userId do autor
+  type            String   @default("note") // note, procedure, prescription, exam
+  content         String   // Texto da anotação
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+
+  @@index([medicalRecordId])
+  @@map("medical_entries")
+}
+
+// ==========================================
+// ESTOQUE
+// ==========================================
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([tenantId, name])
+  @@map("product_categories")
+}
+
+model Product {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  name          String
+  sku           String?
+  categoryId    String?   @map("category_id")
+  quantity      Int       @default(0)
+  minQuantity   Int       @default(0) @map("min_quantity")
+  unit          String    @default("un") // un, kg, L, etc.
+  costPrice     Float?    @map("cost_price")
+  salePrice     Float?    @map("sale_price")
+  supplier      String?
+  batch         String?
+  expiresAt     DateTime? @map("expires_at")
+  location      String?
+  imageUrl      String?   @map("image_url")
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category         ProductCategory?  @relation(fields: [categoryId], references: [id])
+  movements        InventoryMovement[]
+  supplierProducts SupplierProduct[]
+
+  @@index([tenantId])
+  @@map("products")
+}
+
+model InventoryMovement {
+  id        String        @id @default(cuid())
+  tenantId  String        @map("tenant_id")
+  productId String        @map("product_id")
+  type      MovementType
+  quantity  Int
+  reason    String?       // Motivo da movimentação
+  reference String?       // Referência (ex: número da venda)
+  userId    String?       @map("user_id") // Quem registrou
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([productId])
+  @@map("inventory_movements")
+}
+
+enum MovementType {
+  IN    // Entrada
+  OUT   // Saída
+  ADJUSTMENT // Ajuste de inventário
+}
+
+enum NotificationMethod {
+  EMAIL
+  WHATSAPP
+  BOTH
+}
+
+enum OrderStatus {
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  COMPLETED
+  CANCELLED
+}
+
+enum SentVia {
+  EMAIL
+  WHATSAPP
+}
+
+model Supplier {
+  id                 String             @id @default(cuid())
+  tenantId           String             @map("tenant_id")
+  name               String
+  contactName        String?            @map("contact_name")
+  email              String?
+  whatsapp           String?
+  phone              String?
+  notificationMethod NotificationMethod @default(WHATSAPP) @map("notification_method")
+  autoDispatch       Boolean            @default(false) @map("auto_dispatch")
+  notes              String?
+  isActive           Boolean            @default(true) @map("is_active")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products        SupplierProduct[]
+  purchaseOrders  PurchaseOrder[]
+
+  @@index([tenantId])
+  @@map("suppliers")
+}
+
+model SupplierProduct {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  supplierId      String   @map("supplier_id")
+  productId       String   @map("product_id")
+  isPrimary       Boolean  @default(false) @map("is_primary")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, productId])
+  @@index([tenantId])
+  @@index([productId])
+  @@map("supplier_products")
+}
+
+model PurchaseOrder {
+  id         String      @id @default(cuid())
+  tenantId   String      @map("tenant_id")
+  supplierId String      @map("supplier_id")
+  status     OrderStatus @default(PENDING_APPROVAL)
+  items      Json
+  sentAt     DateTime?   @map("sent_at")
+  approvedAt DateTime?   @map("approved_at")
+  sentVia    SentVia?    @map("sent_via")
+  message    String?
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+// ==========================================
+// MENSAGENS AUTOMÁTICAS
+// ==========================================
+
+model MessageTemplate {
+  id        String      @id @default(cuid())
+  tenantId  String      @map("tenant_id")
+  type      MessageType
+  name      String      // Nome amigável (ex: "Lembrete de consulta")
+  body      String      // Texto com variáveis: {nome}, {data}, {hora}
+  isActive  Boolean     @default(true)
+  config    Json?       // Configurações: horário permitido, intervalo, etc.
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messagesSent MessageSent[]
+
+  @@index([tenantId])
+  @@map("message_templates")
+}
+
+enum MessageType {
+  APPOINTMENT_REMINDER  // Lembrete de agendamento
+  RETURN_REMINDER       // Aviso de retorno
+  BIRTHDAY              // Aniversário
+  WELCOME               // Boas-vindas
+  LOW_STOCK_ALERT       // Alerta de estoque baixo
+  CONFIRMATION          // Confirmação de agendamento
+  POST_SERVICE          // Pós-serviço / feedback
+  CUSTOM                // Personalizada
+}
+
+model MessageSent {
+  id         String        @id @default(cuid())
+  tenantId   String        @map("tenant_id")
+  templateId String?       @map("template_id")
+  customerId String?       @map("customer_id")
+  phone      String        // Número destino
+  body       String        // Texto final enviado
+  status     MessageStatus @default(PENDING)
+  sentAt     DateTime?     @map("sent_at")
+  error      String?       // Mensagem de erro se falhou
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template MessageTemplate? @relation(fields: [templateId], references: [id])
+  customer Customer?        @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("messages_sent")
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+// ==========================================
+// AUDIT LOG
+// ==========================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String?  @map("tenant_id")
+  userId    String?  @map("user_id")
+  action    String   // Ex: "customer.create", "product.update"
+  entity    String   // Ex: "Customer", "Product"
+  entityId  String?  @map("entity_id")
+  changes   Json?    // { before: {...}, after: {...} }
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==========================================
+// CHATBOT COM IA
+// ==========================================
+
+model ChatbotConfig {
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique @map("tenant_id")
+  instanceName        String?  @map("instance_name") // Nome da instância na Evolution API
+  isActive            Boolean  @default(false)
+  businessName        String?  @map("business_name")
+  businessDescription String?  @map("business_description")
+  businessHours       String?  @map("business_hours")
+  businessAddress     String?  @map("business_address")
+  businessPhone       String?  @map("business_phone")
+  servicesOffered     String?  @map("services_offered")
+  priceInfo           String?  @map("price_info")
+  customInstructions  String?  @map("custom_instructions")
+  greetingMessage     String?  @map("greeting_message")
+  fallbackMessage     String?  @map("fallback_message")
+  humanHandoffMessage String?  @map("human_handoff_message")
+  allowScheduling     Boolean  @default(false) @map("allow_scheduling")
+  allowOrderStatus    Boolean  @default(false) @map("allow_order_status")
+  maxResponseTime     Int      @default(10) @map("max_response_time")
+  operatingHoursOnly  Boolean  @default(false) @map("operating_hours_only")
+  assistantName       String?  @map("assistant_name")       // Nome do assistente virtual
+  specialties         String?                                // Especialidades da clínica
+  acceptedInsurance   String?  @map("accepted_insurance")   // Convênios aceitos
+  requiredPatientFields String[] @default(["name", "birthDate"]) @map("required_patient_fields")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("chatbot_configs")
+}
+
+model ChatbotFaq {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  question  String
+  answer    String
+  category  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("chatbot_faqs")
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  phone      String
+  senderName String   @map("sender_name")
+  direction  ChatDirection
+  body       String
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([phone])
+  @@index([tenantId, phone])
+  @@map("chat_messages")
+}
+
+enum ChatDirection {
+  INCOMING
+  OUTGOING
+}
+
+model ChatDataCollection {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  phone           String
+  mode            String   @default("COLLECTING") // COLLECTING, CONFIRMING
+  currentField    String   @map("current_field") // name, birthDate, cpfCnpj, email
+  extractedValue  String?  @map("extracted_value")
+  collectedData   Json     @default("{}") @map("collected_data")
+  customerId      String?  @map("customer_id")
+  fieldsToCollect String[] @default([]) @map("fields_to_collect")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@map("chat_data_collections")
+}
+
+// ==========================================
+// SALES CRM — Pipeline de vendas da Anpexia
+// ==========================================
+
+model Lead {
+  id                String    @id @default(cuid())
+  name              String
+  email             String?
+  phone             String
+  company           String?
+  segment           String?
+  source            String?   // landing_page, google_ads, facebook_ads, referral, whatsapp, manual
+  utmSource         String?   @map("utm_source")
+  utmMedium         String?   @map("utm_medium")
+  utmCampaign       String?   @map("utm_campaign")
+  utmContent        String?   @map("utm_content")
+  stage             LeadStage @default(NEW)
+  score             Int       @default(0)
+  notes             String?
+  nextFollowUp      DateTime? @map("next_follow_up")
+  monthlyValue      Float?    @map("monthly_value")
+  plan              Plan?
+  lostReason        String?   @map("lost_reason")
+  convertedTenantId String?   @unique @map("converted_tenant_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  convertedTenant Tenant?         @relation(fields: [convertedTenantId], references: [id])
+  messages        LeadMessage[]
+  activities      LeadActivity[]
+  scheduledCalls  ScheduledCall[]
+  proposals       Proposal[]
+
+  @@index([stage])
+  @@index([source])
+  @@map("leads")
+}
+
+enum LeadStage {
+  NEW              // Acabou de entrar
+  CONTACTED        // Primeira mensagem enviada
+  QUALIFIED        // Confirmou interesse
+  CALL_SCHEDULED   // Call agendada
+  CALL_DONE        // Call realizada
+  PROPOSAL_SENT    // Proposta enviada
+  NEGOTIATION      // Em negociacao
+  CONTRACTED       // Fechou contrato
+  ONBOARDING       // Em implantacao
+  ACTIVE           // Cliente ativo
+  LOST             // Perdido
+}
+
+model LeadMessage {
+  id          String    @id @default(cuid())
+  leadId      String    @map("lead_id")
+  direction   String    // outgoing, incoming
+  channel     String    @default("whatsapp") // whatsapp, email
+  body        String
+  templateKey String?   @map("template_key")
+  status      String    @default("pending") // pending, sent, delivered, read, failed
+  sentAt      DateTime? @map("sent_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("lead_messages")
+}
+
+model LeadActivity {
+  id          String   @id @default(cuid())
+  leadId      String   @map("lead_id")
+  type        String   // stage_change, note, call, message_sent, proposal_sent, follow_up
+  description String
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("lead_activities")
+}
+
+model SalesMessageTemplate {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  name         String
+  body         String
+  delayMinutes Int      @default(0) @map("delay_minutes")
+  trigger      String   // on_new_lead, on_qualified, on_call_scheduled, on_no_response_48h, on_contracted, on_call_reminder
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("sales_message_templates")
+}
+
+model ScheduledCall {
+  id         String   @id @default(cuid())
+  leadId     String?  @map("lead_id")
+  customerId String?  @map("customer_id")
+  name       String
+  email      String?
+  phone      String
+  date       DateTime
+  duration   Int      @default(30)
+  status     String   @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
+  notes      String?
+  meetLink   String?  @map("meet_link")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  lead     Lead?     @relation(fields: [leadId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([date])
+  @@index([customerId])
+  @@map("scheduled_calls")
+}
+
+model Proposal {
+  id           String    @id @default(cuid())
+  leadId       String    @map("lead_id")
+  plan         Plan
+  monthlyValue Float     @map("monthly_value")
+  modules      String[]
+  customTerms  String?   @map("custom_terms")
+  status       String    @default("draft") // draft, sent, viewed, accepted, rejected
+  sentAt       DateTime? @map("sent_at")
+  viewedAt     DateTime? @map("viewed_at")
+  acceptedAt   DateTime? @map("accepted_at")
+  validUntil   DateTime? @map("valid_until")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("proposals")
+}
+
+// ==========================================
+// SCRIPTS DE ATENDIMENTO
+// ==========================================
+
+model ScriptCategory {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  icon      String   @default("FileText") // Lucide icon name
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scripts Script[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("script_categories")
+}
+
+model Script {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  categoryId String   @map("category_id")
+  title      String
+  content    String
+  tags       String[] @default([])
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category ScriptCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([categoryId])
+  @@map("scripts")
+}
+
+model ScheduleConfig {
+  id            String   @id @default(cuid())
+  availableDays Int[]    @map("available_days") // 0=Dom, 1=Seg, ... 6=Sab
+  startHour     Int      @default(9) @map("start_hour")
+  endHour       Int      @default(18) @map("end_hour")
+  slotDuration  Int      @default(30) @map("slot_duration")
+  breakStart    Int?     @map("break_start")
+  breakEnd      Int?     @map("break_end")
+  timezone      String   @default("America/Sao_Paulo")
+  maxDaysAhead  Int      @default(14) @map("max_days_ahead")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("schedule_config")
+}

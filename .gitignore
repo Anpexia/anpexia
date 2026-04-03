@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Credenciais (NUNCA commitar o arquivo real)
+credentials/services.md
+credentials/api-access.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma
+backend/prisma/migrations/
+
+# Coverage
+coverage/
+
+# Claude Code
+.claude/
+
+# Misc
+*.tgz
+.cache/
+Untitled
+qrcode_whatsapp.png
+seed_clinic.js
+temp_ssh.js
+tsconfig.tsbuildinfo
