@@ -58,7 +58,7 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 | Admin painel | Vercel | https://admin-nine-pied.vercel.app |
 | Landing page | Vercel | https://anpexia-landing.vercel.app |
 | Banco de dados | Neon PostgreSQL | us-east-1 |
-| WhatsApp API | Evolution API | A configurar |
+| WhatsApp API | Evolution API v2.2.3 (Railway) | https://evolution-api-production-4209.up.railway.app |
 | IA Chatbot | Claude Sonnet (Anthropic API) | claude-sonnet-4-20250514 via @anthropic-ai/sdk |
 
 ### Tokens disponiveis no .env
