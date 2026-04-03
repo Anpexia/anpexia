@@ -47,18 +47,18 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 - O `.env.example` na raiz serve como referencia (sem valores reais)
 - Variaveis criticas (JWT_SECRET, JWT_REFRESH_SECRET, ENCRYPTION_KEY, DATABASE_URL) falham ruidosamente se ausentes
 
-## Estado atual do projeto (26/03/2026)
+## Estado atual do projeto (03/04/2026)
 
 ### Infraestrutura
 
 | Servico | Plataforma | URL |
 |---------|-----------|-----|
-| Backend API | Railway | https://anpexia-production.up.railway.app |
-| Frontend app | Vercel | https://anpexia-app-kohl.vercel.app |
-| Admin painel | Vercel | https://anpexia-admin.vercel.app |
-| Landing page | Vercel | https://anpexia-landing-eight.vercel.app |
-| Banco de dados | Neon PostgreSQL | sa-east-1 (Sao Paulo) |
-| WhatsApp API | Evolution API v1.8.2 | http://167.71.86.231:8080 (DigitalOcean) |
+| Backend API | Railway | https://backend-production-e9a8.up.railway.app |
+| Frontend app | Vercel | https://anpexia-app.vercel.app |
+| Admin painel | Vercel | https://admin-nine-pied.vercel.app |
+| Landing page | Vercel | https://anpexia-landing.vercel.app |
+| Banco de dados | Neon PostgreSQL | us-east-1 |
+| WhatsApp API | Evolution API | A configurar |
 | IA Chatbot | Claude Sonnet (Anthropic API) | claude-sonnet-4-20250514 via @anthropic-ai/sdk |
 
 ### Tokens disponiveis no .env
@@ -66,9 +66,8 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 - `RAILWAY_API_TOKEN` — Railway GraphQL API para deploys e variaveis
 - `VERCEL_TOKEN` — Vercel REST API para deploys e dominios
 - `NEON_API_TOKEN` — Neon REST API para gerenciamento do banco
-- `DIGITALOCEAN_TOKEN` — DigitalOcean API para gerenciamento do VPS
 - `ANTHROPIC_API_KEY` — Anthropic API para chatbot com Claude
-- `EVOLUTION_API_KEY` — Evolution API para mensagens WhatsApp
+- `EVOLUTION_API_KEY` — Evolution API para mensagens WhatsApp (a configurar)
 - `DATABASE_URL` — Neon PostgreSQL connection string
 - `JWT_SECRET`, `JWT_REFRESH_SECRET`, `ENCRYPTION_KEY` — seguranca
 
@@ -96,12 +95,10 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 - CRUD completo de clientes, estoque, mensagens, FAQs do chatbot
 - Audit log para acoes criticas
 
-### Credenciais de teste
+### Credenciais
 
-- **Admin**: `angelolarocca10@gmail.com` / `Flx@Adm2026!sK9`
-- **Clinica teste**: `ricardo@clinicasaudetotal.com.br` / `Clinica@2026`
-- **Tenant teste**: Clinica Saude Total (ID: `cmn6uok25000dll0pnhjlcert`)
-- **OWNER teste**: Dr. Ricardo Mendes (phone: `5571981449402`)
+- **SUPER_ADMIN**: `anpexia@hotmail.com` / `4nP3x1a0321@!`
+- **Tenant teste**: Anpexia Teste (ID: `cmnjhqv8u0000n6g8kdwqgvb1`)
 
 ### Pendencias
 
