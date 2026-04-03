@@ -12,7 +12,7 @@ import SchedulingPage from './pages/SchedulingPage';
 const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '';
 const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || 'contato@anpexia.com.br';
 const whatsappLink = `https://wa.me/${whatsappNumber}`;
-const PROD_API_URL = 'https://anpexia-production.up.railway.app/api/v1';
+const PROD_API_URL = 'https://backend-production-e9a8.up.railway.app/api/v1';
 const apiUrl =
   import.meta.env.VITE_API_URL ||
   (window.location.hostname.includes('vercel.app') ? PROD_API_URL : '/api/v1');

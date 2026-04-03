@@ -37,9 +37,9 @@ if (process.env.NODE_ENV === 'production') {
 
 // --- 1) CORS — DEVE ser o primeiro middleware ---
 const PRODUCTION_ORIGINS = [
-  'https://anpexia-admin.vercel.app',
-  'https://anpexia-app-kohl.vercel.app',
-  'https://anpexia-landing-eight.vercel.app',
+  'https://admin-nine-pied.vercel.app',
+  'https://anpexia-app.vercel.app',
+  'https://anpexia-landing.vercel.app',
   'https://app.anpexia.com.br',
   'https://admin.anpexia.com.br',
   'https://anpexia.com.br',
