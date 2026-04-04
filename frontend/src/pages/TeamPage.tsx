@@ -225,7 +225,6 @@ export function TeamPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
                 <select value={formRole} onChange={e => setFormRole(e.target.value as any)} className={inputCls}>
-                  <option value="OWNER">Proprietario</option>
                   <option value="MANAGER">Gerente</option>
                   <option value="DOCTOR">Medico</option>
                   <option value="RECEPTIONIST">Recepcionista</option>
@@ -266,7 +265,6 @@ export function TeamPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
                 <select value={formRole} onChange={e => setFormRole(e.target.value as any)} className={inputCls}>
-                  <option value="OWNER">Proprietario</option>
                   <option value="MANAGER">Gerente</option>
                   <option value="DOCTOR">Medico</option>
                   <option value="RECEPTIONIST">Recepcionista</option>

@@ -46,6 +46,7 @@ teamRouter.get('/', requireRole('OWNER', 'MANAGER'), async (req: Request, res: R
 // Create team member — OWNER only
 teamRouter.post('/', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log('[EQUIPE] body:', { ...req.body, password: '***' }, 'tenantId:', req.auth!.tenantId);
     const user = await teamService.create(req.auth!.tenantId!, req.body);
     return created(res, user);
   } catch (err) {

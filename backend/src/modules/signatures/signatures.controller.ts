@@ -23,9 +23,10 @@ signaturesRouter.get('/doctors/:doctorId/signature', async (req: Request, res: R
 signaturesRouter.post('/doctors/:doctorId/signature', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { signatureImage } = req.body;
+    console.log('[ASSINATURA] doctorId:', req.params.doctorId, 'tenantId:', req.auth!.tenantId, 'imageSize:', signatureImage?.length || 0);
 
     if (!signatureImage) {
-      return res.status(400).json({ error: 'signatureImage is required' });
+      return res.status(400).json({ success: false, error: { code: 'MISSING_FIELD', message: 'signatureImage e obrigatorio' } });
     }
 
     const signature = await signaturesService.upsertSignature(

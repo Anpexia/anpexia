@@ -30,6 +30,12 @@ export const teamService = {
   },
 
   async create(tenantId: string, data: CreateMemberData) {
+    // Block creating OWNER or SUPER_ADMIN via team API (req.body can send anything at runtime)
+    const role = data.role as string;
+    if (role === 'OWNER' || role === 'SUPER_ADMIN') {
+      throw new AppError(400, 'INVALID_ROLE', 'Nao e possivel criar membros com cargo Proprietario ou Super Admin');
+    }
+
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
       throw new AppError(409, 'EMAIL_EXISTS', 'Este e-mail ja esta cadastrado');
