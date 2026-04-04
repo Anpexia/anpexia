@@ -103,12 +103,19 @@ export const messagingService = {
       if (error instanceof AppError) throw error;
 
       // Registrar falha de envio
+      const errorDetail = error?.response?.data?.message || error.message || 'Erro desconhecido';
       await prisma.messageSent.update({
         where: { id: message.id },
-        data: { status: 'FAILED', error: error.message },
+        data: { status: 'FAILED', error: errorDetail },
       });
 
-      throw new AppError(502, 'MESSAGE_SEND_FAILED', 'Falha ao enviar mensagem via WhatsApp');
+      // Provide user-friendly error based on Evolution API response
+      const isNotConnected = errorDetail.includes('not found') || errorDetail.includes('not connected') || errorDetail.includes('disconnected');
+      const userMessage = isNotConnected
+        ? 'WhatsApp nao esta conectado. Acesse Configuracoes > WhatsApp para escanear o QR Code.'
+        : `Falha ao enviar mensagem: ${errorDetail}`;
+
+      throw new AppError(502, 'MESSAGE_SEND_FAILED', userMessage);
     }
   },
 
