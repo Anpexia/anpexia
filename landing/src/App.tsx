@@ -312,7 +312,7 @@ function LandingPage() {
               </div>
               <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.8rem', marginTop: 8 }}>2 automações incluídas</p>
               <ul style={{ listStyle: 'none', padding: 0, marginTop: 20 }}>
-                {['2 automações', '10 usuários', '600 contatos', '1.000 msgs WhatsApp/mês', 'Painel personalizado', 'Suporte WhatsApp', '1 reunião mensal', 'Implantação inclusa'].map(f => (
+                {['2 automações', '10 usuários', '600 contatos', '1.000 msgs WhatsApp/mês', 'Painel personalizado', 'Suporte via WhatsApp'].map(f => (
                   <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: '#1C1208' }}>
                     <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
                   </li>
@@ -336,7 +336,7 @@ function LandingPage() {
               </div>
               <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.8rem', marginTop: 8 }}>4 automações incluídas</p>
               <ul style={{ listStyle: 'none', padding: 0, marginTop: 20 }}>
-                {['4 automações', '15 usuários', '1.000 contatos', '2.000 msgs WhatsApp/mês', 'Relatórios automatizados', 'Integrações externas', 'Suporte prioritário', '2 reuniões mensais'].map(f => (
+                {['4 automações', '15 usuários', '1.000 contatos', '2.000 msgs WhatsApp/mês', 'Integrações externas', 'Suporte via WhatsApp'].map(f => (
                   <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: 'rgba(254,243,199,0.7)' }}>
                     <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
                   </li>
@@ -359,7 +359,7 @@ function LandingPage() {
               </div>
               <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.8rem', marginTop: 8 }}>6 automações incluídas</p>
               <ul style={{ listStyle: 'none', padding: 0, marginTop: 20 }}>
-                {['6 automações', '20 usuários', '2.000 contatos', '3.000 msgs WhatsApp/mês', 'Todas as integrações', 'Relatórios customizados', 'Suporte dedicado', 'Reuniões semanais'].map(f => (
+                {['6 automações', '20 usuários', '2.000 contatos', '3.000 msgs WhatsApp/mês', 'Todas as integrações', 'Suporte via WhatsApp'].map(f => (
                   <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: '#1C1208' }}>
                     <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
                   </li>
