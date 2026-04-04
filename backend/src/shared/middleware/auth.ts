@@ -49,6 +49,20 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+/** Like authenticate but doesn't throw — silently skips if no valid token */
+export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return next();
+
+  try {
+    const payload = jwt.verify(header.slice(7), env.jwtSecret) as AuthPayload;
+    req.auth = payload;
+  } catch {
+    // Invalid token — just skip, don't block
+  }
+  next();
+}
+
 export function requireTenant(req: Request, _res: Response, next: NextFunction) {
   if (!req.auth?.tenantId) {
     throw new AppError(403, 'NO_TENANT', 'Acesso requer vínculo com uma empresa');

@@ -3,7 +3,7 @@ import { schedulingService } from './scheduling.service';
 import { bookCallSchema, updateConfigSchema, updateCallStatusSchema } from './scheduling.validators';
 import { AppError } from '../../shared/middleware/error-handler';
 import { success, created } from '../../shared/utils/response';
-import { authenticate, requireRole, requireTenant } from '../../shared/middleware/auth';
+import { authenticate, requireRole, requireTenant, optionalAuth } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
 
 const router = Router();
@@ -32,8 +32,8 @@ router.get('/available-slots/:date', async (req: Request, res: Response, next) =
   } catch (err) { next(err); }
 });
 
-// POST /book (public — used by chatbot and landing page)
-router.post('/book', async (req: Request, res: Response, next) => {
+// POST /book (public with optional auth — used by chatbot, landing page, and app)
+router.post('/book', optionalAuth, async (req: Request, res: Response, next) => {
   try {
     const data = bookCallSchema.parse(req.body);
     // tenantId comes from auth if available, otherwise from body
