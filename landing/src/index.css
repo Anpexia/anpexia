@@ -2,20 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --color-primary: #1E3A5F;
-  --color-primary-light: #2A4D7A;
-  --color-primary-dark: #152C49;
-  --color-accent: #2563EB;
-  --color-bg: #F8FAFC;
-  --color-surface: #FFFFFF;
-  --color-border: #BFDBFE;
-  --color-light: #EFF6FF;
-}
-
 body {
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-  color: #1E293B;
+  font-family: 'Sora', sans-serif;
+  color: #1C1208;
+  margin: 0;
 }
 
 html {

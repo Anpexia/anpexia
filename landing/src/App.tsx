@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 import {
-  Zap, Users, Package, MessageSquare, BarChart3,
-  CheckCircle, Phone, Mail, Send,
-  Clock, TrendingDown, Brain, Bot, Calendar,
-  Menu, X, Shield, Star, ArrowRight
+  BarChart3, Users, Package, MessageSquare, Calendar,
+  CheckCircle, Phone, Mail, Send, Menu, X, Shield, Star,
+  ArrowRight, Clock, TrendingDown, Brain, BookOpen,
+  DollarSign, Bot, UsersRound, PenLine,
 } from 'lucide-react';
 import SchedulingPage from './pages/SchedulingPage';
 
@@ -17,13 +17,59 @@ const apiUrl =
   import.meta.env.VITE_API_URL ||
   (window.location.hostname.includes('vercel.app') ? PROD_API_URL : '/api/v1');
 
+/* ─── Scroll reveal hook ─── */
+function useReveal(threshold = 0.15) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return { ref, visible };
+}
+
+/* ─── Animated counter ─── */
+function Counter({ value, suffix = '' }: { value: string; suffix?: string }) {
+  const { ref, visible } = useReveal(0.3);
+  const num = parseInt(value, 10);
+  const isNum = !isNaN(num);
+  const [display, setDisplay] = useState(isNum ? '0' : value);
+
+  useEffect(() => {
+    if (!visible || !isNum) { if (!isNum && visible) setDisplay(value); return; }
+    let start = 0;
+    const duration = 1200;
+    const step = (ts: number) => {
+      if (!startTs) startTs = ts;
+      const p = Math.min((ts - startTs) / duration, 1);
+      start = Math.floor(p * num);
+      setDisplay(String(start));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    let startTs = 0 as any;
+    requestAnimationFrame(step);
+  }, [visible, num, isNum, value]);
+
+  return <span ref={ref}>{display}{suffix}</span>;
+}
+
+/* ─── Styles ─── */
+const btnPrimary: React.CSSProperties = { backgroundColor: '#F97316', color: '#fff', border: 'none', borderRadius: 999, padding: '14px 32px', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', justifyContent: 'center', transition: 'opacity 0.15s' };
+const btnSecDark: React.CSSProperties = { backgroundColor: '#FEF3C7', color: '#1C1208', border: 'none', borderRadius: 999, padding: '14px 32px', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', justifyContent: 'center', transition: 'opacity 0.15s' };
+const btnSecLight: React.CSSProperties = { backgroundColor: 'transparent', color: '#1C1208', border: '2px solid #1C1208', borderRadius: 999, padding: '12px 30px', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', justifyContent: 'center', transition: 'opacity 0.15s' };
+
 function LandingPage() {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Capture UTM params
   const params = new URLSearchParams(window.location.search);
   const utmSource = params.get('utm_source') || '';
   const utmMedium = params.get('utm_medium') || '';
@@ -35,393 +81,408 @@ function LandingPage() {
     setSubmitting(true);
     try {
       await axios.post(`${apiUrl}/sales/capture`, {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        notes: formData.message,
-        source: 'landing_page',
-        utmSource: utmSource || undefined,
-        utmMedium: utmMedium || undefined,
-        utmCampaign: utmCampaign || undefined,
-        utmContent: utmContent || undefined,
-      }).catch(() => {
-        // If API is not available, still show success
-      });
+        name: formData.name, email: formData.email, phone: formData.phone,
+        notes: formData.message, source: 'landing_page',
+        utmSource: utmSource || undefined, utmMedium: utmMedium || undefined,
+        utmCampaign: utmCampaign || undefined, utmContent: utmContent || undefined,
+      }).catch(() => {});
       setSubmitted(true);
       setFormData({ name: '', email: '', phone: '', message: '' });
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
+  const closeMenu = useCallback(() => setMobileMenuOpen(false), []);
+
+  /* Reveal refs */
+  const benefitsReveal = useReveal();
+  const howReveal = useReveal();
+  const resourcesReveal = useReveal();
+  const plansReveal = useReveal();
+
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      {/* Header */}
-      <header className="fixed top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-100 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <img src="/anpexia-logo.svg" alt="Anpexia" className="h-8" />
-          <nav className="hidden md:flex items-center gap-8 text-sm">
-            <a href="#beneficios" className="text-gray-600 hover:text-[#1E3A5F] transition-colors">Benefícios</a>
-            <a href="#recursos" className="text-gray-600 hover:text-[#1E3A5F] transition-colors">Recursos</a>
-            <a href="#planos" className="text-gray-600 hover:text-[#1E3A5F] transition-colors">Planos</a>
-            <a href="#contato" className="text-gray-600 hover:text-[#1E3A5F] transition-colors">Contato</a>
-            <a href={import.meta.env.VITE_APP_URL || '/login'} className="text-[#2563EB] hover:text-[#1E3A5F] font-medium transition-colors">Acessar painel</a>
+    <div style={{ fontFamily: "'Sora', sans-serif" }}>
+
+      {/* ═══ 1. NAVBAR ═══ */}
+      <header style={{ position: 'fixed', top: 0, width: '100%', zIndex: 50, backgroundColor: '#1C1208', borderBottom: '1px solid rgba(249,115,22,0.15)' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ color: '#FEF3C7', fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>Anpexia</span>
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 32 }} className="hidden md:flex">
+            {['Benefícios', 'Recursos', 'Planos', 'Contato'].map(l => (
+              <a key={l} href={`#${l.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`} style={{ color: 'rgba(254,243,199,0.6)', fontSize: '0.875rem', textDecoration: 'none', transition: 'color 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#FEF3C7')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(254,243,199,0.6)')}>{l}</a>
+            ))}
+            <a href={import.meta.env.VITE_APP_URL || '/login'} style={{ color: '#F97316', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none' }}>Acessar painel</a>
           </nav>
-          <div className="flex items-center gap-3">
-            <a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex text-sm font-medium transition-colors"
-              style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}
-            >
-              Falar no WhatsApp
-            </a>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-600 hover:text-[#1E3A5F]"
-              aria-label="Menu"
-            >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={btnPrimary} className="hidden sm:inline-flex">Falar no WhatsApp</a>
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden" style={{ background: 'none', border: 'none', color: '#FEF3C7', cursor: 'pointer', padding: 8 }}>
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>
-
-        {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-3">
-            <a href="#beneficios" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Benefícios</a>
-            <a href="#recursos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Recursos</a>
-            <a href="#planos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Planos</a>
-            <a href="#contato" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Contato</a>
-            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="block text-center text-sm font-medium" style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}>Falar no WhatsApp</a>
+          <div className="md:hidden" style={{ backgroundColor: '#1C1208', borderTop: '1px solid rgba(249,115,22,0.15)', padding: '16px 24px' }}>
+            {['Benefícios', 'Recursos', 'Planos', 'Contato'].map(l => (
+              <a key={l} href={`#${l.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`} onClick={closeMenu} style={{ display: 'block', color: 'rgba(254,243,199,0.6)', padding: '10px 0', textDecoration: 'none', fontSize: '0.875rem' }}>{l}</a>
+            ))}
+            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" onClick={closeMenu} style={{ ...btnPrimary, width: '100%', marginTop: 12, textAlign: 'center' as const }}>Falar no WhatsApp</a>
           </div>
         )}
       </header>
 
-      {/* Hero */}
-      <section className="pt-32 pb-20 px-6 bg-gradient-to-b from-[#EFF6FF] to-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#DBEAFE] rounded-full text-sm text-[#1E3A5F] mb-6">
-            <Zap size={14} />
-            Automação inteligente para empresas
-          </div>
-          <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight">
-            Substitua trabalho manual por
-            <span className="text-[#2563EB]"> automação inteligente</span>
-          </h2>
-          <p className="text-lg md:text-xl text-gray-600 mt-6 max-w-2xl mx-auto leading-relaxed">
-            Por menos que o custo de um funcionário, a Anpexia automatiza processos, atende seus clientes
-            e organiza sua operação 24 horas por dia, 7 dias por semana.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
-            <a
-              href="/agendar"
-              className="inline-flex items-center justify-center gap-2 text-sm font-medium transition-colors"
-              style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}
-            >
-              <Calendar size={16} />
-              Agendar conversa gratuita
-            </a>
-            <a
-              href="#recursos"
-              className="inline-flex items-center justify-center gap-2 text-sm font-medium transition-colors"
-              style={{ backgroundColor: '#FEF3C7', color: '#1C1208', border: 'none', borderRadius: 999, padding: '12px 28px' }}
-            >
-              Ver recursos
-            </a>
-          </div>
-          <p className="text-xs text-gray-400 mt-4">Sem compromisso · Conversa de 30 min · 100% online</p>
-        </div>
-      </section>
+      {/* ═══ 2. HERO ═══ */}
+      <section style={{
+        backgroundColor: '#1C1208', minHeight: 580, paddingTop: 120, paddingBottom: 60, position: 'relative', overflow: 'hidden',
+        backgroundImage: 'repeating-linear-gradient(0deg, rgba(249,115,22,0.04) 0px, rgba(249,115,22,0.04) 1px, transparent 1px, transparent 60px), repeating-linear-gradient(90deg, rgba(249,115,22,0.04) 0px, rgba(249,115,22,0.04) 1px, transparent 1px, transparent 60px)',
+      }}>
+        {/* Decorative rectangle */}
+        <div style={{ position: 'absolute', top: 80, right: 60, width: 200, height: 200, border: '1px solid rgba(249,115,22,0.2)', borderRadius: 20, transform: 'rotate(12deg)' }} className="hidden lg:block" />
 
-      {/* Social proof / numbers */}
-      <section className="py-12 px-6 border-y border-gray-100">
-        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', flexDirection: 'column', minHeight: 460, justifyContent: 'space-between' }}>
+          {/* Badge */}
           <div>
-            <p className="text-3xl font-bold text-[#1E3A5F]">5+</p>
-            <p className="text-sm text-gray-500 mt-1">Módulos integrados</p>
+            <span style={{ color: '#F97316', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
+              Automação inteligente para empresas
+            </span>
           </div>
-          <div>
-            <p className="text-3xl font-bold text-[#1E3A5F]">24h</p>
-            <p className="text-sm text-gray-500 mt-1">Atendimento automático</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-[#1E3A5F]">100%</p>
-            <p className="text-sm text-gray-500 mt-1">Personalizado</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-[#1E3A5F]">LGPD</p>
-            <p className="text-sm text-gray-500 mt-1">Em conformidade</p>
-          </div>
-        </div>
-      </section>
 
-      {/* Benefits */}
-      <section id="beneficios" className="py-20 px-6 bg-[#F8FAFC]">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-[#1E3A5F]">Por que automatizar?</h3>
-            <p className="text-gray-600 mt-3">O que a Anpexia faz pelo seu negócio</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white rounded-2xl p-8 border border-[#BFDBFE]">
-              <div className="w-12 h-12 bg-[#EFF6FF] rounded-xl flex items-center justify-center mb-5">
-                <Clock size={24} className="text-[#2563EB]" />
-              </div>
-              <h4 className="text-lg font-semibold mb-2">Economize tempo</h4>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Processos que levavam horas agora acontecem automaticamente.
-                Você e sua equipe focam no que realmente gera valor.
-              </p>
+          {/* Bottom area: title left, subtitle+buttons right */}
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 48, alignItems: 'flex-end', marginTop: 'auto' }}>
+            <div style={{ flex: '1 1 500px', minWidth: 280 }}>
+              <h1 style={{ fontSize: 'clamp(32px, 4.5vw, 54px)', fontWeight: 800, lineHeight: 1.1, margin: 0 }}>
+                <span style={{ color: '#FEF3C7' }}>Substitua trabalho manual por </span>
+                <span style={{ color: '#F97316' }}>automação inteligente</span>
+              </h1>
             </div>
-            <div className="bg-white rounded-2xl p-8 border border-[#BFDBFE]">
-              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mb-5">
-                <TrendingDown size={24} className="text-green-600" />
-              </div>
-              <h4 className="text-lg font-semibold mb-2">Reduza custos</h4>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Menos retrabalho, menos erros humanos, menos necessidade de
-                contratar para tarefas repetitivas.
+            <div style={{ flex: '1 1 340px', minWidth: 280 }}>
+              <p style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.95rem', lineHeight: 1.7, margin: '0 0 28px' }}>
+                Por menos que o custo de um funcionário, a Anpexia automatiza processos, atende seus clientes e organiza sua operação 24 horas por dia, 7 dias por semana.
               </p>
-            </div>
-            <div className="bg-white rounded-2xl p-8 border border-[#BFDBFE]">
-              <div className="w-12 h-12 bg-[#EFF6FF] rounded-xl flex items-center justify-center mb-5">
-                <Brain size={24} className="text-[#1E3A5F]" />
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 12 }}>
+                <a href="/agendar" style={btnPrimary}><Calendar size={16} /> Agendar conversa gratuita</a>
+                <a href="#recursos" style={btnSecDark}>Ver recursos</a>
               </div>
-              <h4 className="text-lg font-semibold mb-2">Decisões melhores</h4>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Dashboards e relatórios em tempo real. Saiba exatamente como seu
-                negócio está indo, sem achismo.
-              </p>
+              <p style={{ color: 'rgba(254,243,199,0.3)', fontSize: '0.75rem', marginTop: 20 }}>Sem compromisso · Conversa de 30 min · 100% online</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="py-20 px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-[#1E3A5F]">Como funciona</h3>
-            <p className="text-gray-600 mt-3">Em 3 passos simples</p>
+      {/* ═══ 3. NÚMEROS ═══ */}
+      <section style={{ backgroundColor: '#fff8f0', borderBottom: '1px solid #FCD34D', padding: '40px 24px' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', textAlign: 'center' as const }}>
+          {[
+            { val: '5', suf: '+', label: 'Módulos integrados' },
+            { val: '24', suf: 'h', label: 'Atendimento automático' },
+            { val: '100', suf: '%', label: 'Personalizado' },
+            { val: 'LGPD', suf: '', label: 'Em conformidade' },
+          ].map((item, i) => (
+            <div key={item.label} style={{ padding: '16px 0', borderRight: i < 3 ? '1px solid #FDE68A' : 'none' }}>
+              <p style={{ fontSize: 34, fontWeight: 800, color: '#1C1208', margin: 0 }}>
+                <Counter value={item.val} suffix={item.suf} />
+              </p>
+              <p style={{ fontSize: 12, color: '#92400E', marginTop: 4 }}>{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══ 4. BENEFÍCIOS ═══ */}
+      <section id="beneficios" style={{ backgroundColor: '#fff8f0', padding: '80px 24px' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center' as const, marginBottom: 56 }}>
+            <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.875rem', marginBottom: 8 }}>Benefícios</p>
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#1C1208', margin: '0 0 8px' }}>Por que automatizar?</h2>
+            <p style={{ color: '#92400E', fontSize: '0.95rem' }}>O que a Anpexia faz pelo seu negócio</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div ref={benefitsReveal.ref} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
+            {[
+              { icon: Clock, title: 'Economize tempo', desc: 'Processos que levavam horas agora acontecem automaticamente. Você e sua equipe focam no que realmente gera valor.' },
+              { icon: TrendingDown, title: 'Reduza custos', desc: 'Menos retrabalho, menos erros humanos, menos necessidade de contratar para tarefas repetitivas.' },
+              { icon: Brain, title: 'Decisões melhores', desc: 'Dashboards e relatórios em tempo real. Saiba exatamente como seu negócio está indo, sem achismo.' },
+            ].map((c, i) => (
+              <div key={c.title} style={{
+                backgroundColor: '#1C1208', borderRadius: 16, padding: 32,
+                opacity: benefitsReveal.visible ? 1 : 0,
+                transform: benefitsReveal.visible ? 'translateX(0)' : 'translateX(-40px)',
+                transition: `opacity 0.6s ${i * 0.15}s, transform 0.6s ${i * 0.15}s`,
+              }}>
+                <c.icon size={28} style={{ color: '#F97316', marginBottom: 16 }} />
+                <h3 style={{ color: '#FEF3C7', fontWeight: 700, fontSize: '1.125rem', marginBottom: 8 }}>{c.title}</h3>
+                <p style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.875rem', lineHeight: 1.7 }}>{c.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 5. COMO FUNCIONA ═══ */}
+      <section style={{ backgroundColor: '#FFFBEB', padding: '80px 24px' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center' as const, marginBottom: 56 }}>
+            <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.875rem', marginBottom: 8 }}>Como funciona</p>
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#1C1208', margin: 0 }}>Em 3 passos simples</h2>
+          </div>
+          <div ref={howReveal.ref} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
             {[
               { step: '01', title: 'Conversa inicial', desc: 'Entendemos seu negócio, seus processos e o que pode ser automatizado.' },
               { step: '02', title: 'Configuração', desc: 'Montamos a plataforma personalizada para sua empresa, com os módulos que você precisa.' },
               { step: '03', title: 'Funcionando', desc: 'Sua automação começa a rodar. Acompanhe tudo pelo painel e foque no crescimento.' },
-            ].map((item) => (
-              <div key={item.step} className="text-center">
-                <div className="w-12 h-12 bg-[#1E3A5F] text-white rounded-full flex items-center justify-center text-sm font-bold mx-auto mb-4">
-                  {item.step}
-                </div>
-                <h4 className="font-semibold text-lg mb-2">{item.title}</h4>
-                <p className="text-sm text-gray-600 leading-relaxed">{item.desc}</p>
+            ].map((s, i) => (
+              <div key={s.step} style={{
+                backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 16, padding: 32, textAlign: 'center' as const,
+                opacity: howReveal.visible ? 1 : 0,
+                transform: howReveal.visible ? 'translateY(0)' : 'translateY(30px)',
+                transition: `opacity 0.6s ${i * 0.2}s, transform 0.6s ${i * 0.2}s`,
+              }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: '#F97316', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem', margin: '0 auto 16px' }}>{s.step}</div>
+                <h3 style={{ fontWeight: 700, fontSize: '1.05rem', color: '#1C1208', marginBottom: 8 }}>{s.title}</h3>
+                <p style={{ color: '#92400E', fontSize: '0.875rem', lineHeight: 1.7 }}>{s.desc}</p>
               </div>
             ))}
           </div>
-          <div className="text-center mt-12">
-            <a
-              href="/agendar"
-              className="inline-flex items-center gap-2 text-sm font-medium transition-colors"
-              style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}
-            >
-              Começar agora
-              <ArrowRight size={16} />
-            </a>
+          <div style={{ textAlign: 'center' as const, marginTop: 48 }}>
+            <a href="/agendar" style={btnPrimary}>Começar agora <ArrowRight size={16} /></a>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section id="recursos" className="py-20 px-6 bg-[#F8FAFC]">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-[#1E3A5F]">Tudo que você precisa em um só lugar</h3>
-            <p className="text-gray-600 mt-3">Módulos flexíveis que se adaptam ao seu negócio</p>
+      {/* ═══ 6. RECURSOS ═══ */}
+      <section id="recursos" style={{ backgroundColor: '#fff8f0', padding: '80px 24px' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center' as const, marginBottom: 56 }}>
+            <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.875rem', marginBottom: 8 }}>Recursos</p>
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#1C1208', margin: '0 0 8px' }}>Tudo que você precisa em um só lugar</h2>
+            <p style={{ color: '#92400E', fontSize: '0.95rem' }}>Módulos flexíveis que se adaptam ao seu negócio</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div ref={resourcesReveal.ref} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
             {[
-              { icon: BarChart3, title: 'Dashboard', desc: 'Visão geral do negócio com métricas em tempo real' },
-              { icon: Users, title: 'Clientes', desc: 'Cadastro completo com histórico, tags e segmentação' },
-              { icon: Package, title: 'Estoque', desc: 'Controle de produtos com alertas e movimentações' },
-              { icon: MessageSquare, title: 'Mensagens', desc: 'WhatsApp automático: lembretes, avisos e mais' },
-              { icon: Bot, title: 'Chatbot com IA', desc: 'Atendimento automático inteligente 24h por dia' },
-            ].map((f) => (
-              <div key={f.title} className="bg-white border border-[#BFDBFE] rounded-2xl p-6 hover:border-[#93C5FD] hover:shadow-sm transition-all">
-                <f.icon size={28} className="text-[#1E3A5F] mb-4" />
-                <h4 className="font-semibold mb-2">{f.title}</h4>
-                <p className="text-sm text-gray-600">{f.desc}</p>
+              { icon: BarChart3, title: 'Dashboard', desc: 'Métricas e KPIs em tempo real' },
+              { icon: Users, title: 'Clientes', desc: 'Cadastro completo com histórico' },
+              { icon: Package, title: 'Estoque', desc: 'Controle com alertas automáticos' },
+              { icon: MessageSquare, title: 'Mensagens', desc: 'WhatsApp automático e avisos' },
+              { icon: Calendar, title: 'Agendamentos', desc: 'Agenda com lembretes automáticos' },
+              { icon: BookOpen, title: 'Scripts', desc: 'Roteiros de atendimento prontos' },
+              { icon: DollarSign, title: 'Financeiro', desc: 'Lançamentos e relatórios financeiros' },
+              { icon: Bot, title: 'Chatbot com IA', desc: 'Atendimento inteligente 24h por dia' },
+              { icon: UsersRound, title: 'Equipe', desc: 'Gestão de usuários e permissões' },
+              { icon: PenLine, title: 'Assinatura Digital', desc: 'Assine documentos digitalmente' },
+            ].map((f, i) => (
+              <div key={f.title} style={{
+                backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 16, padding: 24,
+                opacity: resourcesReveal.visible ? 1 : 0,
+                transform: resourcesReveal.visible ? 'translateY(0)' : 'translateY(20px)',
+                transition: `opacity 0.5s ${i * 0.06}s, transform 0.5s ${i * 0.06}s`,
+              }}>
+                <f.icon size={24} style={{ color: '#F97316', marginBottom: 12 }} />
+                <h4 style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1C1208', marginBottom: 4 }}>{f.title}</h4>
+                <p style={{ color: '#92400E', fontSize: '0.8rem', lineHeight: 1.6, margin: 0 }}>{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="planos" className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-[#1E3A5F]">Planos simples e transparentes</h3>
-            <p className="text-gray-600 mt-3">Escolha o que faz sentido para o seu negócio</p>
+      {/* ═══ 7. PLANOS ═══ */}
+      <section id="planos" style={{ backgroundColor: '#FFFBEB', padding: '80px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center' as const, marginBottom: 56 }}>
+            <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.875rem', marginBottom: 8 }}>Planos</p>
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#1C1208', margin: '0 0 8px' }}>Simples e transparentes</h2>
+            <p style={{ color: '#92400E', fontSize: '0.95rem' }}>Escolha o que faz sentido para o seu negócio</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div ref={plansReveal.ref} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
             {/* Essencial */}
-            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-8">
-              <h4 className="font-semibold text-lg">Essencial</h4>
-              <p className="text-sm text-gray-500 mt-1">Para quem está começando a automatizar</p>
-              <div className="mt-6">
-                <span className="text-4xl font-bold text-[#1E3A5F]">R$2.000</span>
-                <span className="text-gray-500">/mês</span>
+            <div style={{
+              backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 16, padding: 32,
+              opacity: plansReveal.visible ? 1 : 0, transform: plansReveal.visible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.6s 0s, transform 0.6s 0s',
+            }}>
+              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#1C1208' }}>Essencial</h3>
+              <p style={{ color: '#92400E', fontSize: '0.8rem', marginTop: 4 }}>Para quem está começando a automatizar</p>
+              <div style={{ marginTop: 20 }}>
+                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#1C1208' }}>R$2.000</span>
+                <span style={{ color: '#92400E', fontSize: '0.875rem' }}>/mês</span>
               </div>
-              <ul className="mt-8 space-y-3">
-                {['Até 4 automações', '5 usuários', '500 contatos', '300 msgs WhatsApp/mês', 'Painel personalizado', 'Suporte WhatsApp', '1 reunião mensal', 'Implantação inclusa'].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" />{item}</li>
+              <ul style={{ listStyle: 'none', padding: 0, marginTop: 24 }}>
+                {['Até 4 automações', '5 usuários', '500 contatos', '300 msgs WhatsApp/mês', 'Painel personalizado', 'Suporte WhatsApp', '1 reunião mensal', 'Implantação inclusa'].map(f => (
+                  <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: '#1C1208' }}>
+                    <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
+                  </li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center text-sm font-medium transition-colors" style={{ backgroundColor: 'transparent', color: '#1C1208', border: '2px solid #1C1208', borderRadius: 999, padding: '12px 28px' }}>Agendar conversa</a>
+              <a href="/agendar" style={{ ...btnSecLight, width: '100%', marginTop: 24, boxSizing: 'border-box' as const }}>Agendar conversa</a>
             </div>
 
             {/* Profissional */}
-            <div className="bg-[#1E3A5F] text-white rounded-2xl p-8 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#2563EB] text-white text-xs font-medium px-3 py-1 rounded-full">Mais popular</div>
-              <h4 className="font-semibold text-lg">Profissional</h4>
-              <p className="text-sm text-white/60 mt-1">Para quem quer escalar resultados</p>
-              <div className="mt-6">
-                <span className="text-4xl font-bold">R$3.500</span>
-                <span className="text-white/60">/mês</span>
+            <div style={{
+              backgroundColor: '#1C1208', borderRadius: 16, padding: 32, position: 'relative' as const,
+              opacity: plansReveal.visible ? 1 : 0, transform: plansReveal.visible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.6s 0.15s, transform 0.6s 0.15s',
+            }}>
+              <div style={{ position: 'absolute' as const, top: -12, left: '50%', transform: 'translateX(-50%)', backgroundColor: '#F97316', color: '#fff', fontSize: '0.7rem', fontWeight: 600, padding: '4px 14px', borderRadius: 999 }}>Mais popular</div>
+              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#FEF3C7' }}>Profissional</h3>
+              <p style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.8rem', marginTop: 4 }}>Para quem quer escalar resultados</p>
+              <div style={{ marginTop: 20 }}>
+                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#FEF3C7' }}>R$3.500</span>
+                <span style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.875rem' }}>/mês</span>
               </div>
-              <ul className="mt-8 space-y-3">
-                {['Até 7 automações', '15 usuários', '2.000 contatos', '1.000 msgs WhatsApp/mês', 'Relatórios automatizados', 'Integrações externas', 'Suporte prioritário', '2 reuniões mensais'].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-[#60A5FA] mt-0.5 shrink-0" />{item}</li>
+              <ul style={{ listStyle: 'none', padding: 0, marginTop: 24 }}>
+                {['Até 7 automações', '15 usuários', '2.000 contatos', '1.000 msgs WhatsApp/mês', 'Relatórios automatizados', 'Integrações externas', 'Suporte prioritário', '2 reuniões mensais'].map(f => (
+                  <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: 'rgba(254,243,199,0.7)' }}>
+                    <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
+                  </li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center text-sm font-medium transition-colors" style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}>Agendar conversa</a>
+              <a href="/agendar" style={{ ...btnPrimary, width: '100%', marginTop: 24, boxSizing: 'border-box' as const }}>Agendar conversa</a>
             </div>
 
             {/* Enterprise */}
-            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-8">
-              <h4 className="font-semibold text-lg">Enterprise</h4>
-              <p className="text-sm text-gray-500 mt-1">Para operações de alta performance</p>
-              <div className="mt-6">
-                <span className="text-4xl font-bold text-[#1E3A5F]">R$6.000</span>
-                <span className="text-gray-500">/mês</span>
+            <div style={{
+              backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 16, padding: 32,
+              opacity: plansReveal.visible ? 1 : 0, transform: plansReveal.visible ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.6s 0.3s, transform 0.6s 0.3s',
+            }}>
+              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#1C1208' }}>Enterprise</h3>
+              <p style={{ color: '#92400E', fontSize: '0.8rem', marginTop: 4 }}>Para operações de alta performance</p>
+              <div style={{ marginTop: 20 }}>
+                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#1C1208' }}>R$6.000</span>
+                <span style={{ color: '#92400E', fontSize: '0.875rem' }}>/mês</span>
               </div>
-              <ul className="mt-8 space-y-3">
-                {['Automações ilimitadas', 'Usuários ilimitados', '10.000 contatos', '5.000 msgs WhatsApp/mês', 'Todas as integrações', 'Relatórios customizados', 'Gerente dedicado', 'Reuniões semanais', 'SLA 2h'].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" />{item}</li>
+              <ul style={{ listStyle: 'none', padding: 0, marginTop: 24 }}>
+                {['Automações ilimitadas', 'Usuários ilimitados', '10.000 contatos', '5.000 msgs WhatsApp/mês', 'Todas as integrações', 'Relatórios customizados', 'Gerente dedicado', 'Reuniões semanais', 'SLA 2h'].map(f => (
+                  <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: '#1C1208' }}>
+                    <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
+                  </li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center text-sm font-medium transition-colors" style={{ backgroundColor: 'transparent', color: '#1C1208', border: '2px solid #1C1208', borderRadius: 999, padding: '12px 28px' }}>Agendar conversa</a>
+              <a href="/agendar" style={{ ...btnSecLight, width: '100%', marginTop: 24, boxSizing: 'border-box' as const }}>Agendar conversa</a>
             </div>
           </div>
-          <p className="text-center text-sm text-gray-500 mt-8">
-            Precisa de mais automações? Adicione por R$400-600/mês cada.
+          <p style={{ textAlign: 'center' as const, fontSize: '0.85rem', color: '#92400E', marginTop: 32 }}>
+            Precisa de mais automações? <a href="#contato" style={{ color: '#F97316', textDecoration: 'none', fontWeight: 600 }}>Fale conosco</a>
           </p>
         </div>
       </section>
 
-      {/* Trust / guarantees */}
-      <section className="py-16 px-6 bg-[#F8FAFC]">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-          <div className="flex flex-col items-center">
-            <Shield size={28} className="text-[#1E3A5F] mb-3" />
-            <h4 className="font-semibold text-sm">Dados protegidos</h4>
-            <p className="text-xs text-gray-500 mt-1">Em conformidade com a LGPD desde o primeiro dia</p>
-          </div>
-          <div className="flex flex-col items-center">
-            <Star size={28} className="text-[#1E3A5F] mb-3" />
-            <h4 className="font-semibold text-sm">Implantação inclusa</h4>
-            <p className="text-xs text-gray-500 mt-1">Configuramos tudo para você, sem custo adicional</p>
-          </div>
-          <div className="flex flex-col items-center">
-            <MessageSquare size={28} className="text-[#1E3A5F] mb-3" />
-            <h4 className="font-semibold text-sm">Suporte humanizado</h4>
-            <p className="text-xs text-gray-500 mt-1">Atendimento direto pelo WhatsApp, sem robôs</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact */}
-      <section id="contato" className="py-20 px-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold text-[#1E3A5F]">Vamos conversar?</h3>
-            <p className="text-gray-600 mt-3">
-              Preencha o formulário ou <a href="/agendar" className="text-[#2563EB] underline">agende uma call diretamente</a>.
-              Respondemos em até 24 horas.
-            </p>
-          </div>
-
-          {submitted ? (
-            <div className="bg-white rounded-2xl border border-green-200 p-8 text-center">
-              <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
-              <h4 className="text-xl font-semibold text-gray-900 mb-2">Mensagem recebida!</h4>
-              <p className="text-gray-600 mb-6">Entraremos em contato em breve pelo WhatsApp.</p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/agendar" className="inline-flex items-center justify-center gap-2 text-sm font-medium transition-colors" style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}>
-                  <Calendar size={16} />
-                  Agendar call agora
-                </a>
-                <button onClick={() => setSubmitted(false)} className="text-sm text-gray-500 hover:text-gray-700">
-                  Enviar outra mensagem
-                </button>
-              </div>
+      {/* ═══ 8. CONFIANÇA ═══ */}
+      <section style={{ backgroundColor: '#fff8f0', padding: '60px 24px' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', textAlign: 'center' as const }}>
+          {[
+            { icon: Shield, title: 'Dados protegidos', desc: 'Em conformidade com a LGPD desde o primeiro dia' },
+            { icon: Star, title: 'Implantação inclusa', desc: 'Configuramos tudo para você, sem custo adicional' },
+            { icon: MessageSquare, title: 'Suporte humanizado', desc: 'Atendimento direto pelo WhatsApp, sem robôs' },
+          ].map((g, i) => (
+            <div key={g.title} style={{ padding: '20px 16px', borderRight: i < 2 ? '1px solid #FDE68A' : 'none' }}>
+              <g.icon size={28} style={{ color: '#F97316', margin: '0 auto 12px' }} />
+              <h4 style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1C1208', marginBottom: 4 }}>{g.title}</h4>
+              <p style={{ color: '#92400E', fontSize: '0.8rem', lineHeight: 1.6, margin: 0 }}>{g.desc}</p>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#BFDBFE] p-8 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" placeholder="Seu nome" required />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">E-mail *</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" placeholder="seu@email.com" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp *</label>
-                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" placeholder="(00) 00000-0000" required />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sobre o seu negócio</label>
-                <textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} rows={4} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent resize-none" placeholder="Conte um pouco sobre sua empresa e o que gostaria de automatizar..." />
-              </div>
-              <button type="submit" disabled={submitting} className="w-full flex items-center justify-center gap-2 text-sm font-medium transition-colors disabled:opacity-50" style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}>
-                <Send size={16} />
-                {submitting ? 'Enviando...' : 'Enviar mensagem'}
-              </button>
-              <p className="text-xs text-gray-400 text-center">Seus dados estão seguros e não serão compartilhados.</p>
-            </form>
-          )}
+          ))}
+        </div>
+      </section>
 
-          <div className="flex items-center justify-center gap-8 mt-8 text-sm text-gray-500">
-            {whatsappNumber && <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-[#1E3A5F] transition-colors"><Phone size={16} />WhatsApp</a>}
-            <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:text-[#1E3A5F] transition-colors"><Mail size={16} />E-mail</a>
-            <a href="/agendar" className="flex items-center gap-2 hover:text-[#1E3A5F] transition-colors"><Calendar size={16} />Agendar call</a>
+      {/* ═══ 9. CONTATO ═══ */}
+      <section id="contato" style={{ backgroundColor: '#1C1208', padding: '80px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 48 }}>
+          {/* Left */}
+          <div>
+            <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.875rem', marginBottom: 12 }}>Contato</p>
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#FEF3C7', margin: '0 0 12px' }}>Vamos conversar?</h2>
+            <p style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.9rem', lineHeight: 1.7, marginBottom: 32 }}>
+              Preencha o formulário ou entre em contato diretamente. Respondemos em até 24 horas.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
+              {whatsappNumber && (
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={{ color: '#F97316', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+                  <Phone size={18} /> WhatsApp
+                </a>
+              )}
+              <a href={`mailto:${contactEmail}`} style={{ color: '#F97316', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+                <Mail size={18} /> {contactEmail}
+              </a>
+              <a href="/agendar" style={{ color: '#F97316', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+                <Calendar size={18} /> Agendar call
+              </a>
+            </div>
+          </div>
+
+          {/* Right — form */}
+          <div>
+            {submitted ? (
+              <div style={{ backgroundColor: '#fff8f0', borderRadius: 16, padding: 32, textAlign: 'center' as const }}>
+                <CheckCircle size={48} style={{ color: '#F97316', margin: '0 auto 16px' }} />
+                <h4 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#1C1208', marginBottom: 8 }}>Mensagem recebida!</h4>
+                <p style={{ color: '#92400E', marginBottom: 24, fontSize: '0.9rem' }}>Entraremos em contato em breve pelo WhatsApp.</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 12, justifyContent: 'center' }}>
+                  <a href="/agendar" style={btnPrimary}><Calendar size={16} /> Agendar call agora</a>
+                  <button onClick={() => setSubmitted(false)} style={{ background: 'none', border: 'none', color: '#92400E', fontSize: '0.85rem', cursor: 'pointer' }}>Enviar outra mensagem</button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, color: '#FEF3C7', marginBottom: 6 }}>Nome *</label>
+                  <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    style={{ width: '100%', padding: '12px 16px', backgroundColor: '#fff8f0', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 10, fontSize: '0.875rem', color: '#1C1208', outline: 'none', boxSizing: 'border-box' as const }}
+                    placeholder="Seu nome" required />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, color: '#FEF3C7', marginBottom: 6 }}>E-mail *</label>
+                    <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
+                      style={{ width: '100%', padding: '12px 16px', backgroundColor: '#fff8f0', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 10, fontSize: '0.875rem', color: '#1C1208', outline: 'none', boxSizing: 'border-box' as const }}
+                      placeholder="seu@email.com" required />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, color: '#FEF3C7', marginBottom: 6 }}>WhatsApp *</label>
+                    <input type="tel" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                      style={{ width: '100%', padding: '12px 16px', backgroundColor: '#fff8f0', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 10, fontSize: '0.875rem', color: '#1C1208', outline: 'none', boxSizing: 'border-box' as const }}
+                      placeholder="(00) 00000-0000" required />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, color: '#FEF3C7', marginBottom: 6 }}>Sobre o seu negócio</label>
+                  <textarea value={formData.message} onChange={e => setFormData({ ...formData, message: e.target.value })} rows={4}
+                    style={{ width: '100%', padding: '12px 16px', backgroundColor: '#fff8f0', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 10, fontSize: '0.875rem', color: '#1C1208', outline: 'none', resize: 'none' as const, boxSizing: 'border-box' as const }}
+                    placeholder="Conte um pouco sobre sua empresa e o que gostaria de automatizar..." />
+                </div>
+                <button type="submit" disabled={submitting} style={{ ...btnPrimary, width: '100%', opacity: submitting ? 0.6 : 1 }}>
+                  <Send size={16} />
+                  {submitting ? 'Enviando...' : 'Enviar mensagem'}
+                </button>
+                <p style={{ fontSize: '0.75rem', color: 'rgba(254,243,199,0.3)', textAlign: 'center' as const, margin: 0 }}>Seus dados estão seguros e não serão compartilhados.</p>
+              </form>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-200 py-8 px-6 bg-[#1E3A5F]">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-white/80">Anpexia — Automação inteligente para empresas</p>
-          <p className="text-sm text-white/50">&copy; 2026 Anpexia. Todos os direitos reservados.</p>
+      {/* ═══ 10. CTA FINAL ═══ */}
+      <section style={{ backgroundColor: '#F97316', padding: '64px 24px', textAlign: 'center' as const }}>
+        <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#fff', margin: '0 0 12px' }}>Pronto para automatizar seu negócio?</h2>
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem', marginBottom: 32 }}>Comece hoje. Sem cartão de crédito. Cancele quando quiser.</p>
+        <a href="/agendar" style={{ backgroundColor: '#1C1208', color: '#F97316', border: 'none', borderRadius: 999, padding: '14px 36px', fontWeight: 700, fontSize: '0.9rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          Agendar conversa gratuita <ArrowRight size={16} />
+        </a>
+      </section>
+
+      {/* ═══ 11. FOOTER ═══ */}
+      <footer style={{ backgroundColor: '#0D0904', padding: '32px 24px' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', flexWrap: 'wrap' as const, justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+          <div>
+            <span style={{ color: '#FEF3C7', fontWeight: 800, fontSize: '1rem' }}>Anpexia</span>
+            <p style={{ color: 'rgba(254,243,199,0.3)', fontSize: '0.75rem', margin: '4px 0 0' }}>Automação inteligente para empresas</p>
+          </div>
+          <p style={{ color: 'rgba(254,243,199,0.2)', fontSize: '0.75rem', margin: 0 }}>&copy; 2026 Anpexia. Todos os direitos reservados.</p>
         </div>
       </footer>
 
-      {/* Floating WhatsApp button (mobile) */}
+      {/* ═══ 12. FLOATING WHATSAPP ═══ */}
       {whatsappNumber && (
-        <a
-          href={whatsappLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fixed bottom-6 right-6 sm:hidden bg-green-500 text-white p-4 rounded-full shadow-lg hover:bg-green-600 transition-colors z-50"
-          aria-label="WhatsApp"
-        >
+        <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+          className="sm:hidden"
+          style={{ position: 'fixed' as const, bottom: 24, right: 24, backgroundColor: '#F97316', color: '#fff', width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(249,115,22,0.4)', zIndex: 50, textDecoration: 'none' }}>
           <MessageSquare size={24} />
         </a>
       )}
