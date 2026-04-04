@@ -162,8 +162,13 @@ function LandingPage() {
         <style>{`@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
         <div style={{ display: 'flex', animation: 'marquee 25s linear infinite' }}>
           {[0, 1].map(i => (
-            <span key={i} style={{ color: '#fff', fontSize: 14, fontWeight: 600, letterSpacing: '0.05em', paddingRight: 0 }}>
-              Automação inteligente para empresas &nbsp;·&nbsp; Chatbot com IA &nbsp;·&nbsp; Agendamentos automáticos &nbsp;·&nbsp; Financeiro integrado &nbsp;·&nbsp; WhatsApp automático &nbsp;·&nbsp;&nbsp;
+            <span key={i} style={{ color: '#fff', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0 }}>
+              {[...Array(6)].map((_, j) => (
+                <span key={j} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <span style={{ padding: '0 60px' }}>Automação inteligente</span>
+                  <span style={{ padding: '0 60px', opacity: 0.7 }}>✦</span>
+                </span>
+              ))}
             </span>
           ))}
         </div>
