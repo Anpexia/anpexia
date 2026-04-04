@@ -53,7 +53,7 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 
 | Servico | Plataforma | URL |
 |---------|-----------|-----|
-| Backend API | Railway | https://backend-production-e9a8.up.railway.app |
+| Backend API | Railway | https://fluxia-production.up.railway.app |
 | Frontend app | Vercel | https://anpexia-app.vercel.app |
 | Admin painel | Vercel | https://admin-nine-pied.vercel.app |
 | Landing page | Vercel | https://anpexia-landing.vercel.app |
@@ -94,15 +94,35 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 - Busca de paciente no modal de agendamento com autocomplete
 - CRUD completo de clientes, estoque, mensagens, FAQs do chatbot
 - Audit log para acoes criticas
+- Segmentacao de tenants (CLINICA_OFTALMOLOGICA, CLINICA_GERAL, CLINICA_MEDICA, SALAO_BELEZA, OUTROS)
+- Modulo financeiro completo (transacoes, categorias, resumo/dashboard)
+- Assinatura digital do medico (base64 canvas)
+- Atestados medicos com geracao de PDF (PDFKit)
+- Prescricoes: medicamentos, exames externos, oculos (oftalmologia), exames internos
+- Anamnese oftalmologica (formulario 5 secoes, segment-gated)
+- Evolucao do paciente com formato SOAP + PIO/acuidade (segment-gated)
+- Prontuario reorganizado com sub-secoes (Dados Clinicos, Anamnese, Evolucao, Prescricoes, Atestados)
 
 ### Credenciais
 
 - **SUPER_ADMIN**: `anpexia@hotmail.com` / `4nP3x1a0321@!`
-- **Tenant teste**: Anpexia Teste (ID: `cmnjhqv8u0000n6g8kdwqgvb1`)
+- **Clinica teste**: `ricardo@clinicasaudetotal.com.br` / `Clinica@2026`
+- **Tenant SUPER_ADMIN**: Anpexia Teste (ID: `cmnjhqv8u0000n6g8kdwqgvb1`)
+- **Tenant Clinica**: Clinica Saude Total (ID: `cmnjmu0jm0001o30p9jaqj4ys`, segment: CLINICA_OFTALMOLOGICA)
+- **Paciente teste**: Maria Silva Teste (ID: `cmnjmubd90003n678al6ckavg`)
+
+### Deploy do backend (Railway)
+
+Railway nao tem auto-deploy configurado (GitHub App nao instalado no org Anpexia).
+Para fazer deploy manual, usar `githubRepoDeploy` via GraphQL:
+
+```graphql
+mutation { githubRepoDeploy(input: { projectId: "fe1fbef3-fd5b-4e6c-9c92-231b651a3766", repo: "Anpexia/anpexia", branch: "main", environmentId: "3e6ea3dc-dd1c-4901-99fa-9e87a019cf5a" }) }
+```
 
 ### Pendencias
 
-- Nome definitivo do produto (Anpexia e temporario)
+- Instalar Railway GitHub App no org Anpexia para auto-deploy
 - Dominio proprio
 - Estrategia comercial e videos de anuncio
 - Teste completo do chatbot com Claude em producao (requer creditos Anthropic)
