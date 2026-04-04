@@ -10,7 +10,7 @@ const STAGES = [
   { key: 'CONTACTED', label: 'Contatado', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
   { key: 'QUALIFIED', label: 'Qualificado', color: 'bg-orange-100 text-orange-800 border-orange-300' },
   { key: 'CALL_SCHEDULED', label: 'Call Agendada', color: 'bg-purple-100 text-purple-800 border-purple-300' },
-  { key: 'CALL_DONE', label: 'Call Realizada', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+  { key: 'CALL_DONE', label: 'Call Realizada', color: 'bg-[#EFF6FF] text-[#1E3A5F] border-[#BFDBFE]' },
   { key: 'PROPOSAL_SENT', label: 'Proposta Enviada', color: 'bg-cyan-100 text-cyan-800 border-cyan-300' },
   { key: 'NEGOTIATION', label: 'Negociacao', color: 'bg-amber-100 text-amber-800 border-amber-300' },
   { key: 'CONTRACTED', label: 'Contratado', color: 'bg-blue-200 text-blue-900 border-blue-400' },
@@ -114,7 +114,7 @@ export default function CrmPage() {
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors"
         >
           <Plus size={18} />
           Novo lead
@@ -379,7 +379,7 @@ export default function CrmPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium disabled:opacity-50"
                 >
                   {saving ? 'Criando...' : 'Criar lead'}
                 </button>

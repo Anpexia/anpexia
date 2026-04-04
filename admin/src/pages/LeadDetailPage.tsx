@@ -26,7 +26,7 @@ const STAGES = [
   { key: 'CONTACTED', label: 'Contatado', color: 'bg-yellow-100 text-yellow-800' },
   { key: 'QUALIFIED', label: 'Qualificado', color: 'bg-orange-100 text-orange-800' },
   { key: 'CALL_SCHEDULED', label: 'Call Agendada', color: 'bg-purple-100 text-purple-800' },
-  { key: 'CALL_DONE', label: 'Call Realizada', color: 'bg-indigo-100 text-indigo-800' },
+  { key: 'CALL_DONE', label: 'Call Realizada', color: 'bg-[#EFF6FF] text-[#1E3A5F]' },
   { key: 'PROPOSAL_SENT', label: 'Proposta Enviada', color: 'bg-cyan-100 text-cyan-800' },
   { key: 'NEGOTIATION', label: 'Negociacao', color: 'bg-amber-100 text-amber-800' },
   { key: 'CONTRACTED', label: 'Contratado', color: 'bg-blue-200 text-blue-900' },
@@ -194,7 +194,7 @@ export default function LeadDetailPage() {
             )}
             <button
               onClick={() => setShowProposal(true)}
-              className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800"
+              className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#2A4D7A]"
             >
               <FileText size={16} />
               Enviar proposta
@@ -306,7 +306,7 @@ export default function LeadDetailPage() {
               <button
                 type="submit"
                 disabled={savingNote || !noteText.trim()}
-                className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 w-full justify-center"
+                className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50 w-full justify-center"
               >
                 <Plus size={16} />
                 {savingNote ? 'Salvando...' : 'Adicionar nota'}

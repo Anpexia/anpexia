@@ -31,7 +31,7 @@ const categoryColors: Record<string, string> = {
   'Medicamentos e Receitas': 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
   'Valores e Convenios': 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
   'Localizacao e Horarios': 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100',
-  'Duvidas Frequentes': 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100',
+  'Duvidas Frequentes': 'bg-[#EFF6FF] text-[#1E3A5F] border-[#BFDBFE] hover:bg-[#EFF6FF]',
   'Urgencias e Emergencias': 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
 };
 
@@ -164,7 +164,7 @@ export function ScriptsPage() {
     return <Icon size={24} />;
   };
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
   const filteredScripts = scripts;
 
@@ -177,7 +177,7 @@ export function ScriptsPage() {
         </div>
         <div className="flex gap-2">
           {categories.length === 0 && !loading && (
-            <button onClick={handleSeedScripts} disabled={seeding} className="flex items-center gap-2 px-4 py-2.5 border border-indigo-300 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors disabled:opacity-50">
+            <button onClick={handleSeedScripts} disabled={seeding} className="flex items-center gap-2 px-4 py-2.5 border border-[#BFDBFE] text-[#1E3A5F] rounded-lg text-sm font-medium hover:bg-[#EFF6FF] transition-colors disabled:opacity-50">
               {seeding ? 'Criando...' : 'Carregar scripts padrao'}
             </button>
           )}
@@ -185,7 +185,7 @@ export function ScriptsPage() {
             <Plus size={18} />
             Nova categoria
           </button>
-          <button onClick={openCreateScript} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+          <button onClick={openCreateScript} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
             <Plus size={18} />
             Novo script
           </button>
@@ -201,14 +201,14 @@ export function ScriptsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar em todos os scripts..."
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
           />
         </div>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" />
         </div>
       ) : (
         <>
@@ -244,7 +244,7 @@ export function ScriptsPage() {
               {selectedCategory && (
                 <button
                   onClick={() => setSelectedCategory(null)}
-                  className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                  className="flex items-center gap-1 text-sm text-[#1E3A5F] hover:text-[#1E3A5F] font-medium"
                 >
                   <ArrowLeft size={16} />
                   Todas as categorias
@@ -270,7 +270,7 @@ export function ScriptsPage() {
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
                   <FileText size={40} className="mx-auto text-slate-300 mb-3" />
                   <p className="text-sm text-slate-500">Nenhum script encontrado.</p>
-                  <button onClick={openCreateScript} className="mt-4 text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+                  <button onClick={openCreateScript} className="mt-4 text-sm text-[#1E3A5F] hover:text-[#1E3A5F] font-medium">
                     Criar novo script
                   </button>
                 </div>
@@ -289,7 +289,7 @@ export function ScriptsPage() {
                             {s.category.name}
                           </span>
                           {s.tags.slice(0, 3).map((tag) => (
-                            <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
+                            <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#1E3A5F]">
                               {tag}
                             </span>
                           ))}
@@ -331,7 +331,7 @@ export function ScriptsPage() {
                         <div className="flex justify-end mt-3">
                           <button
                             onClick={() => handleCopy(s)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${copiedId === s.id ? 'bg-green-100 text-green-700' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${copiedId === s.id ? 'bg-green-100 text-green-700' : 'bg-[#EFF6FF] text-[#1E3A5F] hover:bg-[#EFF6FF]'}`}
                           >
                             {copiedId === s.id ? <><Check size={16} /> Copiado!</> : <><Copy size={16} /> Copiar texto</>}
                           </button>
@@ -351,7 +351,7 @@ export function ScriptsPage() {
               <h3 className="font-semibold text-slate-800 mb-2">Nenhum script cadastrado</h3>
               <p className="text-sm text-slate-500 mb-6">Carregue os scripts padrao para clinica ou crie os seus do zero.</p>
               <div className="flex justify-center gap-3">
-                <button onClick={handleSeedScripts} disabled={seeding} className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                <button onClick={handleSeedScripts} disabled={seeding} className="px-4 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
                   {seeding ? 'Criando...' : 'Carregar scripts padrao'}
                 </button>
                 <button onClick={openCreateCategory} className="px-4 py-2.5 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">
@@ -393,7 +393,7 @@ export function ScriptsPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>
             </form>
           </div>
@@ -428,7 +428,7 @@ export function ScriptsPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? 'Salvando...' : 'Criar'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Criar'}</button>
               </div>
             </form>
           </div>

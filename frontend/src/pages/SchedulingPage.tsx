@@ -73,12 +73,12 @@ function StatusTimeline({ status }: { status: string }) {
         const isCurrent = currentStep === (i + 1);
         return (
           <div key={step.key} className="flex items-center gap-1">
-            <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${isActive ? 'bg-indigo-50 text-indigo-600 font-medium' : 'bg-slate-100 text-slate-400'} ${isCurrent ? 'ring-1 ring-indigo-500' : ''}`}>
+            <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${isActive ? 'bg-[#EFF6FF] text-[#1E3A5F] font-medium' : 'bg-slate-100 text-slate-400'} ${isCurrent ? 'ring-1 ring-[#2563EB]' : ''}`}>
               <span className="text-[10px]">{step.icon}</span>
               <span className="hidden sm:inline">{step.label}</span>
             </div>
             {i < timelineSteps.length - 1 && (
-              <div className={`w-3 h-0.5 ${isActive ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+              <div className={`w-3 h-0.5 ${isActive ? 'bg-[#1E3A5F]' : 'bg-slate-200'}`} />
             )}
           </div>
         );
@@ -221,7 +221,7 @@ export function SchedulingPage() {
   const upcomingAppointments = appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed');
   const pastAppointments = appointments.filter(a => a.status !== 'scheduled' && a.status !== 'confirmed');
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
   return (
     <div>
@@ -230,7 +230,7 @@ export function SchedulingPage() {
           <h2 className="text-2xl font-bold text-slate-800">Agendamentos</h2>
           <p className="text-slate-500 mt-1">Gerencie consultas e compromissos</p>
         </div>
-        <button onClick={openBook} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+        <button onClick={openBook} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
           <Calendar size={18} />
           Novo agendamento
         </button>
@@ -238,16 +238,16 @@ export function SchedulingPage() {
 
       {/* View Toggle */}
       <div className="flex gap-1 mb-6 border-b border-slate-200">
-        <button onClick={() => setView('list')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${view === 'list' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setView('list')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${view === 'list' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
           Lista
         </button>
-        <button onClick={() => setView('calendar')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${view === 'calendar' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setView('calendar')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${view === 'calendar' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
           Calendario
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" /></div>
       ) : (
         <>
           {/* List View */}
@@ -266,14 +266,14 @@ export function SchedulingPage() {
                       <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                           <div className="flex items-start gap-4">
-                            <div className="bg-indigo-50 rounded-lg p-3 text-center min-w-[60px]">
-                              <p className="text-xs text-indigo-600 font-medium">{format(new Date(a.date), 'MMM', { locale: ptBR }).toUpperCase()}</p>
-                              <p className="text-xl font-bold text-indigo-600">{format(new Date(a.date), 'dd')}</p>
+                            <div className="bg-[#EFF6FF] rounded-lg p-3 text-center min-w-[60px]">
+                              <p className="text-xs text-[#1E3A5F] font-medium">{format(new Date(a.date), 'MMM', { locale: ptBR }).toUpperCase()}</p>
+                              <p className="text-xl font-bold text-[#1E3A5F]">{format(new Date(a.date), 'dd')}</p>
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-medium text-slate-800">{a.customer?.name || a.name}</span>
-                                {a.customer && <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">Paciente vinculado</span>}
+                                {a.customer && <span className="text-xs bg-[#EFF6FF] text-[#1E3A5F] px-1.5 py-0.5 rounded">Paciente vinculado</span>}
                               </div>
                               <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
                                 <span className="flex items-center gap-1"><Clock size={14} />{format(new Date(a.date), 'HH:mm')}</span>
@@ -344,11 +344,11 @@ export function SchedulingPage() {
                     <button
                       key={d.date}
                       onClick={() => handleDateClick(d.date)}
-                      className={`p-3 rounded-lg border text-left transition-colors ${selectedDate === d.date ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                      className={`p-3 rounded-lg border text-left transition-colors ${selectedDate === d.date ? 'border-[#1E3A5F] bg-[#EFF6FF]/50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
                     >
                       <p className="text-sm font-medium text-slate-800">{format(new Date(d.date + 'T12:00:00'), 'EEEE', { locale: ptBR })}</p>
                       <p className="text-xs text-slate-500">{format(new Date(d.date + 'T12:00:00'), 'dd/MM/yyyy')}</p>
-                      <p className="text-xs text-indigo-600 mt-1">{d.availableSlots} vagas</p>
+                      <p className="text-xs text-[#1E3A5F] mt-1">{d.availableSlots} vagas</p>
                     </button>
                   ))}
                 </div>
@@ -359,7 +359,7 @@ export function SchedulingPage() {
                 {!selectedDate ? (
                   <p className="text-sm text-slate-500 text-center py-12">Selecione uma data para ver os horarios.</p>
                 ) : loadingSlots ? (
-                  <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>
+                  <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" /></div>
                 ) : (
                   <>
                     <h3 className="font-semibold text-slate-800 mb-4">
@@ -398,7 +398,7 @@ export function SchedulingPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Buscar paciente</label>
                 {selectedBookCustomer ? (
-                  <div className="flex items-center justify-between p-2.5 bg-indigo-50/50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center justify-between p-2.5 bg-[#EFF6FF]/50 border border-[#BFDBFE] rounded-lg">
                     <div>
                       <p className="text-sm font-medium text-slate-800">{selectedBookCustomer.name}</p>
                       <p className="text-xs text-slate-500">{selectedBookCustomer.phone || selectedBookCustomer.email || ''}</p>
@@ -463,7 +463,7 @@ export function SchedulingPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowBookModal(false)} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? 'Agendando...' : 'Agendar'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Agendando...' : 'Agendar'}</button>
               </div>
             </form>
           </div>

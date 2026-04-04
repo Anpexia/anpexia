@@ -249,7 +249,7 @@ export function MessagesPage() {
     return <span className={`text-xs px-2 py-0.5 rounded ${st.cls}`}>{st.label}</span>;
   };
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
   return (
     <div>
@@ -258,7 +258,7 @@ export function MessagesPage() {
           <h2 className="text-2xl font-bold text-slate-800">Mensagens</h2>
           <p className="text-slate-500 mt-1">Mensagens automaticas via WhatsApp</p>
         </div>
-        <button onClick={() => setShowSendModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+        <button onClick={() => setShowSendModal(true)} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
           <Send size={18} />
           Enviar mensagem
         </button>
@@ -276,7 +276,7 @@ export function MessagesPage() {
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
           <p className="text-sm text-slate-500">Total</p>
-          <p className="text-2xl font-bold text-indigo-600 mt-1">{stats.sentTotal}</p>
+          <p className="text-2xl font-bold text-[#1E3A5F] mt-1">{stats.sentTotal}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
           <p className="text-sm text-slate-500">Falhas</p>
@@ -286,19 +286,19 @@ export function MessagesPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-slate-200">
-        <button onClick={() => setActiveTab('overview')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'overview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setActiveTab('overview')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'overview' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
           <MessageSquare size={14} className="inline mr-1.5 -mt-0.5" />Historico
         </button>
-        <button onClick={() => setActiveTab('templates')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'templates' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setActiveTab('templates')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'templates' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
           <FileText size={14} className="inline mr-1.5 -mt-0.5" />Templates
         </button>
-        <button onClick={() => setActiveTab('chatbot')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'chatbot' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setActiveTab('chatbot')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'chatbot' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
           <Bot size={14} className="inline mr-1.5 -mt-0.5" />Chatbot IA
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" /></div>
       ) : (
         <>
           {/* Overview Tab */}
@@ -333,7 +333,7 @@ export function MessagesPage() {
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-slate-800">Templates de mensagem</h3>
-                <button onClick={openTemplateCreate} className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                <button onClick={openTemplateCreate} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
                   <Plus size={16} />Novo template
                 </button>
               </div>
@@ -434,7 +434,7 @@ export function MessagesPage() {
                 </div>
 
                 <div className="mt-6">
-                  <button onClick={handleSaveChatbot} disabled={savingChatbot} className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                  <button onClick={handleSaveChatbot} disabled={savingChatbot} className="px-6 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
                     {savingChatbot ? 'Salvando...' : 'Salvar configuracao'}
                   </button>
                 </div>
@@ -444,7 +444,7 @@ export function MessagesPage() {
               <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-slate-800">Perguntas frequentes (FAQ)</h3>
-                  <button onClick={openFaqCreate} className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                  <button onClick={openFaqCreate} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
                     <Plus size={16} />Nova FAQ
                   </button>
                 </div>
@@ -551,7 +551,7 @@ export function MessagesPage() {
               </label>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowTemplateModal(false)} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Salvar</button>
+                <button type="submit" className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A]">Salvar</button>
               </div>
             </form>
           </div>
@@ -581,7 +581,7 @@ export function MessagesPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowFaqModal(false)} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Salvar</button>
+                <button type="submit" className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A]">Salvar</button>
               </div>
             </form>
           </div>

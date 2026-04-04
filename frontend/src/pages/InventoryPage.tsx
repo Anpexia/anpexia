@@ -540,7 +540,7 @@ export function InventoryPage() {
     return new Date(d).getTime() < Date.now();
   };
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
   return (
     <div>
@@ -548,19 +548,19 @@ export function InventoryPage() {
       <div className="flex border-b border-slate-200 mb-6">
         <button
           onClick={() => setActiveTab('products')}
-          className={`px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'products' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'products' ? 'border-b-2 border-[#1E3A5F] text-[#1E3A5F]' : 'text-slate-500 hover:text-slate-700'}`}
         >
           Produtos
         </button>
         <button
           onClick={() => setActiveTab('suppliers')}
-          className={`px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'suppliers' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'suppliers' ? 'border-b-2 border-[#1E3A5F] text-[#1E3A5F]' : 'text-slate-500 hover:text-slate-700'}`}
         >
           Fornecedores
         </button>
         <button
           onClick={() => setActiveTab('orders')}
-          className={`px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'orders' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'orders' ? 'border-b-2 border-[#1E3A5F] text-[#1E3A5F]' : 'text-slate-500 hover:text-slate-700'}`}
         >
           Pedidos de Compra
         </button>
@@ -580,7 +580,7 @@ export function InventoryPage() {
             <Barcode size={18} />
             Escanear
           </button>
-          <button onClick={openCreate} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm">
+          <button onClick={openCreate} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors shadow-sm">
             <Plus size={18} />
             Novo produto
           </button>
@@ -639,7 +639,7 @@ export function InventoryPage() {
       <div className="flex gap-3 mb-6">
         <div className="flex-1 relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome, SKU ou fornecedor..." className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome, SKU ou fornecedor..." className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" />
         </div>
       </div>
 
@@ -805,7 +805,7 @@ export function InventoryPage() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-slate-800">{ps.supplier.name}</span>
                             {ps.isPrimary && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">Principal</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-[#EFF6FF] text-[#1E3A5F]">Principal</span>
                             )}
                           </div>
                           <button
@@ -839,7 +839,7 @@ export function InventoryPage() {
                             key={s.id}
                             type="button"
                             onClick={() => handleLinkSupplier(s.id)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 hover:text-indigo-700"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-[#EFF6FF] hover:text-[#1E3A5F]"
                           >
                             {s.name}
                             {s.contactName && <span className="text-xs text-slate-400 ml-2">({s.contactName})</span>}
@@ -858,7 +858,7 @@ export function InventoryPage() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>
             </form>
           </div>
@@ -906,7 +906,7 @@ export function InventoryPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? 'Registrando...' : 'Registrar'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Registrando...' : 'Registrar'}</button>
               </div>
             </form>
           </div>
@@ -996,7 +996,7 @@ export function InventoryPage() {
       {barcodeLoading && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl px-8 py-6 flex flex-col items-center gap-3">
-            <Loader2 size={32} className="text-indigo-600 animate-spin" />
+            <Loader2 size={32} className="text-[#1E3A5F] animate-spin" />
             <span className="text-sm font-medium text-slate-700">Buscando produto na base...</span>
           </div>
         </div>

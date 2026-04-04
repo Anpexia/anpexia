@@ -152,7 +152,7 @@ export default function SchedulingPage() {
             const isActive = i <= stepIndex;
             return (
               <div key={label} className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${isActive ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${isActive ? 'bg-[#1E3A5F] text-white' : 'bg-gray-200 text-gray-500'}`}>
                   {i + 1}
                 </div>
                 <span className={`text-sm ${isActive ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{label}</span>
@@ -299,7 +299,7 @@ export default function SchedulingPage() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   placeholder="Seu nome completo"
                   required
                 />
@@ -313,7 +313,7 @@ export default function SchedulingPage() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                     placeholder="seu@email.com"
                   />
                 </div>
@@ -325,7 +325,7 @@ export default function SchedulingPage() {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                     placeholder="(00) 00000-0000"
                     required
                   />
@@ -335,7 +335,7 @@ export default function SchedulingPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-[#1E3A5F] text-white py-3.5 rounded-xl text-sm font-medium hover:bg-[#2A4D7A] transition-colors disabled:opacity-50"
               >
                 {submitting ? 'Agendando...' : 'Confirmar agendamento'}
               </button>

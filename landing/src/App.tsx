@@ -59,26 +59,26 @@ function LandingPage() {
       {/* Header */}
       <header className="fixed top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-100 z-50">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-bold tracking-tight">Anpexia</h1>
+          <img src="/anpexia-logo.svg" alt="Anpexia" className="h-8" />
           <nav className="hidden md:flex items-center gap-8 text-sm">
-            <a href="#beneficios" className="text-gray-600 hover:text-gray-900 transition-colors">Benefícios</a>
-            <a href="#recursos" className="text-gray-600 hover:text-gray-900 transition-colors">Recursos</a>
-            <a href="#planos" className="text-gray-600 hover:text-gray-900 transition-colors">Planos</a>
-            <a href="#contato" className="text-gray-600 hover:text-gray-900 transition-colors">Contato</a>
-            <a href={import.meta.env.VITE_APP_URL || '/login'} className="text-blue-600 hover:text-blue-800 font-medium transition-colors">Acessar painel</a>
+            <a href="#beneficios" className="text-gray-600 hover:text-[#1E3A5F] transition-colors">Benefícios</a>
+            <a href="#recursos" className="text-gray-600 hover:text-[#1E3A5F] transition-colors">Recursos</a>
+            <a href="#planos" className="text-gray-600 hover:text-[#1E3A5F] transition-colors">Planos</a>
+            <a href="#contato" className="text-gray-600 hover:text-[#1E3A5F] transition-colors">Contato</a>
+            <a href={import.meta.env.VITE_APP_URL || '/login'} className="text-[#2563EB] hover:text-[#1E3A5F] font-medium transition-colors">Acessar painel</a>
           </nav>
           <div className="flex items-center gap-3">
             <a
               href={whatsappLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+              className="hidden sm:inline-flex bg-[#1E3A5F] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors"
             >
               Falar no WhatsApp
             </a>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-600 hover:text-gray-900"
+              className="md:hidden p-2 text-gray-600 hover:text-[#1E3A5F]"
               aria-label="Menu"
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -89,25 +89,25 @@ function LandingPage() {
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-3">
-            <a href="#beneficios" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-gray-900 py-2">Benefícios</a>
-            <a href="#recursos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-gray-900 py-2">Recursos</a>
-            <a href="#planos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-gray-900 py-2">Planos</a>
-            <a href="#contato" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-gray-900 py-2">Contato</a>
-            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="block bg-gray-900 text-white text-center px-5 py-2.5 rounded-lg text-sm font-medium">Falar no WhatsApp</a>
+            <a href="#beneficios" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Benefícios</a>
+            <a href="#recursos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Recursos</a>
+            <a href="#planos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Planos</a>
+            <a href="#contato" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Contato</a>
+            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="block bg-[#1E3A5F] text-white text-center px-5 py-2.5 rounded-lg text-sm font-medium">Falar no WhatsApp</a>
           </div>
         )}
       </header>
 
       {/* Hero */}
-      <section className="pt-32 pb-20 px-6">
+      <section className="pt-32 pb-20 px-6 bg-gradient-to-b from-[#EFF6FF] to-white">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-100 rounded-full text-sm text-gray-600 mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#DBEAFE] rounded-full text-sm text-[#1E3A5F] mb-6">
             <Zap size={14} />
             Automação inteligente para empresas
           </div>
           <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight">
             Substitua trabalho manual por
-            <span className="text-blue-600"> automação inteligente</span>
+            <span className="text-[#2563EB]"> automação inteligente</span>
           </h2>
           <p className="text-lg md:text-xl text-gray-600 mt-6 max-w-2xl mx-auto leading-relaxed">
             Por menos que o custo de um funcionário, a Anpexia automatiza processos, atende seus clientes
@@ -116,14 +116,14 @@ function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
             <a
               href="/agendar"
-              className="inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors"
+              className="inline-flex items-center justify-center gap-2 bg-[#1E3A5F] text-white px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-[#2A4D7A] transition-colors"
             >
               <Calendar size={16} />
               Agendar conversa gratuita
             </a>
             <a
               href="#recursos"
-              className="inline-flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center justify-center gap-2 border border-[#BFDBFE] text-[#1E3A5F] px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-[#EFF6FF] transition-colors"
             >
               Ver recursos
             </a>
@@ -136,35 +136,35 @@ function LandingPage() {
       <section className="py-12 px-6 border-y border-gray-100">
         <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div>
-            <p className="text-3xl font-bold text-gray-900">5+</p>
+            <p className="text-3xl font-bold text-[#1E3A5F]">5+</p>
             <p className="text-sm text-gray-500 mt-1">Módulos integrados</p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-gray-900">24h</p>
+            <p className="text-3xl font-bold text-[#1E3A5F]">24h</p>
             <p className="text-sm text-gray-500 mt-1">Atendimento automático</p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-gray-900">100%</p>
+            <p className="text-3xl font-bold text-[#1E3A5F]">100%</p>
             <p className="text-sm text-gray-500 mt-1">Personalizado</p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-gray-900">LGPD</p>
+            <p className="text-3xl font-bold text-[#1E3A5F]">LGPD</p>
             <p className="text-sm text-gray-500 mt-1">Em conformidade</p>
           </div>
         </div>
       </section>
 
       {/* Benefits */}
-      <section id="beneficios" className="py-20 px-6 bg-gray-50">
+      <section id="beneficios" className="py-20 px-6 bg-[#F8FAFC]">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold">Por que automatizar?</h3>
+            <h3 className="text-3xl font-bold text-[#1E3A5F]">Por que automatizar?</h3>
             <p className="text-gray-600 mt-3">O que a Anpexia faz pelo seu negócio</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white rounded-2xl p-8 border border-gray-200">
-              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-5">
-                <Clock size={24} className="text-blue-600" />
+            <div className="bg-white rounded-2xl p-8 border border-[#BFDBFE]">
+              <div className="w-12 h-12 bg-[#EFF6FF] rounded-xl flex items-center justify-center mb-5">
+                <Clock size={24} className="text-[#2563EB]" />
               </div>
               <h4 className="text-lg font-semibold mb-2">Economize tempo</h4>
               <p className="text-gray-600 text-sm leading-relaxed">
@@ -172,7 +172,7 @@ function LandingPage() {
                 Você e sua equipe focam no que realmente gera valor.
               </p>
             </div>
-            <div className="bg-white rounded-2xl p-8 border border-gray-200">
+            <div className="bg-white rounded-2xl p-8 border border-[#BFDBFE]">
               <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mb-5">
                 <TrendingDown size={24} className="text-green-600" />
               </div>
@@ -182,9 +182,9 @@ function LandingPage() {
                 contratar para tarefas repetitivas.
               </p>
             </div>
-            <div className="bg-white rounded-2xl p-8 border border-gray-200">
-              <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-5">
-                <Brain size={24} className="text-purple-600" />
+            <div className="bg-white rounded-2xl p-8 border border-[#BFDBFE]">
+              <div className="w-12 h-12 bg-[#EFF6FF] rounded-xl flex items-center justify-center mb-5">
+                <Brain size={24} className="text-[#1E3A5F]" />
               </div>
               <h4 className="text-lg font-semibold mb-2">Decisões melhores</h4>
               <p className="text-gray-600 text-sm leading-relaxed">
@@ -200,7 +200,7 @@ function LandingPage() {
       <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold">Como funciona</h3>
+            <h3 className="text-3xl font-bold text-[#1E3A5F]">Como funciona</h3>
             <p className="text-gray-600 mt-3">Em 3 passos simples</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -210,7 +210,7 @@ function LandingPage() {
               { step: '03', title: 'Funcionando', desc: 'Sua automação começa a rodar. Acompanhe tudo pelo painel e foque no crescimento.' },
             ].map((item) => (
               <div key={item.step} className="text-center">
-                <div className="w-12 h-12 bg-gray-900 text-white rounded-full flex items-center justify-center text-sm font-bold mx-auto mb-4">
+                <div className="w-12 h-12 bg-[#1E3A5F] text-white rounded-full flex items-center justify-center text-sm font-bold mx-auto mb-4">
                   {item.step}
                 </div>
                 <h4 className="font-semibold text-lg mb-2">{item.title}</h4>
@@ -221,7 +221,7 @@ function LandingPage() {
           <div className="text-center mt-12">
             <a
               href="/agendar"
-              className="inline-flex items-center gap-2 bg-gray-900 text-white px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors"
+              className="inline-flex items-center gap-2 bg-[#1E3A5F] text-white px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-[#2A4D7A] transition-colors"
             >
               Começar agora
               <ArrowRight size={16} />
@@ -231,10 +231,10 @@ function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="recursos" className="py-20 px-6 bg-gray-50">
+      <section id="recursos" className="py-20 px-6 bg-[#F8FAFC]">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold">Tudo que você precisa em um só lugar</h3>
+            <h3 className="text-3xl font-bold text-[#1E3A5F]">Tudo que você precisa em um só lugar</h3>
             <p className="text-gray-600 mt-3">Módulos flexíveis que se adaptam ao seu negócio</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -245,8 +245,8 @@ function LandingPage() {
               { icon: MessageSquare, title: 'Mensagens', desc: 'WhatsApp automático: lembretes, avisos e mais' },
               { icon: Bot, title: 'Chatbot com IA', desc: 'Atendimento automático inteligente 24h por dia' },
             ].map((f) => (
-              <div key={f.title} className="bg-white border border-gray-200 rounded-2xl p-6 hover:border-gray-300 hover:shadow-sm transition-all">
-                <f.icon size={28} className="text-gray-800 mb-4" />
+              <div key={f.title} className="bg-white border border-[#BFDBFE] rounded-2xl p-6 hover:border-[#93C5FD] hover:shadow-sm transition-all">
+                <f.icon size={28} className="text-[#1E3A5F] mb-4" />
                 <h4 className="font-semibold mb-2">{f.title}</h4>
                 <p className="text-sm text-gray-600">{f.desc}</p>
               </div>
@@ -259,16 +259,16 @@ function LandingPage() {
       <section id="planos" className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold">Planos simples e transparentes</h3>
+            <h3 className="text-3xl font-bold text-[#1E3A5F]">Planos simples e transparentes</h3>
             <p className="text-gray-600 mt-3">Escolha o que faz sentido para o seu negócio</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {/* Essencial */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8">
+            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-8">
               <h4 className="font-semibold text-lg">Essencial</h4>
               <p className="text-sm text-gray-500 mt-1">Para quem está começando a automatizar</p>
               <div className="mt-6">
-                <span className="text-4xl font-bold">R$2.000</span>
+                <span className="text-4xl font-bold text-[#1E3A5F]">R$2.000</span>
                 <span className="text-gray-500">/mês</span>
               </div>
               <ul className="mt-8 space-y-3">
@@ -276,32 +276,32 @@ function LandingPage() {
                   <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" />{item}</li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center py-3 border border-gray-300 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">Agendar conversa</a>
+              <a href="/agendar" className="block mt-8 text-center py-3 border border-[#BFDBFE] text-[#1E3A5F] rounded-xl text-sm font-medium hover:bg-[#EFF6FF] transition-colors">Agendar conversa</a>
             </div>
 
             {/* Profissional */}
-            <div className="bg-gray-900 text-white rounded-2xl p-8 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-medium px-3 py-1 rounded-full">Mais popular</div>
+            <div className="bg-[#1E3A5F] text-white rounded-2xl p-8 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#2563EB] text-white text-xs font-medium px-3 py-1 rounded-full">Mais popular</div>
               <h4 className="font-semibold text-lg">Profissional</h4>
-              <p className="text-sm text-gray-400 mt-1">Para quem quer escalar resultados</p>
+              <p className="text-sm text-white/60 mt-1">Para quem quer escalar resultados</p>
               <div className="mt-6">
                 <span className="text-4xl font-bold">R$3.500</span>
-                <span className="text-gray-400">/mês</span>
+                <span className="text-white/60">/mês</span>
               </div>
               <ul className="mt-8 space-y-3">
                 {['Até 7 automações', '15 usuários', '2.000 contatos', '1.000 msgs WhatsApp/mês', 'Relatórios automatizados', 'Integrações externas', 'Suporte prioritário', '2 reuniões mensais'].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-blue-400 mt-0.5 shrink-0" />{item}</li>
+                  <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-[#60A5FA] mt-0.5 shrink-0" />{item}</li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center py-3 bg-white text-gray-900 rounded-xl text-sm font-medium hover:bg-gray-100 transition-colors">Agendar conversa</a>
+              <a href="/agendar" className="block mt-8 text-center py-3 bg-white text-[#1E3A5F] rounded-xl text-sm font-medium hover:bg-[#EFF6FF] transition-colors">Agendar conversa</a>
             </div>
 
             {/* Enterprise */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8">
+            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-8">
               <h4 className="font-semibold text-lg">Enterprise</h4>
               <p className="text-sm text-gray-500 mt-1">Para operações de alta performance</p>
               <div className="mt-6">
-                <span className="text-4xl font-bold">R$6.000</span>
+                <span className="text-4xl font-bold text-[#1E3A5F]">R$6.000</span>
                 <span className="text-gray-500">/mês</span>
               </div>
               <ul className="mt-8 space-y-3">
@@ -309,7 +309,7 @@ function LandingPage() {
                   <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" />{item}</li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center py-3 border border-gray-300 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">Agendar conversa</a>
+              <a href="/agendar" className="block mt-8 text-center py-3 border border-[#BFDBFE] text-[#1E3A5F] rounded-xl text-sm font-medium hover:bg-[#EFF6FF] transition-colors">Agendar conversa</a>
             </div>
           </div>
           <p className="text-center text-sm text-gray-500 mt-8">
@@ -319,20 +319,20 @@ function LandingPage() {
       </section>
 
       {/* Trust / guarantees */}
-      <section className="py-16 px-6 bg-gray-50">
+      <section className="py-16 px-6 bg-[#F8FAFC]">
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
           <div className="flex flex-col items-center">
-            <Shield size={28} className="text-gray-700 mb-3" />
+            <Shield size={28} className="text-[#1E3A5F] mb-3" />
             <h4 className="font-semibold text-sm">Dados protegidos</h4>
             <p className="text-xs text-gray-500 mt-1">Em conformidade com a LGPD desde o primeiro dia</p>
           </div>
           <div className="flex flex-col items-center">
-            <Star size={28} className="text-gray-700 mb-3" />
+            <Star size={28} className="text-[#1E3A5F] mb-3" />
             <h4 className="font-semibold text-sm">Implantação inclusa</h4>
             <p className="text-xs text-gray-500 mt-1">Configuramos tudo para você, sem custo adicional</p>
           </div>
           <div className="flex flex-col items-center">
-            <MessageSquare size={28} className="text-gray-700 mb-3" />
+            <MessageSquare size={28} className="text-[#1E3A5F] mb-3" />
             <h4 className="font-semibold text-sm">Suporte humanizado</h4>
             <p className="text-xs text-gray-500 mt-1">Atendimento direto pelo WhatsApp, sem robôs</p>
           </div>
@@ -343,9 +343,9 @@ function LandingPage() {
       <section id="contato" className="py-20 px-6">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold">Vamos conversar?</h3>
+            <h3 className="text-3xl font-bold text-[#1E3A5F]">Vamos conversar?</h3>
             <p className="text-gray-600 mt-3">
-              Preencha o formulário ou <a href="/agendar" className="text-blue-600 underline">agende uma call diretamente</a>.
+              Preencha o formulário ou <a href="/agendar" className="text-[#2563EB] underline">agende uma call diretamente</a>.
               Respondemos em até 24 horas.
             </p>
           </div>
@@ -356,7 +356,7 @@ function LandingPage() {
               <h4 className="text-xl font-semibold text-gray-900 mb-2">Mensagem recebida!</h4>
               <p className="text-gray-600 mb-6">Entraremos em contato em breve pelo WhatsApp.</p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/agendar" className="inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-gray-800">
+                <a href="/agendar" className="inline-flex items-center justify-center gap-2 bg-[#1E3A5F] text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-[#2A4D7A]">
                   <Calendar size={16} />
                   Agendar call agora
                 </a>
@@ -366,26 +366,26 @@ function LandingPage() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-8 space-y-5">
+            <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#BFDBFE] p-8 space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" placeholder="Seu nome" required />
+                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" placeholder="Seu nome" required />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">E-mail *</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" placeholder="seu@email.com" required />
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" placeholder="seu@email.com" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp *</label>
-                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" placeholder="(00) 00000-0000" required />
+                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" placeholder="(00) 00000-0000" required />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sobre o seu negócio</label>
-                <textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} rows={4} className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none" placeholder="Conte um pouco sobre sua empresa e o que gostaria de automatizar..." />
+                <textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} rows={4} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent resize-none" placeholder="Conte um pouco sobre sua empresa e o que gostaria de automatizar..." />
               </div>
-              <button type="submit" disabled={submitting} className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
+              <button type="submit" disabled={submitting} className="w-full flex items-center justify-center gap-2 bg-[#1E3A5F] text-white py-3.5 rounded-xl text-sm font-medium hover:bg-[#2A4D7A] transition-colors disabled:opacity-50">
                 <Send size={16} />
                 {submitting ? 'Enviando...' : 'Enviar mensagem'}
               </button>
@@ -394,18 +394,18 @@ function LandingPage() {
           )}
 
           <div className="flex items-center justify-center gap-8 mt-8 text-sm text-gray-500">
-            {whatsappNumber && <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-gray-700 transition-colors"><Phone size={16} />WhatsApp</a>}
-            <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:text-gray-700 transition-colors"><Mail size={16} />E-mail</a>
-            <a href="/agendar" className="flex items-center gap-2 hover:text-gray-700 transition-colors"><Calendar size={16} />Agendar call</a>
+            {whatsappNumber && <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-[#1E3A5F] transition-colors"><Phone size={16} />WhatsApp</a>}
+            <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:text-[#1E3A5F] transition-colors"><Mail size={16} />E-mail</a>
+            <a href="/agendar" className="flex items-center gap-2 hover:text-[#1E3A5F] transition-colors"><Calendar size={16} />Agendar call</a>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-200 py-8 px-6">
+      <footer className="border-t border-gray-200 py-8 px-6 bg-[#1E3A5F]">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-gray-500">Anpexia — Automação inteligente para empresas</p>
-          <p className="text-sm text-gray-400">&copy; 2026 Anpexia. Todos os direitos reservados.</p>
+          <p className="text-sm text-white/80">Anpexia — Automação inteligente para empresas</p>
+          <p className="text-sm text-white/50">&copy; 2026 Anpexia. Todos os direitos reservados.</p>
         </div>
       </footer>
 

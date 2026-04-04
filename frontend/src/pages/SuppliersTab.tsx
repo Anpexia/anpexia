@@ -37,7 +37,7 @@ const emptyForm = {
   notes: '',
 };
 
-const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
 export function SuppliersTab() {
   const [search, setSearch] = useState('');
@@ -183,7 +183,7 @@ export function SuppliersTab() {
           <h2 className="text-2xl font-bold text-slate-800">Fornecedores</h2>
           <p className="text-slate-500 mt-1">Gerencie seus fornecedores e vincule a produtos</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm">
+        <button onClick={openCreate} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors shadow-sm">
           <Plus size={18} />
           Novo fornecedor
         </button>
@@ -198,7 +198,7 @@ export function SuppliersTab() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome, email ou contato..."
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
           />
         </div>
       </div>
@@ -240,7 +240,7 @@ export function SuppliersTab() {
                   <td className="px-6 py-4 hidden xl:table-cell">
                     <button
                       onClick={() => handleToggleAutoDispatch(s)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${s.autoDispatch ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${s.autoDispatch ? 'bg-[#1E3A5F]' : 'bg-slate-300'}`}
                     >
                       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${s.autoDispatch ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
                     </button>
@@ -320,7 +320,7 @@ export function SuppliersTab() {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, autoDispatch: !formData.autoDispatch })}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${formData.autoDispatch ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${formData.autoDispatch ? 'bg-[#1E3A5F]' : 'bg-slate-300'}`}
                   >
                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${formData.autoDispatch ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
                   </button>
@@ -346,7 +346,7 @@ export function SuppliersTab() {
                             <span className="text-sm text-slate-800">{lp.product.name}</span>
                             {lp.product.sku && <span className="text-xs text-slate-400">({lp.product.sku})</span>}
                             {lp.isPrimary && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">Principal</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-[#EFF6FF] text-[#1E3A5F]">Principal</span>
                             )}
                           </div>
                           <button
@@ -366,7 +366,7 @@ export function SuppliersTab() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>
             </form>
           </div>

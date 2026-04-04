@@ -393,7 +393,7 @@ export function CustomersPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prontuarioSection, selectedCustomer?.id, detailTab]);
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
   // Compute summary from real scheduled calls
   const computeSummary = (c: Customer) => {
@@ -416,7 +416,7 @@ export function CustomersPage() {
           <h2 className="text-2xl font-bold text-slate-800">Clientes</h2>
           <p className="text-slate-500 mt-1">Gerencie seus clientes e contatos</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+        <button onClick={openCreate} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
           <Plus size={18} /> Novo cliente
         </button>
       </div>
@@ -425,7 +425,7 @@ export function CustomersPage() {
       <div className="flex gap-3 mb-6">
         <div className="flex-1 relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome, telefone ou e-mail..." className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome, telefone ou e-mail..." className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" />
         </div>
       </div>
 
@@ -465,7 +465,7 @@ export function CustomersPage() {
                     {c.lastAppointment ? format(new Date(c.lastAppointment), 'dd/MM/yy') : <span className="text-slate-400">-</span>}
                   </td>
                   <td className="px-6 py-4 text-sm hidden lg:table-cell">
-                    {c.nextAppointment ? <span className="text-indigo-600 font-medium">{format(new Date(c.nextAppointment), 'dd/MM/yy')}</span> : <span className="text-slate-400">-</span>}
+                    {c.nextAppointment ? <span className="text-[#1E3A5F] font-medium">{format(new Date(c.nextAppointment), 'dd/MM/yy')}</span> : <span className="text-slate-400">-</span>}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-500 hidden md:table-cell">{c.totalAppointments || 0}</td>
                   <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
@@ -562,7 +562,7 @@ export function CustomersPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{saving ? 'Salvando...' : 'Criar cliente'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Criar cliente'}</button>
               </div>
             </form>
           </div>
@@ -592,7 +592,7 @@ export function CustomersPage() {
               {/* Summary Cards */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="bg-slate-50 rounded-lg p-3 text-center">
-                  <Calendar size={16} className="mx-auto text-indigo-600 mb-1" />
+                  <Calendar size={16} className="mx-auto text-[#1E3A5F] mb-1" />
                   <p className="text-xs text-slate-500">Proxima</p>
                   <p className="text-sm font-semibold text-slate-800">
                     {summary.nextAppt ? format(new Date(summary.nextAppt), 'dd/MM') : '-'}
@@ -636,10 +636,10 @@ export function CustomersPage() {
                 { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
               ] as const).map((tab) => (
                 <button key={tab.key} onClick={() => setDetailTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === tab.key ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === tab.key ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                   <tab.icon size={14} />{tab.label}
                   {tab.key === 'appointments' && selectedCustomer.scheduledCalls && selectedCustomer.scheduledCalls.length > 0 && (
-                    <span className="bg-indigo-50 text-indigo-600 text-xs px-1.5 py-0.5 rounded">{selectedCustomer.scheduledCalls.length}</span>
+                    <span className="bg-[#EFF6FF] text-[#1E3A5F] text-xs px-1.5 py-0.5 rounded">{selectedCustomer.scheduledCalls.length}</span>
                   )}
                   {tab.key === 'whatsapp' && selectedCustomer.chatMessages && selectedCustomer.chatMessages.length > 0 && (
                     <span className="bg-green-50 text-green-600 text-xs px-1.5 py-0.5 rounded">{selectedCustomer.chatMessages.length}</span>
@@ -714,7 +714,7 @@ export function CustomersPage() {
                   </div>
                   <div className="flex items-center justify-between pt-2">
                     <p className="text-xs text-slate-400">Cadastrado em {format(new Date(selectedCustomer.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</p>
-                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
                       {saving ? 'Salvando...' : 'Salvar alteracoes'}
                     </button>
                   </div>
@@ -734,7 +734,7 @@ export function CustomersPage() {
                       { key: 'atestados', label: 'Atestados', show: true },
                     ].filter(t => t.show).map(t => (
                       <button key={t.key} onClick={() => setProntuarioSection(t.key)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${prontuarioSection === t.key ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${prontuarioSection === t.key ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                         {t.label}
                       </button>
                     ))}
@@ -770,7 +770,7 @@ export function CustomersPage() {
                             <textarea value={medForm.clinicalNotes} onChange={(e) => setMedForm({ ...medForm, clinicalNotes: e.target.value })} className={inputCls + ' h-20 resize-none'} placeholder="Anotacoes gerais do medico..." />
                           </div>
                         </div>
-                        <button onClick={handleSaveMedical} disabled={savingMed} className="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                        <button onClick={handleSaveMedical} disabled={savingMed} className="mt-3 px-4 py-2 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
                           {savingMed ? 'Salvando...' : 'Salvar dados clinicos'}
                         </button>
                       </div>
@@ -779,13 +779,13 @@ export function CustomersPage() {
                       <div>
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-medium text-slate-800">Historico de anotacoes</h4>
-                          <button onClick={() => setShowNewEntry(!showNewEntry)} className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                          <button onClick={() => setShowNewEntry(!showNewEntry)} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
                             <Plus size={16} /> Nova anotacao
                           </button>
                         </div>
 
                         {showNewEntry && (
-                          <form onSubmit={handleAddEntry} className="mb-4 p-4 border border-indigo-200 bg-indigo-50/50 rounded-lg">
+                          <form onSubmit={handleAddEntry} className="mb-4 p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg">
                             <div className="flex gap-3 mb-3">
                               <select value={entryForm.type} onChange={(e) => setEntryForm({ ...entryForm, type: e.target.value })} className={inputCls + ' w-auto'}>
                                 <option value="note">Anotacao</option>
@@ -797,7 +797,7 @@ export function CustomersPage() {
                             <textarea value={entryForm.content} onChange={(e) => setEntryForm({ ...entryForm, content: e.target.value })} className={inputCls + ' h-24 resize-none mb-3'} placeholder="Descreva o procedimento, anotacao ou observacao..." required />
                             <div className="flex gap-2">
                               <button type="button" onClick={() => setShowNewEntry(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                              <button type="submit" disabled={savingEntry} className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                              <button type="submit" disabled={savingEntry} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
                                 {savingEntry ? 'Salvando...' : 'Adicionar'}
                               </button>
                             </div>
@@ -1052,7 +1052,7 @@ export function CustomersPage() {
                             )}
                           </div>
 
-                          <button onClick={handleSaveAnamnese} disabled={savingAnamnese} className="w-full py-2.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                          <button onClick={handleSaveAnamnese} disabled={savingAnamnese} className="w-full py-2.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50 font-medium">
                             {savingAnamnese ? 'Salvando...' : 'Salvar anamnese'}
                           </button>
                         </>
@@ -1065,13 +1065,13 @@ export function CustomersPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-slate-800">Evolucoes</h4>
-                        <button onClick={() => setShowNewEvolucao(!showNewEvolucao)} className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                        <button onClick={() => setShowNewEvolucao(!showNewEvolucao)} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
                           <Plus size={16} /> Nova Evolucao
                         </button>
                       </div>
 
                       {showNewEvolucao && (
-                        <div className="p-4 border border-indigo-200 bg-indigo-50/50 rounded-lg space-y-3">
+                        <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-slate-600 mb-1">Subjetivo</label>
@@ -1114,7 +1114,7 @@ export function CustomersPage() {
                           </div>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setShowNewEvolucao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                            <button type="button" onClick={handleAddEvolucao} disabled={savingEvolucao} className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                            <button type="button" onClick={handleAddEvolucao} disabled={savingEvolucao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
                               {savingEvolucao ? 'Salvando...' : 'Registrar'}
                             </button>
                           </div>
@@ -1130,7 +1130,7 @@ export function CustomersPage() {
                           {evolucoes.map((ev: any) => (
                             <div key={ev.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50/50 transition-colors">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-medium text-indigo-600">{format(new Date(ev.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
+                                <span className="text-xs font-medium text-[#1E3A5F]">{format(new Date(ev.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                 {ev.subjective && <div><span className="font-medium text-slate-600">S: </span><span className="text-slate-700">{ev.subjective}</span></div>}
@@ -1159,13 +1159,13 @@ export function CustomersPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-slate-800">Prescricoes</h4>
-                        <button onClick={() => { setShowNewPrescricao(!showNewPrescricao); setPrescricaoType('MEDICAMENTO'); setPrescricaoItems([]); }} className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                        <button onClick={() => { setShowNewPrescricao(!showNewPrescricao); setPrescricaoType('MEDICAMENTO'); setPrescricaoItems([]); }} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
                           <Plus size={16} /> Nova Prescricao
                         </button>
                       </div>
 
                       {showNewPrescricao && (
-                        <div className="p-4 border border-indigo-200 bg-indigo-50/50 rounded-lg space-y-3">
+                        <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
                             <select value={prescricaoType} onChange={(e) => { setPrescricaoType(e.target.value); setPrescricaoItems([]); }} className={inputCls}>
@@ -1194,7 +1194,7 @@ export function CustomersPage() {
                                   </div>
                                 </div>
                               ))}
-                              <button type="button" onClick={() => setPrescricaoItems([...prescricaoItems, { name: '', dosage: '', posologia: '', duration: '', via: '' }])} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">+ Adicionar medicamento</button>
+                              <button type="button" onClick={() => setPrescricaoItems([...prescricaoItems, { name: '', dosage: '', posologia: '', duration: '', via: '' }])} className="text-sm text-[#1E3A5F] hover:text-[#1E3A5F] font-medium">+ Adicionar medicamento</button>
                             </div>
                           )}
 
@@ -1219,7 +1219,7 @@ export function CustomersPage() {
                                   </div>
                                 </div>
                               ))}
-                              <button type="button" onClick={() => setPrescricaoItems([...prescricaoItems, { name: '', specialty: '', indication: '', urgency: '' }])} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">+ Adicionar exame</button>
+                              <button type="button" onClick={() => setPrescricaoItems([...prescricaoItems, { name: '', specialty: '', indication: '', urgency: '' }])} className="text-sm text-[#1E3A5F] hover:text-[#1E3A5F] font-medium">+ Adicionar exame</button>
                             </div>
                           )}
 
@@ -1261,7 +1261,7 @@ export function CustomersPage() {
 
                           <div className="flex gap-2 pt-2">
                             <button type="button" onClick={() => setShowNewPrescricao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                            <button type="button" onClick={handleAddPrescricao} disabled={savingPrescricao} className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                            <button type="button" onClick={handleAddPrescricao} disabled={savingPrescricao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
                               {savingPrescricao ? 'Salvando...' : 'Criar prescricao'}
                             </button>
                           </div>
@@ -1289,7 +1289,7 @@ export function CustomersPage() {
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${tl.cls}`}>{tl.label}</span>
                                     <span className="text-xs text-slate-400">{format(new Date(p.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
                                   </div>
-                                  <button onClick={() => handleDownloadPdf('prescriptions', p.id)} className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium" title="Baixar PDF">
+                                  <button onClick={() => handleDownloadPdf('prescriptions', p.id)} className="flex items-center gap-1 text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium" title="Baixar PDF">
                                     <Download size={14} /> PDF
                                   </button>
                                 </div>
@@ -1314,13 +1314,13 @@ export function CustomersPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-slate-800">Atestados e Declaracoes</h4>
-                        <button onClick={() => setShowNewAtestado(!showNewAtestado)} className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                        <button onClick={() => setShowNewAtestado(!showNewAtestado)} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
                           <Plus size={16} /> Emitir Atestado
                         </button>
                       </div>
 
                       {showNewAtestado && (
-                        <div className="p-4 border border-indigo-200 bg-indigo-50/50 rounded-lg space-y-3">
+                        <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
@@ -1354,7 +1354,7 @@ export function CustomersPage() {
                           </div>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setShowNewAtestado(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                            <button type="button" onClick={handleAddAtestado} disabled={savingAtestado} className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                            <button type="button" onClick={handleAddAtestado} disabled={savingAtestado} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
                               {savingAtestado ? 'Emitindo...' : 'Emitir'}
                             </button>
                           </div>
@@ -1380,7 +1380,7 @@ export function CustomersPage() {
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${at.cls}`}>{at.label}</span>
                                     <span className="text-xs text-slate-400">{format(new Date(a.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
                                   </div>
-                                  <button onClick={() => handleDownloadPdf('medical-certificates', a.id)} className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium" title="Baixar PDF">
+                                  <button onClick={() => handleDownloadPdf('medical-certificates', a.id)} className="flex items-center gap-1 text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium" title="Baixar PDF">
                                     <Download size={14} /> PDF
                                   </button>
                                 </div>
@@ -1407,12 +1407,12 @@ export function CustomersPage() {
                         const st = apptStatusMap[a.status] || { label: a.status, cls: 'bg-gray-100 text-gray-600' };
                         const isPast = new Date(a.date) < new Date();
                         return (
-                          <div key={a.id} className={`p-4 border rounded-lg transition-colors ${isPast ? 'border-slate-200 opacity-70' : 'border-indigo-200 bg-indigo-50/30'}`}>
+                          <div key={a.id} className={`p-4 border rounded-lg transition-colors ${isPast ? 'border-slate-200 opacity-70' : 'border-[#BFDBFE] bg-[#EFF6FF]/30'}`}>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                <div className="bg-indigo-50 rounded-lg p-2 text-center min-w-[50px]">
-                                  <p className="text-xs text-indigo-600 font-medium">{format(new Date(a.date), 'MMM', { locale: ptBR }).toUpperCase()}</p>
-                                  <p className="text-lg font-bold text-indigo-600">{format(new Date(a.date), 'dd')}</p>
+                                <div className="bg-[#EFF6FF] rounded-lg p-2 text-center min-w-[50px]">
+                                  <p className="text-xs text-[#1E3A5F] font-medium">{format(new Date(a.date), 'MMM', { locale: ptBR }).toUpperCase()}</p>
+                                  <p className="text-lg font-bold text-[#1E3A5F]">{format(new Date(a.date), 'dd')}</p>
                                 </div>
                                 <div>
                                   <p className="text-sm font-medium text-slate-800">
@@ -1447,17 +1447,17 @@ export function CustomersPage() {
                           <div className="space-y-2 max-h-80 overflow-y-auto bg-slate-50 rounded-lg p-4">
                             {[...selectedCustomer.chatMessages].reverse().map((msg) => (
                               <div key={msg.id} className={`flex ${msg.direction === 'OUTGOING' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[75%] rounded-lg p-3 ${msg.direction === 'OUTGOING' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>
-                                  <p className={`text-xs mb-1 font-medium ${msg.direction === 'OUTGOING' ? 'text-indigo-200' : 'text-slate-500'}`}>
+                                <div className={`max-w-[75%] rounded-lg p-3 ${msg.direction === 'OUTGOING' ? 'bg-[#1E3A5F] text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>
+                                  <p className={`text-xs mb-1 font-medium ${msg.direction === 'OUTGOING' ? 'text-blue-200' : 'text-slate-500'}`}>
                                     {msg.direction === 'OUTGOING' ? 'Bot' : msg.senderName}
                                   </p>
                                   <p className="text-sm whitespace-pre-wrap">{msg.body}</p>
                                   {msg.metadata?.buttonResponseId && (
-                                    <p className={`text-xs mt-1 italic ${msg.direction === 'OUTGOING' ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                    <p className={`text-xs mt-1 italic ${msg.direction === 'OUTGOING' ? 'text-blue-200' : 'text-slate-400'}`}>
                                       Botao: {msg.metadata.buttonResponseText || msg.metadata.buttonResponseId}
                                     </p>
                                   )}
-                                  <p className={`text-xs mt-1 ${msg.direction === 'OUTGOING' ? 'text-indigo-300' : 'text-slate-400'}`}>
+                                  <p className={`text-xs mt-1 ${msg.direction === 'OUTGOING' ? 'text-blue-300' : 'text-slate-400'}`}>
                                     {format(new Date(msg.createdAt), 'dd/MM HH:mm')}
                                   </p>
                                 </div>
@@ -1470,7 +1470,7 @@ export function CustomersPage() {
                       {selectedCustomer.messagesSent && selectedCustomer.messagesSent.length > 0 && (
                         <div>
                           <h4 className="font-medium text-slate-800 mb-3 flex items-center gap-2">
-                            <Send size={16} className="text-indigo-600" /> Mensagens enviadas
+                            <Send size={16} className="text-[#1E3A5F]" /> Mensagens enviadas
                           </h4>
                           <div className="space-y-2">
                             {selectedCustomer.messagesSent.map((m) => {

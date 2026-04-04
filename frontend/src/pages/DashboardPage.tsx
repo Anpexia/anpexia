@@ -58,7 +58,7 @@ function StatCard({ title, value, subtitle, icon: Icon, accent, alert, onClick, 
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-slate-500">{title}</p>
-          <p className={`text-2xl font-bold mt-1 ${alert ? 'text-red-600' : accent ? 'text-indigo-600' : 'text-slate-800'}`}>{value}</p>
+          <p className={`text-2xl font-bold mt-1 ${alert ? 'text-red-600' : accent ? 'text-[#1E3A5F]' : 'text-slate-800'}`}>{value}</p>
           {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
         </div>
         <div className={`p-2.5 rounded-lg ${alert ? 'bg-red-50' : 'bg-slate-50'}`}>
@@ -66,7 +66,7 @@ function StatCard({ title, value, subtitle, icon: Icon, accent, alert, onClick, 
         </div>
       </div>
       {onClick && (
-        <div className="flex items-center gap-1 mt-3 text-xs text-indigo-600 font-medium">
+        <div className="flex items-center gap-1 mt-3 text-xs text-[#1E3A5F] font-medium">
           Ver detalhes <ArrowRight size={12} />
         </div>
       )}
@@ -133,7 +133,7 @@ export function DashboardPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" />
         </div>
       ) : (
         <>
@@ -189,11 +189,11 @@ export function DashboardPage() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <Calendar size={18} className="text-indigo-600" />
+                  <Calendar size={18} className="text-[#1E3A5F]" />
                   <h3 className="font-semibold text-slate-800">Pacientes de hoje</h3>
                 </div>
                 {todayAppts.length > 0 && (
-                  <button onClick={() => navigate('/agendamentos')} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                  <button onClick={() => navigate('/agendamentos')} className="text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium flex items-center gap-1">
                     Ver agenda <ArrowRight size={12} />
                   </button>
                 )}
@@ -207,7 +207,7 @@ export function DashboardPage() {
                     return (
                       <div key={a.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-blue-50/50 transition-colors">
                         <div className="flex items-center gap-3">
-                          <span className="text-sm font-medium text-indigo-600">{format(new Date(a.date), 'HH:mm')}</span>
+                          <span className="text-sm font-medium text-[#1E3A5F]">{format(new Date(a.date), 'HH:mm')}</span>
                           <div>
                             <p className="text-sm font-medium text-slate-800">{a.customer?.name || a.name}</p>
                             <p className="text-xs text-slate-500">{a.phone}</p>
@@ -308,7 +308,7 @@ export function DashboardPage() {
                   <h3 className="font-semibold text-slate-800">Estoque baixo</h3>
                 </div>
                 {lowStockProducts.length > 0 && (
-                  <button onClick={() => navigate('/estoque')} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                  <button onClick={() => navigate('/estoque')} className="text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium flex items-center gap-1">
                     Ver todos <ArrowRight size={12} />
                   </button>
                 )}
@@ -341,7 +341,7 @@ export function DashboardPage() {
                   <h3 className="font-semibold text-slate-800">Vencendo em 30 dias</h3>
                 </div>
                 {expiringProducts.length > 0 && (
-                  <button onClick={() => navigate('/estoque')} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                  <button onClick={() => navigate('/estoque')} className="text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium flex items-center gap-1">
                     Ver todos <ArrowRight size={12} />
                   </button>
                 )}

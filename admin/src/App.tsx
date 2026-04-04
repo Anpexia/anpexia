@@ -73,26 +73,26 @@ function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#152C49] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white tracking-tight">Anpexia</h1>
-          <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded mt-2 inline-block">Admin</span>
-          <p className="text-gray-400 mt-3">Painel administrativo</p>
+          <img src="/anpexia-logo-white.svg" alt="Anpexia" className="h-10 mx-auto mb-3" />
+          <span className="text-xs bg-[#2563EB] text-white px-2 py-0.5 rounded mt-2 inline-block">Admin</span>
+          <p className="text-white/60 mt-3">Painel administrativo</p>
         </div>
-        <form onSubmit={handleSubmit} className="bg-gray-900 rounded-xl border border-gray-800 p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-[#1E3A5F] rounded-xl border border-white/10 p-6 space-y-4">
           {error && (
             <div className="bg-red-900/50 border border-red-800 text-red-300 text-sm px-4 py-3 rounded-lg">{error}</div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">E-mail</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="admin@anpexia.com.br" required />
+            <label className="block text-sm font-medium text-white/70 mb-1">E-mail</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB] placeholder-white/40" placeholder="admin@anpexia.com.br" required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Senha</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+            <label className="block text-sm font-medium text-white/70 mb-1">Senha</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB] placeholder-white/40" required />
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
+          <button type="submit" disabled={loading} className="w-full bg-[#2563EB] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
@@ -216,7 +216,7 @@ function TenantsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Empresas</h2>
           <p className="text-gray-600 mt-1">Gerencie todas as empresas clientes</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
           <Plus size={18} />
           Nova empresa
         </button>
@@ -264,7 +264,7 @@ function TenantsPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium disabled:opacity-50">{saving ? 'Criando...' : 'Criar empresa'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium disabled:opacity-50">{saving ? 'Criando...' : 'Criar empresa'}</button>
               </div>
             </form>
           </div>
@@ -302,7 +302,7 @@ function TenantsPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowUserForm(null)} className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">{saving ? 'Criando...' : 'Criar usuario'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#2563EB] text-white rounded-lg text-sm font-medium disabled:opacity-50">{saving ? 'Criando...' : 'Criar usuario'}</button>
               </div>
             </form>
           </div>
@@ -454,10 +454,10 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen flex">
-      <aside className="w-64 bg-gray-900 text-white flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-gray-800">
-          <h1 className="text-xl font-bold tracking-tight">Anpexia</h1>
-          <span className="ml-2 text-xs bg-blue-600 px-2 py-0.5 rounded">Admin</span>
+      <aside className="w-64 bg-[#1E3A5F] text-white flex flex-col">
+        <div className="h-16 flex items-center px-6 border-b border-white/10">
+          <img src="/anpexia-logo-white.svg" alt="Anpexia" className="h-7" />
+          <span className="ml-3 text-xs bg-[#2563EB] px-2 py-0.5 rounded">Admin</span>
         </div>
         <nav className="flex-1 py-4 px-3">
           {navItems.map((item) => (
@@ -467,7 +467,7 @@ function AdminLayout() {
               className={({ isActive }) =>
                 clsx(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-1',
-                  isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200',
+                  isActive ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
                 )
               }
             >
@@ -476,14 +476,14 @@ function AdminLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="p-3 border-t border-gray-800">
-          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors w-full">
+        <div className="p-3 border-t border-white/10">
+          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors w-full">
             <LogOut size={20} />
             Sair
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto bg-gray-50">
+      <main className="flex-1 overflow-auto bg-[#F8FAFC]">
         <div className="max-w-7xl mx-auto p-8">
           <Outlet />
         </div>

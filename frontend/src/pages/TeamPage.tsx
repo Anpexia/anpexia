@@ -98,12 +98,12 @@ export function TeamPage() {
   const roleLabel: Record<string, string> = { SUPER_ADMIN: 'Super Admin', OWNER: 'Proprietario', MANAGER: 'Gerente', EMPLOYEE: 'Funcionario' };
   const roleBadge: Record<string, string> = {
     SUPER_ADMIN: 'bg-purple-100 text-purple-700',
-    OWNER: 'bg-indigo-100 text-indigo-700',
+    OWNER: 'bg-blue-100 text-[#1E3A5F]',
     MANAGER: 'bg-blue-100 text-blue-700',
     EMPLOYEE: 'bg-slate-100 text-slate-700',
   };
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
   return (
     <div className="space-y-6">
@@ -120,7 +120,7 @@ export function TeamPage() {
         </div>
         {isOwner && (
           <button onClick={() => { resetForm(); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+            className="flex items-center gap-2 px-4 py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A]">
             <Plus size={16} /> Adicionar Membro
           </button>
         )}
@@ -181,7 +181,7 @@ export function TeamPage() {
                               </button>
                             </>
                           )}
-                          {m.role === 'OWNER' && <Shield size={15} className="text-indigo-400" />}
+                          {m.role === 'OWNER' && <Shield size={15} className="text-[#1E3A5F]" />}
                         </div>
                       </td>
                     )}
@@ -226,7 +226,7 @@ export function TeamPage() {
                 </select>
               </div>
               <button onClick={handleCreate} disabled={submitting}
-                className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                className="w-full py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
                 {submitting ? 'Adicionando...' : 'Adicionar'}
               </button>
             </div>
@@ -263,7 +263,7 @@ export function TeamPage() {
                 </select>
               </div>
               <button onClick={handleUpdate} disabled={submitting}
-                className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                className="w-full py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
                 {submitting ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

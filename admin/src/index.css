@@ -2,8 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-primary: #1E3A5F;
+  --color-primary-light: #2A4D7A;
+  --color-primary-dark: #152C49;
+  --color-accent: #2563EB;
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-border: #BFDBFE;
+  --color-light: #EFF6FF;
+}
+
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #f8f9fa;
-  color: #212529;
+  font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg);
+  color: #1E293B;
 }

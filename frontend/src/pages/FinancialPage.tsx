@@ -262,7 +262,7 @@ export function FinancialPage() {
               onClick={() => setActiveTab(t.key)}
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === t.key
-                  ? 'border-indigo-500 text-indigo-600'
+                  ? 'border-[#2563EB] text-[#1E3A5F]'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -280,7 +280,7 @@ export function FinancialPage() {
             <select
               value={month}
               onChange={e => setMonth(Number(e.target.value))}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               {months.map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
@@ -289,7 +289,7 @@ export function FinancialPage() {
             <select
               value={year}
               onChange={e => setYear(Number(e.target.value))}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
             >
               {yearOptions.map(y => (
                 <option key={y} value={y}>{y}</option>
@@ -383,7 +383,7 @@ export function FinancialPage() {
               <select
                 value={filterType}
                 onChange={e => setFilterType(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
               >
                 <option value="">Todos os tipos</option>
                 <option value="INCOME">Receita</option>
@@ -392,7 +392,7 @@ export function FinancialPage() {
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
               >
                 <option value="">Todos os status</option>
                 <option value="PAGO">Pago</option>
@@ -403,20 +403,20 @@ export function FinancialPage() {
                 type="date"
                 value={filterStartDate}
                 onChange={e => setFilterStartDate(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 placeholder="Data início"
               />
               <input
                 type="date"
                 value={filterEndDate}
                 onChange={e => setFilterEndDate(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 placeholder="Data fim"
               />
               <div className="ml-auto">
                 <button
                   onClick={() => { setTxForm(emptyTxForm); setEditingTxId(null); setTxModal('create'); }}
-                  className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors"
                 >
                   <Plus className="w-4 h-4" /> Novo Lançamento
                 </button>
@@ -470,7 +470,7 @@ export function FinancialPage() {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => openEditTx(tx)}
-                                className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                                className="p-1.5 text-slate-400 hover:text-[#1E3A5F] transition-colors"
                                 title="Editar"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -523,13 +523,13 @@ export function FinancialPage() {
                 value={newCatName}
                 onChange={e => setNewCatName(e.target.value)}
                 placeholder="Nome da categoria"
-                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 required
               />
               <select
                 value={newCatType}
                 onChange={e => setNewCatType(e.target.value as 'INCOME' | 'EXPENSE')}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
               >
                 <option value="INCOME">Receita</option>
                 <option value="EXPENSE">Despesa</option>
@@ -537,7 +537,7 @@ export function FinancialPage() {
               <button
                 type="submit"
                 disabled={savingCat}
-                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors disabled:opacity-50"
               >
                 <Plus className="w-4 h-4" /> {savingCat ? 'Salvando...' : 'Adicionar'}
               </button>
@@ -598,7 +598,7 @@ export function FinancialPage() {
                   <select
                     value={txForm.type}
                     onChange={e => setTxForm({ ...txForm, type: e.target.value as 'INCOME' | 'EXPENSE', categoryId: '' })}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   >
                     <option value="INCOME">Receita</option>
                     <option value="EXPENSE">Despesa</option>
@@ -609,7 +609,7 @@ export function FinancialPage() {
                   <select
                     value={txForm.categoryId}
                     onChange={e => setTxForm({ ...txForm, categoryId: e.target.value })}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   >
                     <option value="">Sem categoria</option>
                     {formCategories.map(c => (
@@ -625,7 +625,7 @@ export function FinancialPage() {
                   type="text"
                   value={txForm.description}
                   onChange={e => setTxForm({ ...txForm, description: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   required
                 />
               </div>
@@ -639,7 +639,7 @@ export function FinancialPage() {
                     min="0"
                     value={txForm.amount}
                     onChange={e => setTxForm({ ...txForm, amount: e.target.value })}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                     required
                   />
                 </div>
@@ -649,7 +649,7 @@ export function FinancialPage() {
                     type="date"
                     value={txForm.date}
                     onChange={e => setTxForm({ ...txForm, date: e.target.value })}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                     required
                   />
                 </div>
@@ -661,7 +661,7 @@ export function FinancialPage() {
                   <select
                     value={txForm.paymentMethod}
                     onChange={e => setTxForm({ ...txForm, paymentMethod: e.target.value })}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   >
                     {Object.entries(paymentMethodLabels).map(([val, label]) => (
                       <option key={val} value={val}>{label}</option>
@@ -673,7 +673,7 @@ export function FinancialPage() {
                   <select
                     value={txForm.status}
                     onChange={e => setTxForm({ ...txForm, status: e.target.value })}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   >
                     <option value="PENDENTE">Pendente</option>
                     <option value="PAGO">Pago</option>
@@ -688,7 +688,7 @@ export function FinancialPage() {
                   value={txForm.notes}
                   onChange={e => setTxForm({ ...txForm, notes: e.target.value })}
                   rows={2}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] resize-none"
                 />
               </div>
 
@@ -699,7 +699,7 @@ export function FinancialPage() {
                   value={txForm.patientId}
                   onChange={e => setTxForm({ ...txForm, patientId: e.target.value })}
                   placeholder="ID do paciente vinculado"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 />
               </div>
 
@@ -714,7 +714,7 @@ export function FinancialPage() {
                 <button
                   type="submit"
                   disabled={savingTx}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  className="bg-[#1E3A5F] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors disabled:opacity-50"
                 >
                   {savingTx ? 'Salvando...' : 'Salvar'}
                 </button>
