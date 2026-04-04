@@ -7,7 +7,7 @@ interface Msg {
   time: string;
 }
 
-const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY || '';
+const API_URL = import.meta.env.VITE_API_URL || 'https://backend-production-e9a8.up.railway.app/api/v1';
 
 const SYSTEM = `Você é Ana, secretária da Clínica Oftalmologia Avançada Dr. Eloy Chicata, em Pará de Minas/MG. Você faz parte do time de atendimento de luxo. Você NÃO é um bot — você é uma pessoa real respondendo pelo WhatsApp.
 
@@ -118,23 +118,16 @@ export function EloyDemo() {
     const delay = 1500 + Math.random() * 1000;
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch(`${API_URL}/demo/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 300,
-          system: SYSTEM,
+          systemPrompt: SYSTEM,
           messages: updated.map(m => ({ role: m.role, content: m.content })),
         }),
       });
-      const data = await res.json();
-      const reply = data.content?.[0]?.text || 'Desculpa, não consegui responder agora. Pode repetir?';
+      const json = await res.json();
+      const reply = json.data?.content?.[0]?.text || 'Desculpa, não consegui responder agora. Pode repetir?';
 
       await new Promise(r => setTimeout(r, delay));
       setMessages(prev => [...prev, { role: 'assistant', content: reply, time: now() }]);

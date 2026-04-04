@@ -173,6 +173,39 @@ async function loadRoutes() {
         return res.status(500).json({ success: false, error: err.message });
       }
     });
+    // Demo chat proxy — no auth, proxies to Anthropic API
+    app.post('/api/v1/demo/chat', async (req, res) => {
+      try {
+        const { messages, systemPrompt } = req.body;
+        if (!messages || !systemPrompt) {
+          return res.status(400).json({ success: false, error: 'Missing messages or systemPrompt' });
+        }
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          return res.status(500).json({ success: false, error: 'ANTHROPIC_API_KEY not configured' });
+        }
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 300,
+            system: systemPrompt,
+            messages,
+          }),
+        });
+        const data = await response.json();
+        return res.json({ success: true, data });
+      } catch (err: any) {
+        console.error('[DEMO-CHAT] Error:', err.message);
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
     app.use('/api/v1/scheduling', schedulingRouter);
     app.use('/api/v1/sales', salesRouter);
     app.use('/api/v1/onboarding', onboardingRouter);
