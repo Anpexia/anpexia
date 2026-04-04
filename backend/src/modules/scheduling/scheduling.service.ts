@@ -166,7 +166,7 @@ async function getAvailableDates() {
 }
 
 // Book a call — auto-link to Customer by phone
-async function bookCall(data: BookCallInput) {
+async function bookCall(data: BookCallInput, tenantId?: string | null) {
   const config = await getConfig();
 
   // Validate date is available
@@ -216,8 +216,12 @@ async function bookCall(data: BookCallInput) {
 
   const call = await prisma.$transaction(async (tx) => {
     // Create the scheduled call
+    // Resolve tenantId: explicit param > customer's tenant > null
+    const resolvedTenantId = tenantId || customer?.tenantId || null;
+
     const scheduledCall = await tx.scheduledCall.create({
       data: {
+        tenantId: resolvedTenantId ?? undefined,
         name: data.name,
         email: data.email ?? undefined,
         phone: data.phone,
@@ -264,14 +268,14 @@ async function bookCall(data: BookCallInput) {
 }
 
 // List calls with pagination and filters
-async function listCalls(filters: {
+async function listCalls(tenantId: string, filters: {
   page: number;
   limit: number;
   skip: number;
   status?: string;
   date?: string;
 }) {
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { tenantId };
 
   if (filters.status) {
     where.status = filters.status;
@@ -301,7 +305,7 @@ async function listCalls(filters: {
 }
 
 // Get today's appointments for dashboard
-async function getTodayAppointments() {
+async function getTodayAppointments(tenantId: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -309,6 +313,7 @@ async function getTodayAppointments() {
 
   return prisma.scheduledCall.findMany({
     where: {
+      tenantId,
       date: { gte: today, lt: tomorrow },
       status: { notIn: ['cancelled'] },
     },
@@ -320,10 +325,10 @@ async function getTodayAppointments() {
 }
 
 // Update call status
-async function updateCallStatus(id: string, data: UpdateCallStatusInput) {
+async function updateCallStatus(id: string, data: UpdateCallStatusInput, tenantId?: string) {
   const call = await prisma.scheduledCall.findUnique({ where: { id } });
 
-  if (!call) {
+  if (!call || (tenantId && call.tenantId !== tenantId)) {
     throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
   }
 
@@ -360,10 +365,10 @@ async function updateCallStatus(id: string, data: UpdateCallStatusInput) {
 }
 
 // Cancel a call
-async function cancelCall(id: string) {
+async function cancelCall(id: string, tenantId?: string) {
   const call = await prisma.scheduledCall.findUnique({ where: { id } });
 
-  if (!call) {
+  if (!call || (tenantId && call.tenantId !== tenantId)) {
     throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
   }
 

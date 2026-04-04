@@ -3,7 +3,7 @@ import { schedulingService } from './scheduling.service';
 import { bookCallSchema, updateConfigSchema, updateCallStatusSchema } from './scheduling.validators';
 import { AppError } from '../../shared/middleware/error-handler';
 import { success, created } from '../../shared/utils/response';
-import { authenticate, requireRole } from '../../shared/middleware/auth';
+import { authenticate, requireRole, requireTenant } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
 
 const router = Router();
@@ -32,11 +32,13 @@ router.get('/available-slots/:date', async (req: Request, res: Response, next) =
   } catch (err) { next(err); }
 });
 
-// POST /book
+// POST /book (public — used by chatbot and landing page)
 router.post('/book', async (req: Request, res: Response, next) => {
   try {
     const data = bookCallSchema.parse(req.body);
-    const call = await schedulingService.bookCall(data);
+    // tenantId comes from auth if available, otherwise from body
+    const tenantId = (req as any).auth?.tenantId || req.body.tenantId || null;
+    const call = await schedulingService.bookCall(data, tenantId);
     return created(res, call);
   } catch (err) { next(err); }
 });
@@ -59,40 +61,44 @@ router.put('/config', authenticate, requireRole('SUPER_ADMIN'), async (req: Requ
 });
 
 // GET /today — today's appointments for dashboard
-router.get('/today', authenticate, async (_req: Request, res: Response, next) => {
+router.get('/today', authenticate, requireTenant, async (req: Request, res: Response, next) => {
   try {
-    const appointments = await schedulingService.getTodayAppointments();
+    const appointments = await schedulingService.getTodayAppointments(req.auth!.tenantId!);
     return success(res, appointments);
   } catch (err) { next(err); }
 });
 
 // GET /calls
-router.get('/calls', authenticate, requireRole('SUPER_ADMIN'), async (req: Request, res: Response) => {
+router.get('/calls', authenticate, requireTenant, async (req: Request, res: Response) => {
   const pagination = getPagination(req);
   const status = req.query.status as string | undefined;
   const date = req.query.date as string | undefined;
 
-  const { calls, total } = await schedulingService.listCalls({
+  const { calls, total } = await schedulingService.listCalls(req.auth!.tenantId!, {
     ...pagination,
     status,
     date,
   });
 
+  console.log('[AGENDAMENTOS] tenantId:', req.auth!.tenantId);
+  console.log('[AGENDAMENTOS] filtro status:', status, 'data:', date);
+  console.log('[AGENDAMENTOS] total encontrado:', total);
+
   return success(res, calls, paginationMeta(total, pagination.page, pagination.limit));
 });
 
 // PATCH /calls/:id
-router.patch('/calls/:id', authenticate, requireRole('SUPER_ADMIN'), async (req: Request, res: Response) => {
+router.patch('/calls/:id', authenticate, requireTenant, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const data = updateCallStatusSchema.parse(req.body);
-  const call = await schedulingService.updateCallStatus(id, data);
+  const call = await schedulingService.updateCallStatus(id, data, req.auth!.tenantId!);
   return success(res, call);
 });
 
 // DELETE /calls/:id
-router.delete('/calls/:id', authenticate, requireRole('SUPER_ADMIN'), async (req: Request, res: Response) => {
+router.delete('/calls/:id', authenticate, requireTenant, async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const call = await schedulingService.cancelCall(id);
+  const call = await schedulingService.cancelCall(id, req.auth!.tenantId!);
   return success(res, call);
 });
 

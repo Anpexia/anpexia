@@ -59,6 +59,7 @@ model Tenant {
   prescriptions         Prescription[]
   anamneses             Anamnesis[]
   patientEvolutions     PatientEvolution[]
+  scheduledCalls        ScheduledCall[]
 
   @@map("tenants")
 }
@@ -678,6 +679,7 @@ model SalesMessageTemplate {
 
 model ScheduledCall {
   id         String   @id @default(cuid())
+  tenantId   String?  @map("tenant_id")
   leadId     String?  @map("lead_id")
   customerId String?  @map("customer_id")
   name       String
@@ -691,9 +693,11 @@ model ScheduledCall {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
+  tenant   Tenant?   @relation(fields: [tenantId], references: [id])
   lead     Lead?     @relation(fields: [leadId], references: [id])
   customer Customer? @relation(fields: [customerId], references: [id])
 
+  @@index([tenantId])
   @@index([date])
   @@index([customerId])
   @@map("scheduled_calls")
