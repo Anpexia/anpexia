@@ -99,7 +99,10 @@ export const messagingService = {
 
       return { ...message, status: 'SENT' };
     } catch (error: any) {
-      // Registrar falha
+      // Re-throw AppErrors (like NO_WHATSAPP_INSTANCE) without wrapping
+      if (error instanceof AppError) throw error;
+
+      // Registrar falha de envio
       await prisma.messageSent.update({
         where: { id: message.id },
         data: { status: 'FAILED', error: error.message },
