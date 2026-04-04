@@ -151,7 +151,7 @@ function TenantsPage() {
   const [showUserForm, setShowUserForm] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({ name: '', segment: '', phone: '', email: '', plan: 'ESSENTIAL' as string });
+  const [formData, setFormData] = useState({ name: '', segment: 'OUTROS' as string, phone: '', email: '', plan: 'ESSENTIAL' as string });
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'OWNER' as string });
 
   const fetchTenants = useCallback(async () => {
@@ -171,7 +171,7 @@ function TenantsPage() {
     try {
       await api.post('/tenants', formData);
       setShowForm(false);
-      setFormData({ name: '', segment: '', phone: '', email: '', plan: 'ESSENTIAL' });
+      setFormData({ name: '', segment: 'OUTROS', phone: '', email: '', plan: 'ESSENTIAL' });
       fetchTenants();
     } catch {} finally {
       setSaving(false);
@@ -237,7 +237,12 @@ function TenantsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Segmento</label>
-                <input type="text" value={formData.segment} onChange={(e) => setFormData({ ...formData, segment: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Ex: Clinica, Restaurante, Loja..." />
+                <select value={formData.segment} onChange={(e) => setFormData({ ...formData, segment: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  <option value="OUTROS">Outros</option>
+                  <option value="CLINICA_OFTALMOLOGICA">Clínica Oftalmológica</option>
+                  <option value="CLINICA_GERAL">Clínica Geral</option>
+                  <option value="SALAO_BELEZA">Salão de Beleza</option>
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -314,7 +319,7 @@ function TenantsPage() {
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-gray-500">Segmento:</span> <span className="ml-1">{showDetail.segment || '-'}</span></div>
+                <div><span className="text-gray-500">Segmento:</span> <select value={showDetail.segment || 'OUTROS'} onChange={async (e) => { try { await api.put(`/tenants/${showDetail.id}`, { segment: e.target.value }); setShowDetail({ ...showDetail, segment: e.target.value }); } catch {} }} className="ml-1 text-sm border border-gray-300 rounded px-1 py-0.5"><option value="OUTROS">Outros</option><option value="CLINICA_OFTALMOLOGICA">Oftalmológica</option><option value="CLINICA_GERAL">Clínica Geral</option><option value="SALAO_BELEZA">Salão de Beleza</option></select></div>
                 <div><span className="text-gray-500">Plano:</span> <span className="ml-1">{planLabel[showDetail.plan]}</span></div>
                 <div><span className="text-gray-500">Telefone:</span> <span className="ml-1">{showDetail.phone || '-'}</span></div>
                 <div><span className="text-gray-500">E-mail:</span> <span className="ml-1">{showDetail.email || '-'}</span></div>

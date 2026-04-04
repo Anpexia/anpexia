@@ -6,6 +6,7 @@ import { InventoryPage } from './pages/InventoryPage';
 import { MessagesPage } from './pages/MessagesPage';
 import { SchedulingPage } from './pages/SchedulingPage';
 import { ScriptsPage } from './pages/ScriptsPage';
+import { FinancialPage } from './pages/FinancialPage';
 import { LoginPage } from './pages/LoginPage';
 import { DemoPage } from './pages/DemoPage';
 import { DemoJFPage } from './pages/DemoJFPage';
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="mensagens" element={<MessagesPage />} />
         <Route path="agendamentos" element={<SchedulingPage />} />
         <Route path="scripts" element={<ScriptsPage />} />
+        <Route path="financeiro" element={<FinancialPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

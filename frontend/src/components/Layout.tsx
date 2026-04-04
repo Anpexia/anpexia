@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
 
@@ -11,6 +11,7 @@ const navItems = [
   { to: '/mensagens', label: 'Mensagens', icon: MessageSquare },
   { to: '/agendamentos', label: 'Agendamentos', icon: Calendar },
   { to: '/scripts', label: 'Scripts', icon: BookOpen },
+  { to: '/financeiro', label: 'Financeiro', icon: DollarSign },
 ];
 
 export function Layout() {

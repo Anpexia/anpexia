@@ -19,7 +19,7 @@ export const authService = {
   async login(email: string, password: string) {
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { tenant: { select: { id: true, name: true, slug: true, plan: true } } },
+      include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
     });
 
     if (!user || !user.isActive) {
@@ -152,7 +152,7 @@ export const authService = {
         name: true,
         email: true,
         role: true,
-        tenant: { select: { id: true, name: true, slug: true, plan: true } },
+        tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } },
       },
     });
 

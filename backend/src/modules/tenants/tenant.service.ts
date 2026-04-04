@@ -1,6 +1,6 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
-import { Module } from '@prisma/client';
+import { Module, TenantSegment } from '@prisma/client';
 import { evolutionApi } from '../messaging/evolution.client';
 
 function generateSlug(name: string): string {
@@ -16,7 +16,7 @@ const DEFAULT_MODULES: Module[] = ['DASHBOARD', 'CUSTOMERS', 'INVENTORY', 'MESSA
 
 interface CreateTenantData {
   name: string;
-  segment?: string;
+  segment?: TenantSegment;
   phone?: string;
   email?: string;
   address?: string;

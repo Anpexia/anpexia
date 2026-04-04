@@ -120,6 +120,12 @@ async function loadRoutes() {
     const { supplierRouter } = await import('./modules/suppliers/supplier.controller');
     const { demoRouter } = await import('./modules/demo/demo.controller');
     const { demoJFRouter } = await import('./modules/demo-jf/demo-jf.controller');
+    const { financialRouter } = await import('./modules/financial/financial.controller');
+    const { signaturesRouter } = await import('./modules/signatures/signatures.controller');
+    const { certificatesRouter } = await import('./modules/certificates/certificates.controller');
+    const { prescriptionsRouter } = await import('./modules/prescriptions/prescriptions.controller');
+    const { anamnesisRouter } = await import('./modules/anamnesis/anamnesis.controller');
+    const { evolutionsRouter } = await import('./modules/evolutions/evolutions.controller');
 
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/tenants', tenantRouter);
@@ -173,6 +179,12 @@ async function loadRoutes() {
     app.use('/api/v1/suppliers', supplierRouter);
     app.use('/api/v1/demo', demoRouter);
     app.use('/api/v1/demo-jf', demoJFRouter);
+    app.use('/api/v1/financial', financialRouter);
+    app.use('/api/v1', signaturesRouter);
+    app.use('/api/v1', certificatesRouter);
+    app.use('/api/v1', prescriptionsRouter);
+    app.use('/api/v1', anamnesisRouter);
+    app.use('/api/v1', evolutionsRouter);
 
     const { errorHandler } = await import('./shared/middleware/error-handler');
     app.use(errorHandler);

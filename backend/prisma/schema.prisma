@@ -12,48 +12,62 @@ datasource db {
 // ==========================================
 
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String   // Nome da empresa
-  slug      String   @unique // URL-friendly identifier
-  segment   String?  // Segmento do negócio (ex: "comercio", "clinica")
+  id        String        @id @default(cuid())
+  name      String // Nome da empresa
+  slug      String        @unique // URL-friendly identifier
+  segment   TenantSegment @default(OUTROS)
   phone     String?
   email     String?
   address   String?
-  logo      String?  // URL do logo
-  smtpHost     String?  @map("smtp_host")
-  smtpPort     Int?     @map("smtp_port")
-  smtpUser     String?  @map("smtp_user")
-  smtpPass     String?  @map("smtp_pass")
-  smtpFrom     String?  @map("smtp_from")
-  isActive  Boolean  @default(true)
-  plan      Plan     @default(ESSENTIAL)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  logo      String? // URL do logo
+  smtpHost  String?       @map("smtp_host")
+  smtpPort  Int?          @map("smtp_port")
+  smtpUser  String?       @map("smtp_user")
+  smtpPass  String?       @map("smtp_pass")
+  smtpFrom  String?       @map("smtp_from")
+  isActive  Boolean       @default(true)
+  plan      Plan          @default(ESSENTIAL)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
 
   // Configuração de módulos ativos
   modules TenantModule[]
 
   // Relacionamentos
-  users              User[]
-  customers          Customer[]
-  customerTags       CustomerTag[]
-  products           Product[]
-  productCategories  ProductCategory[]
-  inventoryMovements InventoryMovement[]
-  messageTemplates   MessageTemplate[]
-  messagesSent       MessageSent[]
-  auditLogs          AuditLog[]
-  chatbotConfig      ChatbotConfig?
-  chatbotFaqs        ChatbotFaq[]
-  chatMessages       ChatMessage[]
-  convertedFromLead  Lead?
-  scriptCategories   ScriptCategory[]
-  scripts            Script[]
-  suppliers          Supplier[]
-  supplierProducts   SupplierProduct[]
-  purchaseOrders     PurchaseOrder[]
+  users                 User[]
+  customers             Customer[]
+  customerTags          CustomerTag[]
+  products              Product[]
+  productCategories     ProductCategory[]
+  inventoryMovements    InventoryMovement[]
+  messageTemplates      MessageTemplate[]
+  messagesSent          MessageSent[]
+  auditLogs             AuditLog[]
+  chatbotConfig         ChatbotConfig?
+  chatbotFaqs           ChatbotFaq[]
+  chatMessages          ChatMessage[]
+  convertedFromLead     Lead?
+  scriptCategories      ScriptCategory[]
+  scripts               Script[]
+  suppliers             Supplier[]
+  supplierProducts      SupplierProduct[]
+  purchaseOrders        PurchaseOrder[]
+  financialTransactions FinancialTransaction[]
+  financialCategories   FinancialCategory[]
+  doctorSignatures      DoctorSignature[]
+  medicalCertificates   MedicalCertificate[]
+  prescriptions         Prescription[]
+  anamneses             Anamnesis[]
+  patientEvolutions     PatientEvolution[]
 
   @@map("tenants")
+}
+
+enum TenantSegment {
+  CLINICA_OFTALMOLOGICA
+  CLINICA_GERAL
+  SALAO_BELEZA
+  OUTROS
 }
 
 enum Plan {
@@ -67,7 +81,7 @@ model TenantModule {
   tenantId  String   @map("tenant_id")
   module    Module
   isActive  Boolean  @default(true)
-  config    Json?    // Configurações específicas do módulo para este tenant
+  config    Json? // Configurações específicas do módulo para este tenant
   createdAt DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -88,17 +102,17 @@ enum Module {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  tenantId     String?  @map("tenant_id") // null para super admin
-  email        String   @unique
-  passwordHash String   @map("password_hash")
+  id           String    @id @default(cuid())
+  tenantId     String?   @map("tenant_id") // null para super admin
+  email        String    @unique
+  passwordHash String    @map("password_hash")
   name         String
-  phone        String?  // WhatsApp para receber alertas
-  role         Role     @default(EMPLOYEE)
-  isActive     Boolean  @default(true)
+  phone        String? // WhatsApp para receber alertas
+  role         Role      @default(EMPLOYEE)
+  isActive     Boolean   @default(true)
   lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   auditLogs AuditLog[]
@@ -107,10 +121,10 @@ model User {
 }
 
 enum Role {
-  SUPER_ADMIN  // Angel
-  OWNER        // Dono da empresa cliente
-  MANAGER      // Gerente
-  EMPLOYEE     // Funcionário
+  SUPER_ADMIN // Angel
+  OWNER // Dono da empresa cliente
+  MANAGER // Gerente
+  EMPLOYEE // Funcionário
 }
 
 model RefreshToken {
@@ -128,27 +142,32 @@ model RefreshToken {
 // ==========================================
 
 model Customer {
-  id          String    @id @default(cuid())
-  tenantId    String    @map("tenant_id")
-  name        String
-  phone       String?
-  email       String?
-  cpfCnpj     String?   @map("cpf_cnpj") // Criptografado
-  birthDate   DateTime? @map("birth_date")
-  address     Json?     // { cep, street, number, neighborhood, city, state }
-  insurance   String?   // "Particular" ou "NomePlano - NumCarteirinha"
-  notes       String?
-  origin      String?   // Como chegou (indicação, redes sociais, etc.)
-  optInWhatsApp Boolean @default(false) @map("opt_in_whatsapp")
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  name          String
+  phone         String?
+  email         String?
+  cpfCnpj       String?   @map("cpf_cnpj") // Criptografado
+  birthDate     DateTime? @map("birth_date")
+  address       Json? // { cep, street, number, neighborhood, city, state }
+  insurance     String? // "Particular" ou "NomePlano - NumCarteirinha"
+  notes         String?
+  origin        String? // Como chegou (indicação, redes sociais, etc.)
+  optInWhatsApp Boolean   @default(false) @map("opt_in_whatsapp")
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  tags           CustomerTagAssignment[]
-  messagesSent   MessageSent[]
-  scheduledCalls ScheduledCall[]
-  medicalRecord  MedicalRecord?
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tags                  CustomerTagAssignment[]
+  messagesSent          MessageSent[]
+  scheduledCalls        ScheduledCall[]
+  medicalRecord         MedicalRecord?
+  medicalCertificates   MedicalCertificate[]
+  prescriptions         Prescription[]
+  anamneses             Anamnesis[]
+  patientEvolutions     PatientEvolution[]
+  financialTransactions FinancialTransaction[]
 
   @@index([tenantId])
   @@map("customers")
@@ -157,11 +176,11 @@ model Customer {
 model CustomerTag {
   id        String   @id @default(cuid())
   tenantId  String   @map("tenant_id")
-  name      String   // Ex: "VIP", "Novo", "Inadimplente"
+  name      String // Ex: "VIP", "Novo", "Inadimplente"
   color     String   @default("#6B7280") // Cor hex para exibição
   createdAt DateTime @default(now()) @map("created_at")
 
-  tenant    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customers CustomerTagAssignment[]
 
   @@unique([tenantId, name])
@@ -186,21 +205,21 @@ model CustomerTagAssignment {
 // ==========================================
 
 model MedicalRecord {
-  id         String   @id @default(cuid())
-  tenantId   String   @map("tenant_id")
-  customerId String   @unique @map("customer_id")
+  id         String @id @default(cuid())
+  tenantId   String @map("tenant_id")
+  customerId String @unique @map("customer_id")
 
   // Dados clínicos fixos (atualizáveis)
-  bloodType       String?  @map("blood_type") // A+, A-, B+, B-, AB+, AB-, O+, O-
-  allergies       String?  // Texto livre
-  medications     String?  // Medicamentos em uso
-  chronicDiseases String?  @map("chronic_diseases") // Doenças crônicas
-  clinicalNotes   String?  @map("clinical_notes") // Observações clínicas gerais
+  bloodType       String? @map("blood_type") // A+, A-, B+, B-, AB+, AB-, O+, O-
+  allergies       String? // Texto livre
+  medications     String? // Medicamentos em uso
+  chronicDiseases String? @map("chronic_diseases") // Doenças crônicas
+  clinicalNotes   String? @map("clinical_notes") // Observações clínicas gerais
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   entries  MedicalEntry[]
 
   @@unique([tenantId, customerId])
@@ -214,7 +233,7 @@ model MedicalEntry {
   authorName      String   @map("author_name") // Nome do médico/profissional
   authorId        String?  @map("author_id") // userId do autor
   type            String   @default("note") // note, procedure, prescription, exam
-  content         String   // Texto da anotação
+  content         String // Texto da anotação
   createdAt       DateTime @default(now()) @map("created_at")
 
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
@@ -241,27 +260,27 @@ model ProductCategory {
 }
 
 model Product {
-  id            String    @id @default(cuid())
-  tenantId      String    @map("tenant_id")
-  name          String
-  sku           String?
-  categoryId    String?   @map("category_id")
-  quantity      Int       @default(0)
-  minQuantity   Int       @default(0) @map("min_quantity")
-  unit          String    @default("un") // un, kg, L, etc.
-  costPrice     Float?    @map("cost_price")
-  salePrice     Float?    @map("sale_price")
-  supplier      String?
-  batch         String?
-  expiresAt     DateTime? @map("expires_at")
-  location      String?
-  imageUrl      String?   @map("image_url")
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  sku         String?
+  categoryId  String?   @map("category_id")
+  quantity    Int       @default(0)
+  minQuantity Int       @default(0) @map("min_quantity")
+  unit        String    @default("un") // un, kg, L, etc.
+  costPrice   Float?    @map("cost_price")
+  salePrice   Float?    @map("sale_price")
+  supplier    String?
+  batch       String?
+  expiresAt   DateTime? @map("expires_at")
+  location    String?
+  imageUrl    String?   @map("image_url")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category         ProductCategory?  @relation(fields: [categoryId], references: [id])
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category         ProductCategory?    @relation(fields: [categoryId], references: [id])
   movements        InventoryMovement[]
   supplierProducts SupplierProduct[]
 
@@ -270,15 +289,15 @@ model Product {
 }
 
 model InventoryMovement {
-  id        String        @id @default(cuid())
-  tenantId  String        @map("tenant_id")
-  productId String        @map("product_id")
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  productId String       @map("product_id")
   type      MovementType
   quantity  Int
-  reason    String?       // Motivo da movimentação
-  reference String?       // Referência (ex: número da venda)
-  userId    String?       @map("user_id") // Quem registrou
-  createdAt DateTime      @default(now()) @map("created_at")
+  reason    String? // Motivo da movimentação
+  reference String? // Referência (ex: número da venda)
+  userId    String?      @map("user_id") // Quem registrou
+  createdAt DateTime     @default(now()) @map("created_at")
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -289,8 +308,8 @@ model InventoryMovement {
 }
 
 enum MovementType {
-  IN    // Entrada
-  OUT   // Saída
+  IN // Entrada
+  OUT // Saída
   ADJUSTMENT // Ajuste de inventário
 }
 
@@ -328,21 +347,21 @@ model Supplier {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  products        SupplierProduct[]
-  purchaseOrders  PurchaseOrder[]
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products       SupplierProduct[]
+  purchaseOrders PurchaseOrder[]
 
   @@index([tenantId])
   @@map("suppliers")
 }
 
 model SupplierProduct {
-  id              String   @id @default(cuid())
-  tenantId        String   @map("tenant_id")
-  supplierId      String   @map("supplier_id")
-  productId       String   @map("product_id")
-  isPrimary       Boolean  @default(false) @map("is_primary")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  supplierId String   @map("supplier_id")
+  productId  String   @map("product_id")
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
@@ -384,10 +403,10 @@ model MessageTemplate {
   id        String      @id @default(cuid())
   tenantId  String      @map("tenant_id")
   type      MessageType
-  name      String      // Nome amigável (ex: "Lembrete de consulta")
-  body      String      // Texto com variáveis: {nome}, {data}, {hora}
+  name      String // Nome amigável (ex: "Lembrete de consulta")
+  body      String // Texto com variáveis: {nome}, {data}, {hora}
   isActive  Boolean     @default(true)
-  config    Json?       // Configurações: horário permitido, intervalo, etc.
+  config    Json? // Configurações: horário permitido, intervalo, etc.
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
 
@@ -399,14 +418,14 @@ model MessageTemplate {
 }
 
 enum MessageType {
-  APPOINTMENT_REMINDER  // Lembrete de agendamento
-  RETURN_REMINDER       // Aviso de retorno
-  BIRTHDAY              // Aniversário
-  WELCOME               // Boas-vindas
-  LOW_STOCK_ALERT       // Alerta de estoque baixo
-  CONFIRMATION          // Confirmação de agendamento
-  POST_SERVICE          // Pós-serviço / feedback
-  CUSTOM                // Personalizada
+  APPOINTMENT_REMINDER // Lembrete de agendamento
+  RETURN_REMINDER // Aviso de retorno
+  BIRTHDAY // Aniversário
+  WELCOME // Boas-vindas
+  LOW_STOCK_ALERT // Alerta de estoque baixo
+  CONFIRMATION // Confirmação de agendamento
+  POST_SERVICE // Pós-serviço / feedback
+  CUSTOM // Personalizada
 }
 
 model MessageSent {
@@ -414,11 +433,11 @@ model MessageSent {
   tenantId   String        @map("tenant_id")
   templateId String?       @map("template_id")
   customerId String?       @map("customer_id")
-  phone      String        // Número destino
-  body       String        // Texto final enviado
+  phone      String // Número destino
+  body       String // Texto final enviado
   status     MessageStatus @default(PENDING)
   sentAt     DateTime?     @map("sent_at")
-  error      String?       // Mensagem de erro se falhou
+  error      String? // Mensagem de erro se falhou
   createdAt  DateTime      @default(now()) @map("created_at")
 
   tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -446,10 +465,10 @@ model AuditLog {
   id        String   @id @default(cuid())
   tenantId  String?  @map("tenant_id")
   userId    String?  @map("user_id")
-  action    String   // Ex: "customer.create", "product.update"
-  entity    String   // Ex: "Customer", "Product"
+  action    String // Ex: "customer.create", "product.update"
+  entity    String // Ex: "Customer", "Product"
   entityId  String?  @map("entity_id")
-  changes   Json?    // { before: {...}, after: {...} }
+  changes   Json? // { before: {...}, after: {...} }
   ip        String?
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -467,31 +486,31 @@ model AuditLog {
 // ==========================================
 
 model ChatbotConfig {
-  id                  String   @id @default(cuid())
-  tenantId            String   @unique @map("tenant_id")
-  instanceName        String?  @map("instance_name") // Nome da instância na Evolution API
-  isActive            Boolean  @default(false)
-  businessName        String?  @map("business_name")
-  businessDescription String?  @map("business_description")
-  businessHours       String?  @map("business_hours")
-  businessAddress     String?  @map("business_address")
-  businessPhone       String?  @map("business_phone")
-  servicesOffered     String?  @map("services_offered")
-  priceInfo           String?  @map("price_info")
-  customInstructions  String?  @map("custom_instructions")
-  greetingMessage     String?  @map("greeting_message")
-  fallbackMessage     String?  @map("fallback_message")
-  humanHandoffMessage String?  @map("human_handoff_message")
-  allowScheduling     Boolean  @default(false) @map("allow_scheduling")
-  allowOrderStatus    Boolean  @default(false) @map("allow_order_status")
-  maxResponseTime     Int      @default(10) @map("max_response_time")
-  operatingHoursOnly  Boolean  @default(false) @map("operating_hours_only")
-  assistantName       String?  @map("assistant_name")       // Nome do assistente virtual
-  specialties         String?                                // Especialidades da clínica
-  acceptedInsurance   String?  @map("accepted_insurance")   // Convênios aceitos
+  id                    String   @id @default(cuid())
+  tenantId              String   @unique @map("tenant_id")
+  instanceName          String?  @map("instance_name") // Nome da instância na Evolution API
+  isActive              Boolean  @default(false)
+  businessName          String?  @map("business_name")
+  businessDescription   String?  @map("business_description")
+  businessHours         String?  @map("business_hours")
+  businessAddress       String?  @map("business_address")
+  businessPhone         String?  @map("business_phone")
+  servicesOffered       String?  @map("services_offered")
+  priceInfo             String?  @map("price_info")
+  customInstructions    String?  @map("custom_instructions")
+  greetingMessage       String?  @map("greeting_message")
+  fallbackMessage       String?  @map("fallback_message")
+  humanHandoffMessage   String?  @map("human_handoff_message")
+  allowScheduling       Boolean  @default(false) @map("allow_scheduling")
+  allowOrderStatus      Boolean  @default(false) @map("allow_order_status")
+  maxResponseTime       Int      @default(10) @map("max_response_time")
+  operatingHoursOnly    Boolean  @default(false) @map("operating_hours_only")
+  assistantName         String?  @map("assistant_name") // Nome do assistente virtual
+  specialties           String? // Especialidades da clínica
+  acceptedInsurance     String?  @map("accepted_insurance") // Convênios aceitos
   requiredPatientFields String[] @default(["name", "birthDate"]) @map("required_patient_fields")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -515,14 +534,14 @@ model ChatbotFaq {
 }
 
 model ChatMessage {
-  id         String   @id @default(cuid())
-  tenantId   String   @map("tenant_id")
+  id         String        @id @default(cuid())
+  tenantId   String        @map("tenant_id")
   phone      String
-  senderName String   @map("sender_name")
+  senderName String        @map("sender_name")
   direction  ChatDirection
   body       String
   metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -566,7 +585,7 @@ model Lead {
   phone             String
   company           String?
   segment           String?
-  source            String?   // landing_page, google_ads, facebook_ads, referral, whatsapp, manual
+  source            String? // landing_page, google_ads, facebook_ads, referral, whatsapp, manual
   utmSource         String?   @map("utm_source")
   utmMedium         String?   @map("utm_medium")
   utmCampaign       String?   @map("utm_campaign")
@@ -594,23 +613,23 @@ model Lead {
 }
 
 enum LeadStage {
-  NEW              // Acabou de entrar
-  CONTACTED        // Primeira mensagem enviada
-  QUALIFIED        // Confirmou interesse
-  CALL_SCHEDULED   // Call agendada
-  CALL_DONE        // Call realizada
-  PROPOSAL_SENT    // Proposta enviada
-  NEGOTIATION      // Em negociacao
-  CONTRACTED       // Fechou contrato
-  ONBOARDING       // Em implantacao
-  ACTIVE           // Cliente ativo
-  LOST             // Perdido
+  NEW // Acabou de entrar
+  CONTACTED // Primeira mensagem enviada
+  QUALIFIED // Confirmou interesse
+  CALL_SCHEDULED // Call agendada
+  CALL_DONE // Call realizada
+  PROPOSAL_SENT // Proposta enviada
+  NEGOTIATION // Em negociacao
+  CONTRACTED // Fechou contrato
+  ONBOARDING // Em implantacao
+  ACTIVE // Cliente ativo
+  LOST // Perdido
 }
 
 model LeadMessage {
   id          String    @id @default(cuid())
   leadId      String    @map("lead_id")
-  direction   String    // outgoing, incoming
+  direction   String // outgoing, incoming
   channel     String    @default("whatsapp") // whatsapp, email
   body        String
   templateKey String?   @map("template_key")
@@ -627,7 +646,7 @@ model LeadMessage {
 model LeadActivity {
   id          String   @id @default(cuid())
   leadId      String   @map("lead_id")
-  type        String   // stage_change, note, call, message_sent, proposal_sent, follow_up
+  type        String // stage_change, note, call, message_sent, proposal_sent, follow_up
   description String
   metadata    Json?
   createdAt   DateTime @default(now()) @map("created_at")
@@ -644,7 +663,7 @@ model SalesMessageTemplate {
   name         String
   body         String
   delayMinutes Int      @default(0) @map("delay_minutes")
-  trigger      String   // on_new_lead, on_qualified, on_call_scheduled, on_no_response_48h, on_contracted, on_call_reminder
+  trigger      String // on_new_lead, on_qualified, on_call_scheduled, on_no_response_48h, on_contracted, on_call_reminder
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -751,4 +770,196 @@ model ScheduleConfig {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("schedule_config")
+}
+
+// ==========================================
+// FINANCEIRO
+// ==========================================
+
+model FinancialTransaction {
+  id            String            @id @default(cuid())
+  tenantId      String            @map("tenant_id")
+  type          TransactionType
+  category      String
+  description   String
+  amount        Decimal
+  date          DateTime
+  paymentMethod PaymentMethod
+  customerId    String?           @map("customer_id")
+  status        TransactionStatus @default(PENDENTE)
+  notes         String?
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@map("financial_transactions")
+}
+
+model FinancialCategory {
+  id        String          @id @default(cuid())
+  tenantId  String          @map("tenant_id")
+  name      String
+  type      TransactionType
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("financial_categories")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum PaymentMethod {
+  DINHEIRO
+  PIX
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  CONVENIO
+  TRANSFERENCIA
+}
+
+enum TransactionStatus {
+  PAGO
+  PENDENTE
+  CANCELADO
+}
+
+// ==========================================
+// ASSINATURA DIGITAL
+// ==========================================
+
+model DoctorSignature {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  doctorId       String   @map("doctor_id")
+  signatureImage String   @map("signature_image") // base64
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, doctorId])
+  @@map("doctor_signatures")
+}
+
+// ==========================================
+// ATESTADOS MÉDICOS
+// ==========================================
+
+model MedicalCertificate {
+  id           String          @id @default(cuid())
+  tenantId     String          @map("tenant_id")
+  patientId    String          @map("patient_id")
+  doctorId     String          @map("doctor_id")
+  type         CertificateType
+  reason       String
+  daysOff      Int?            @map("days_off")
+  startDate    DateTime        @map("start_date")
+  endDate      DateTime        @map("end_date")
+  observations String?
+  signed       Boolean         @default(false)
+  signedAt     DateTime?       @map("signed_at")
+  pdfUrl       String?         @map("pdf_url")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient Customer @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([patientId])
+  @@map("medical_certificates")
+}
+
+enum CertificateType {
+  ATESTADO
+  DECLARACAO
+}
+
+// ==========================================
+// PRESCRIÇÕES
+// ==========================================
+
+model Prescription {
+  id        String           @id @default(cuid())
+  tenantId  String           @map("tenant_id")
+  patientId String           @map("patient_id")
+  doctorId  String           @map("doctor_id")
+  type      PrescriptionType
+  data      Json
+  signed    Boolean          @default(false)
+  signedAt  DateTime?        @map("signed_at")
+  pdfUrl    String?          @map("pdf_url")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient Customer @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([patientId])
+  @@map("prescriptions")
+}
+
+enum PrescriptionType {
+  MEDICAMENTO
+  EXAME_EXTERNO
+  OCULOS
+  EXAME_INTERNO
+}
+
+// ==========================================
+// ANAMNESE OFTALMOLÓGICA
+// ==========================================
+
+model Anamnesis {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  patientId String   @map("patient_id")
+  doctorId  String   @map("doctor_id")
+  data      Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient Customer @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([patientId])
+  @@map("anamneses")
+}
+
+// ==========================================
+// EVOLUÇÃO CLÍNICA
+// ==========================================
+
+model PatientEvolution {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  patientId     String   @map("patient_id")
+  doctorId      String   @map("doctor_id")
+  appointmentId String?  @map("appointment_id")
+  subjective    String
+  objective     String
+  assessment    String
+  plan          String
+  iop_od        Decimal? @map("iop_od")
+  iop_oe        Decimal? @map("iop_oe")
+  acuity_od     String?  @map("acuity_od")
+  acuity_oe     String?  @map("acuity_oe")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient Customer @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([patientId])
+  @@map("patient_evolutions")
 }
