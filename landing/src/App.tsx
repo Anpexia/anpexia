@@ -72,7 +72,8 @@ function LandingPage() {
               href={whatsappLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex bg-[#1E3A5F] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors"
+              className="hidden sm:inline-flex text-sm font-medium transition-colors"
+              style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}
             >
               Falar no WhatsApp
             </a>
@@ -93,7 +94,7 @@ function LandingPage() {
             <a href="#recursos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Recursos</a>
             <a href="#planos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Planos</a>
             <a href="#contato" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-[#1E3A5F] py-2">Contato</a>
-            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="block bg-[#1E3A5F] text-white text-center px-5 py-2.5 rounded-lg text-sm font-medium">Falar no WhatsApp</a>
+            <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="block text-center text-sm font-medium" style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}>Falar no WhatsApp</a>
           </div>
         )}
       </header>
@@ -116,14 +117,16 @@ function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
             <a
               href="/agendar"
-              className="inline-flex items-center justify-center gap-2 bg-[#1E3A5F] text-white px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-[#2A4D7A] transition-colors"
+              className="inline-flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+              style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}
             >
               <Calendar size={16} />
               Agendar conversa gratuita
             </a>
             <a
               href="#recursos"
-              className="inline-flex items-center justify-center gap-2 border border-[#BFDBFE] text-[#1E3A5F] px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-[#EFF6FF] transition-colors"
+              className="inline-flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+              style={{ backgroundColor: '#FEF3C7', color: '#1C1208', border: 'none', borderRadius: 999, padding: '12px 28px' }}
             >
               Ver recursos
             </a>
@@ -221,7 +224,8 @@ function LandingPage() {
           <div className="text-center mt-12">
             <a
               href="/agendar"
-              className="inline-flex items-center gap-2 bg-[#1E3A5F] text-white px-8 py-3.5 rounded-xl text-sm font-medium hover:bg-[#2A4D7A] transition-colors"
+              className="inline-flex items-center gap-2 text-sm font-medium transition-colors"
+              style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}
             >
               Começar agora
               <ArrowRight size={16} />
@@ -276,7 +280,7 @@ function LandingPage() {
                   <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" />{item}</li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center py-3 border border-[#BFDBFE] text-[#1E3A5F] rounded-xl text-sm font-medium hover:bg-[#EFF6FF] transition-colors">Agendar conversa</a>
+              <a href="/agendar" className="block mt-8 text-center text-sm font-medium transition-colors" style={{ backgroundColor: 'transparent', color: '#1C1208', border: '2px solid #1C1208', borderRadius: 999, padding: '12px 28px' }}>Agendar conversa</a>
             </div>
 
             {/* Profissional */}
@@ -293,7 +297,7 @@ function LandingPage() {
                   <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-[#60A5FA] mt-0.5 shrink-0" />{item}</li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center py-3 bg-white text-[#1E3A5F] rounded-xl text-sm font-medium hover:bg-[#EFF6FF] transition-colors">Agendar conversa</a>
+              <a href="/agendar" className="block mt-8 text-center text-sm font-medium transition-colors" style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}>Agendar conversa</a>
             </div>
 
             {/* Enterprise */}
@@ -309,7 +313,7 @@ function LandingPage() {
                   <li key={item} className="flex items-start gap-2 text-sm"><CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" />{item}</li>
                 ))}
               </ul>
-              <a href="/agendar" className="block mt-8 text-center py-3 border border-[#BFDBFE] text-[#1E3A5F] rounded-xl text-sm font-medium hover:bg-[#EFF6FF] transition-colors">Agendar conversa</a>
+              <a href="/agendar" className="block mt-8 text-center text-sm font-medium transition-colors" style={{ backgroundColor: 'transparent', color: '#1C1208', border: '2px solid #1C1208', borderRadius: 999, padding: '12px 28px' }}>Agendar conversa</a>
             </div>
           </div>
           <p className="text-center text-sm text-gray-500 mt-8">
@@ -356,7 +360,7 @@ function LandingPage() {
               <h4 className="text-xl font-semibold text-gray-900 mb-2">Mensagem recebida!</h4>
               <p className="text-gray-600 mb-6">Entraremos em contato em breve pelo WhatsApp.</p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/agendar" className="inline-flex items-center justify-center gap-2 bg-[#1E3A5F] text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-[#2A4D7A]">
+                <a href="/agendar" className="inline-flex items-center justify-center gap-2 text-sm font-medium transition-colors" style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}>
                   <Calendar size={16} />
                   Agendar call agora
                 </a>
@@ -385,7 +389,7 @@ function LandingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sobre o seu negócio</label>
                 <textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} rows={4} className="w-full px-4 py-3 border border-[#BFDBFE] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent resize-none" placeholder="Conte um pouco sobre sua empresa e o que gostaria de automatizar..." />
               </div>
-              <button type="submit" disabled={submitting} className="w-full flex items-center justify-center gap-2 bg-[#1E3A5F] text-white py-3.5 rounded-xl text-sm font-medium hover:bg-[#2A4D7A] transition-colors disabled:opacity-50">
+              <button type="submit" disabled={submitting} className="w-full flex items-center justify-center gap-2 text-sm font-medium transition-colors disabled:opacity-50" style={{ backgroundColor: '#F97316', color: '#ffffff', border: 'none', borderRadius: 999, padding: '12px 28px' }}>
                 <Send size={16} />
                 {submitting ? 'Enviando...' : 'Enviar mensagem'}
               </button>
