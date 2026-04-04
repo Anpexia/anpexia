@@ -92,7 +92,7 @@ function AdminLoginPage() {
             <label className="block text-sm font-medium text-white/70 mb-1">Senha</label>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB] placeholder-white/40" required />
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-[#2563EB] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">
+          <button type="submit" disabled={loading} className="w-full btn-pill justify-center" style={{ backgroundColor: '#2563EB', color: '#fff', borderRadius: 999 }}>
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
@@ -216,7 +216,7 @@ function TenantsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Empresas</h2>
           <p className="text-gray-600 mt-1">Gerencie todas as empresas clientes</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
+        <button onClick={() => setShowForm(true)} className="btn-pill btn-primary">
           <Plus size={18} />
           Nova empresa
         </button>
@@ -263,8 +263,8 @@ function TenantsPage() {
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium disabled:opacity-50">{saving ? 'Criando...' : 'Criar empresa'}</button>
+                <button type="button" onClick={() => setShowForm(false)} className="flex-1 btn-pill btn-secondary justify-center">Cancelar</button>
+                <button type="submit" disabled={saving} className="flex-1 btn-pill btn-primary justify-center">{saving ? 'Criando...' : 'Criar empresa'}</button>
               </div>
             </form>
           </div>
@@ -301,8 +301,8 @@ function TenantsPage() {
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowUserForm(null)} className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#2563EB] text-white rounded-lg text-sm font-medium disabled:opacity-50">{saving ? 'Criando...' : 'Criar usuario'}</button>
+                <button type="button" onClick={() => setShowUserForm(null)} className="flex-1 btn-pill btn-secondary justify-center">Cancelar</button>
+                <button type="submit" disabled={saving} className="flex-1 btn-pill btn-primary justify-center">{saving ? 'Criando...' : 'Criar usuario'}</button>
               </div>
             </form>
           </div>

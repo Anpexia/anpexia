@@ -1,18 +1,20 @@
 import { useState } from 'react';
-import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, UserCircle } from 'lucide-react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/clientes', label: 'Clientes', icon: Users },
-  { to: '/estoque', label: 'Estoque', icon: Package },
-  { to: '/mensagens', label: 'Mensagens', icon: MessageSquare },
-  { to: '/agendamentos', label: 'Agendamentos', icon: Calendar },
-  { to: '/scripts', label: 'Scripts', icon: BookOpen },
-  { to: '/financeiro', label: 'Financeiro', icon: DollarSign },
-  { to: '/equipe', label: 'Equipe', icon: UsersRound },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/clientes', label: 'Clientes', icon: Users },
+  { path: '/estoque', label: 'Estoque', icon: Package },
+  { path: '/mensagens', label: 'Mensagens', icon: MessageSquare },
+  { path: '/agendamentos', label: 'Agendamentos', icon: Calendar },
+  { path: '/scripts', label: 'Scripts', icon: BookOpen },
+  { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
+  { path: '/equipe', label: 'Equipe', icon: UsersRound },
+  { path: '/assinatura', label: 'Assinatura Digital', icon: PenLine },
+  { path: '/perfil', label: 'Meu Perfil', icon: UserCircle },
 ];
 
 export function Layout() {
@@ -33,7 +35,7 @@ export function Layout() {
         style={{ backgroundColor: '#1E3A5F' }}
       >
         <img src="/anpexia-logo.svg" alt="Anpexia" className="h-7" style={{ filter: 'brightness(0) invert(1)' }} />
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded-lg text-white" style={{ cursor: 'pointer' }}>
+        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded-lg text-white">
           {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
@@ -58,11 +60,11 @@ export function Layout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-3">
+        <nav className="flex-1 py-4 px-3 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
-              key={item.to}
-              to={item.to}
+              key={item.path}
+              to={item.path}
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-1"
               style={({ isActive }) => ({
@@ -77,24 +79,8 @@ export function Layout() {
           ))}
         </nav>
 
-        {/* User info + Logout */}
+        {/* Logout */}
         <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          {user && (
-            <Link
-              to="/perfil"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2 mb-2 rounded-lg transition-colors"
-              style={{ color: '#BFDBFE' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-            >
-              <UserCircle size={20} />
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: '#FFFFFF' }}>{user.name}</p>
-                <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{user.tenant?.name || 'Admin'}</p>
-              </div>
-            </Link>
-          )}
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full"

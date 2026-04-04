@@ -120,7 +120,7 @@ export function TeamPage() {
         </div>
         {isOwner && (
           <button onClick={() => { resetForm(); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A]">
+            className="btn-pill btn-primary">
             <Plus size={16} /> Adicionar Membro
           </button>
         )}
@@ -226,7 +226,7 @@ export function TeamPage() {
                 </select>
               </div>
               <button onClick={handleCreate} disabled={submitting}
-                className="w-full py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                className="w-full btn-pill btn-primary justify-center">
                 {submitting ? 'Adicionando...' : 'Adicionar'}
               </button>
             </div>
@@ -263,7 +263,7 @@ export function TeamPage() {
                 </select>
               </div>
               <button onClick={handleUpdate} disabled={submitting}
-                className="w-full py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                className="w-full btn-pill btn-primary justify-center">
                 {submitting ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

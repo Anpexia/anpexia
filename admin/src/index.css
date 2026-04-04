@@ -14,7 +14,39 @@
 }
 
 body {
-  font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   background-color: var(--color-bg);
   color: #1E293B;
 }
+
+/* Pill buttons */
+.btn-pill {
+  border-radius: 999px;
+  padding: 9px 24px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.btn-primary {
+  background-color: #1E3A5F;
+  color: #fff;
+  border: none;
+}
+.btn-primary:hover { background-color: #2A4D7A; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  background-color: #EFF6FF;
+  color: #1E3A5F;
+  border: 1px solid #BFDBFE;
+}
+.btn-secondary:hover { background-color: #DBEAFE; }
+.btn-destructive {
+  background-color: #FEE2E2;
+  color: #991B1B;
+  border: none;
+}
+.btn-destructive:hover { background-color: #FECACA; }
