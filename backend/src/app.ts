@@ -174,7 +174,7 @@ async function loadRoutes() {
       }
     });
     // Demo chat proxy — no auth, proxies to Anthropic API
-    app.post('/api/v1/demo/chat', async (req, res) => {
+    app.post('/api/v1/demo-eloy/chat', async (req, res) => {
       try {
         const { messages, systemPrompt } = req.body;
         if (!messages || !systemPrompt) {

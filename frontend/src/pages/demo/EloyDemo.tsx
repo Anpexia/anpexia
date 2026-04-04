@@ -118,7 +118,7 @@ export function EloyDemo() {
     const delay = 1500 + Math.random() * 1000;
 
     try {
-      const res = await fetch(`${API_URL}/demo/chat`, {
+      const res = await fetch(`${API_URL}/demo-eloy/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
