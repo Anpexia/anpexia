@@ -66,6 +66,7 @@ model Tenant {
 enum TenantSegment {
   CLINICA_OFTALMOLOGICA
   CLINICA_GERAL
+  CLINICA_MEDICA
   SALAO_BELEZA
   OUTROS
 }

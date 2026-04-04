@@ -1,4 +1,4 @@
-export type TenantSegment = 'CLINICA_OFTALMOLOGICA' | 'CLINICA_GERAL' | 'SALAO_BELEZA' | 'OUTROS';
+export type TenantSegment = 'CLINICA_OFTALMOLOGICA' | 'CLINICA_GERAL' | 'CLINICA_MEDICA' | 'SALAO_BELEZA' | 'OUTROS';
 
 export function hasSegment(tenant: { segment?: string } | null | undefined, segment: TenantSegment): boolean {
   return tenant?.segment === segment;

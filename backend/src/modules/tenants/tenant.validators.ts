@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const tenantSegmentEnum = z.enum(['CLINICA_OFTALMOLOGICA', 'CLINICA_GERAL', 'SALAO_BELEZA', 'OUTROS']);
+const tenantSegmentEnum = z.enum(['CLINICA_OFTALMOLOGICA', 'CLINICA_GERAL', 'CLINICA_MEDICA', 'SALAO_BELEZA', 'OUTROS']);
 
 export const createTenantSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
