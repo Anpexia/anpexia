@@ -53,7 +53,7 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 
 | Servico | Plataforma | URL |
 |---------|-----------|-----|
-| Backend API | Railway | https://fluxia-production.up.railway.app |
+| Backend API | Railway | https://anpexia-production.up.railway.app |
 | Frontend app | Vercel | https://anpexia-app.vercel.app |
 | Admin painel | Vercel | https://admin-nine-pied.vercel.app |
 | Landing page | Vercel | https://anpexia-landing.vercel.app |
