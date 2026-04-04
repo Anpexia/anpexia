@@ -293,20 +293,21 @@ function LandingPage() {
             <p style={{ color: '#92400E', fontSize: '0.95rem' }}>Escolha o que faz sentido para o seu negócio</p>
           </div>
           <div ref={plansReveal.ref} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
-            {/* Essencial */}
+            {/* Starter */}
             <div style={{
               backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 16, padding: 32,
               opacity: plansReveal.visible ? 1 : 0, transform: plansReveal.visible ? 'translateY(0)' : 'translateY(30px)',
               transition: 'opacity 0.6s 0s, transform 0.6s 0s',
             }}>
-              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#1C1208' }}>Essencial</h3>
+              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#1C1208' }}>Starter</h3>
               <p style={{ color: '#92400E', fontSize: '0.8rem', marginTop: 4 }}>Para quem está começando a automatizar</p>
               <div style={{ marginTop: 20 }}>
-                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#1C1208' }}>R$2.000</span>
+                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#1C1208' }}>R$1.200</span>
                 <span style={{ color: '#92400E', fontSize: '0.875rem' }}>/mês</span>
               </div>
-              <ul style={{ listStyle: 'none', padding: 0, marginTop: 24 }}>
-                {['Até 4 automações', '5 usuários', '500 contatos', '300 msgs WhatsApp/mês', 'Painel personalizado', 'Suporte WhatsApp', '1 reunião mensal', 'Implantação inclusa'].map(f => (
+              <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.8rem', marginTop: 8 }}>2 automações incluídas</p>
+              <ul style={{ listStyle: 'none', padding: 0, marginTop: 20 }}>
+                {['2 automações', '3 usuários', '300 contatos', '200 msgs WhatsApp/mês', 'Painel personalizado', 'Suporte WhatsApp', '1 reunião mensal', 'Implantação inclusa'].map(f => (
                   <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: '#1C1208' }}>
                     <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
                   </li>
@@ -315,21 +316,22 @@ function LandingPage() {
               <a href="/agendar" style={{ ...btnSecLight, width: '100%', marginTop: 24, boxSizing: 'border-box' as const }}>Agendar conversa</a>
             </div>
 
-            {/* Profissional */}
+            {/* Pro */}
             <div style={{
-              backgroundColor: '#1C1208', borderRadius: 16, padding: 32, position: 'relative' as const,
+              backgroundColor: '#1C1208', border: '1px solid #F97316', borderRadius: 16, padding: 32, position: 'relative' as const,
               opacity: plansReveal.visible ? 1 : 0, transform: plansReveal.visible ? 'translateY(0)' : 'translateY(30px)',
               transition: 'opacity 0.6s 0.15s, transform 0.6s 0.15s',
             }}>
               <div style={{ position: 'absolute' as const, top: -12, left: '50%', transform: 'translateX(-50%)', backgroundColor: '#F97316', color: '#fff', fontSize: '0.7rem', fontWeight: 600, padding: '4px 14px', borderRadius: 999 }}>Mais popular</div>
-              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#FEF3C7' }}>Profissional</h3>
+              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#FEF3C7' }}>Pro</h3>
               <p style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.8rem', marginTop: 4 }}>Para quem quer escalar resultados</p>
               <div style={{ marginTop: 20 }}>
-                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#FEF3C7' }}>R$3.500</span>
+                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#FEF3C7' }}>R$2.000</span>
                 <span style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.875rem' }}>/mês</span>
               </div>
-              <ul style={{ listStyle: 'none', padding: 0, marginTop: 24 }}>
-                {['Até 7 automações', '15 usuários', '2.000 contatos', '1.000 msgs WhatsApp/mês', 'Relatórios automatizados', 'Integrações externas', 'Suporte prioritário', '2 reuniões mensais'].map(f => (
+              <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.8rem', marginTop: 8 }}>4 automações incluídas</p>
+              <ul style={{ listStyle: 'none', padding: 0, marginTop: 20 }}>
+                {['4 automações', '10 usuários', '1.000 contatos', '500 msgs WhatsApp/mês', 'Relatórios automatizados', 'Integrações externas', 'Suporte prioritário', '2 reuniões mensais'].map(f => (
                   <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: 'rgba(254,243,199,0.7)' }}>
                     <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
                   </li>
@@ -338,20 +340,21 @@ function LandingPage() {
               <a href="/agendar" style={{ ...btnPrimary, width: '100%', marginTop: 24, boxSizing: 'border-box' as const }}>Agendar conversa</a>
             </div>
 
-            {/* Enterprise */}
+            {/* Business */}
             <div style={{
               backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 16, padding: 32,
               opacity: plansReveal.visible ? 1 : 0, transform: plansReveal.visible ? 'translateY(0)' : 'translateY(30px)',
               transition: 'opacity 0.6s 0.3s, transform 0.6s 0.3s',
             }}>
-              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#1C1208' }}>Enterprise</h3>
-              <p style={{ color: '#92400E', fontSize: '0.8rem', marginTop: 4 }}>Para operações de alta performance</p>
+              <h3 style={{ fontWeight: 700, fontSize: '1.125rem', color: '#1C1208' }}>Business</h3>
+              <p style={{ color: '#92400E', fontSize: '0.8rem', marginTop: 4 }}>Para operações que precisam de mais poder</p>
               <div style={{ marginTop: 20 }}>
-                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#1C1208' }}>R$6.000</span>
+                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#1C1208' }}>R$3.000</span>
                 <span style={{ color: '#92400E', fontSize: '0.875rem' }}>/mês</span>
               </div>
-              <ul style={{ listStyle: 'none', padding: 0, marginTop: 24 }}>
-                {['Automações ilimitadas', 'Usuários ilimitados', '10.000 contatos', '5.000 msgs WhatsApp/mês', 'Todas as integrações', 'Relatórios customizados', 'Gerente dedicado', 'Reuniões semanais', 'SLA 2h'].map(f => (
+              <p style={{ color: '#F97316', fontWeight: 600, fontSize: '0.8rem', marginTop: 8 }}>6 automações incluídas</p>
+              <ul style={{ listStyle: 'none', padding: 0, marginTop: 20 }}>
+                {['6 automações', '20 usuários', '3.000 contatos', '1.500 msgs WhatsApp/mês', 'Todas as integrações', 'Relatórios customizados', 'Suporte dedicado', 'Reuniões semanais'].map(f => (
                   <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', marginBottom: 10, color: '#1C1208' }}>
                     <CheckCircle size={15} style={{ color: '#F97316', flexShrink: 0, marginTop: 2 }} />{f}
                   </li>
@@ -361,7 +364,7 @@ function LandingPage() {
             </div>
           </div>
           <p style={{ textAlign: 'center' as const, fontSize: '0.85rem', color: '#92400E', marginTop: 32 }}>
-            Precisa de mais automações? <a href="#contato" style={{ color: '#F97316', textDecoration: 'none', fontWeight: 600 }}>Fale conosco</a>
+            Precisa de mais automações? <a href="#contato" style={{ color: '#F97316', textDecoration: 'none', fontWeight: 700 }}>Fale conosco</a>
           </p>
         </div>
       </section>
