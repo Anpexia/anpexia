@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign } from 'lucide-react';
+import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom';
+import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, UserCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
 
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/agendamentos', label: 'Agendamentos', icon: Calendar },
   { to: '/scripts', label: 'Scripts', icon: BookOpen },
   { to: '/financeiro', label: 'Financeiro', icon: DollarSign },
+  { to: '/equipe', label: 'Equipe', icon: UsersRound },
 ];
 
 export function Layout() {
@@ -75,10 +76,13 @@ export function Layout() {
         {/* User info + Logout */}
         <div className="p-3 border-t border-slate-200">
           {user && (
-            <div className="px-3 py-2 mb-2">
-              <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
-              <p className="text-xs text-slate-500 truncate">{user.tenant?.name || 'Admin'}</p>
-            </div>
+            <Link to="/perfil" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 mb-2 rounded-lg hover:bg-slate-50 transition-colors group">
+              <UserCircle size={20} className="text-slate-400 group-hover:text-indigo-500" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
+                <p className="text-xs text-slate-500 truncate">{user.tenant?.name || 'Admin'}</p>
+              </div>
+            </Link>
           )}
           <button
             onClick={handleLogout}
