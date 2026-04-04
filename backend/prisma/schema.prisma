@@ -26,7 +26,7 @@ model Tenant {
   smtpPass  String?       @map("smtp_pass")
   smtpFrom  String?       @map("smtp_from")
   isActive  Boolean       @default(true)
-  plan      Plan          @default(ESSENTIAL)
+  plan      Plan          @default(STARTER)
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
 
@@ -72,9 +72,9 @@ enum TenantSegment {
 }
 
 enum Plan {
-  ESSENTIAL
-  PROFESSIONAL
-  ENTERPRISE
+  STARTER
+  PRO
+  BUSINESS
 }
 
 model TenantModule {

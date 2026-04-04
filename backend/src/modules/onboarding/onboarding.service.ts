@@ -34,7 +34,7 @@ export const onboardingService = {
         name: tenantName,
         slug,
         segment: (lead.segment as any) || 'OUTROS',
-        plan: lead.plan || 'ESSENTIAL',
+        plan: lead.plan || 'STARTER',
         phone: lead.phone,
         email: lead.email,
         modules: {

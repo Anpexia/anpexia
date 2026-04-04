@@ -110,7 +110,7 @@ function OverviewPage() {
     api.get('/tenants?limit=100').then(({ data }) => {
       const tenants = data.data;
       const active = tenants.filter((t: any) => t.isActive).length;
-      const planPrices: Record<string, number> = { ESSENTIAL: 2000, PROFESSIONAL: 3500, ENTERPRISE: 6000 };
+      const planPrices: Record<string, number> = { STARTER: 1200, PRO: 2000, BUSINESS: 3000 };
       const mrr = tenants.filter((t: any) => t.isActive).reduce((sum: number, t: any) => sum + (planPrices[t.plan] || 0), 0);
       const users = tenants.reduce((sum: number, t: any) => sum + (t._count?.users || 0), 0);
       setStats({
@@ -151,7 +151,7 @@ function TenantsPage() {
   const [showUserForm, setShowUserForm] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({ name: '', segment: 'OUTROS' as string, phone: '', email: '', plan: 'ESSENTIAL' as string });
+  const [formData, setFormData] = useState({ name: '', segment: 'OUTROS' as string, phone: '', email: '', plan: 'STARTER' as string });
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'OWNER' as string });
 
   const fetchTenants = useCallback(async () => {
@@ -171,7 +171,7 @@ function TenantsPage() {
     try {
       await api.post('/tenants', formData);
       setShowForm(false);
-      setFormData({ name: '', segment: 'OUTROS', phone: '', email: '', plan: 'ESSENTIAL' });
+      setFormData({ name: '', segment: 'OUTROS', phone: '', email: '', plan: 'STARTER' });
       fetchTenants();
     } catch {} finally {
       setSaving(false);
@@ -207,7 +207,7 @@ function TenantsPage() {
     } catch {}
   };
 
-  const planLabel: Record<string, string> = { ESSENTIAL: 'Essencial', PROFESSIONAL: 'Profissional', ENTERPRISE: 'Enterprise' };
+  const planLabel: Record<string, string> = { STARTER: 'Starter', PRO: 'Pro', BUSINESS: 'Business' };
 
   return (
     <div>
@@ -257,9 +257,9 @@ function TenantsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Plano</label>
                 <select value={formData.plan} onChange={(e) => setFormData({ ...formData, plan: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                  <option value="ESSENTIAL">Essencial — R$2.000/mes</option>
-                  <option value="PROFESSIONAL">Profissional — R$3.500/mes</option>
-                  <option value="ENTERPRISE">Enterprise — R$6.000/mes</option>
+                  <option value="STARTER">Starter — R$1.200/mes</option>
+                  <option value="PRO">Pro — R$2.000/mes</option>
+                  <option value="BUSINESS">Business — R$3.000/mes</option>
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
@@ -391,8 +391,8 @@ function TenantsPage() {
                   <td className="px-6 py-4 text-sm text-gray-600">{t.segment || '-'}</td>
                   <td className="px-6 py-4 text-sm">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      t.plan === 'ENTERPRISE' ? 'bg-purple-100 text-purple-700' :
-                      t.plan === 'PROFESSIONAL' ? 'bg-blue-100 text-blue-700' :
+                      t.plan === 'BUSINESS' ? 'bg-purple-100 text-purple-700' :
+                      t.plan === 'PRO' ? 'bg-blue-100 text-blue-700' :
                       'bg-gray-100 text-gray-700'
                     }`}>{planLabel[t.plan]}</span>
                   </td>

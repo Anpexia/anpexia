@@ -8,7 +8,7 @@ export const createTenantSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email('E-mail inválido').optional(),
   address: z.string().optional(),
-  plan: z.enum(['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
+  plan: z.enum(['STARTER', 'PRO', 'BUSINESS']).optional(),
 });
 
 export const updateTenantSchema = z.object({
@@ -17,6 +17,6 @@ export const updateTenantSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional(),
   address: z.string().optional(),
-  plan: z.enum(['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
+  plan: z.enum(['STARTER', 'PRO', 'BUSINESS']).optional(),
   logo: z.string().optional(),
 });

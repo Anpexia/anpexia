@@ -18,7 +18,7 @@ export const createLeadSchema = z.object({
   utmContent: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   monthlyValue: z.number().optional().nullable(),
-  plan: z.enum(['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE']).optional().nullable(),
+  plan: z.enum(['STARTER', 'PRO', 'BUSINESS']).optional().nullable(),
   score: z.number().int().optional(),
   nextFollowUp: z.string().datetime().optional().nullable(),
 });
@@ -36,7 +36,7 @@ export const updateLeadSchema = z.object({
   utmContent: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   monthlyValue: z.number().optional().nullable(),
-  plan: z.enum(['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE']).optional().nullable(),
+  plan: z.enum(['STARTER', 'PRO', 'BUSINESS']).optional().nullable(),
   score: z.number().int().optional(),
   nextFollowUp: z.string().datetime().optional().nullable(),
   stage: LeadStage.optional(),

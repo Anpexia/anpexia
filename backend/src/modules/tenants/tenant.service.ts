@@ -20,7 +20,7 @@ interface CreateTenantData {
   phone?: string;
   email?: string;
   address?: string;
-  plan?: 'ESSENTIAL' | 'PROFESSIONAL' | 'ENTERPRISE';
+  plan?: 'STARTER' | 'PRO' | 'BUSINESS';
 }
 
 export const tenantService = {
@@ -75,7 +75,7 @@ export const tenantService = {
         phone: data.phone,
         email: data.email,
         address: data.address,
-        plan: data.plan || 'ESSENTIAL',
+        plan: data.plan || 'STARTER',
         modules: {
           create: DEFAULT_MODULES.map((module) => ({
             module,
