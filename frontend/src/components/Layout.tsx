@@ -8,12 +8,12 @@ const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/clientes', label: 'Clientes', icon: Users },
   { path: '/estoque', label: 'Estoque', icon: Package },
+  { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { path: '/mensagens', label: 'Mensagens', icon: MessageSquare },
   { path: '/agendamentos', label: 'Agendamentos', icon: Calendar },
   { path: '/scripts', label: 'Scripts', icon: BookOpen },
-  { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
+  { path: '/assinatura', label: 'Assinatura', icon: PenLine },
   { path: '/equipe', label: 'Equipe', icon: UsersRound },
-  { path: '/assinatura', label: 'Assinatura Digital', icon: PenLine },
   { path: '/perfil', label: 'Meu Perfil', icon: UserCircle },
 ];
 
