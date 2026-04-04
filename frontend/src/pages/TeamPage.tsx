@@ -29,7 +29,7 @@ export function TeamPage() {
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [formRole, setFormRole] = useState<'MANAGER' | 'EMPLOYEE'>('EMPLOYEE');
+  const [formRole, setFormRole] = useState<'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'>('RECEPTIONIST');
   const [submitting, setSubmitting] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
@@ -86,20 +86,24 @@ export function TeamPage() {
     }
   };
 
-  const resetForm = () => { setFormName(''); setFormEmail(''); setFormPassword(''); setFormPhone(''); setFormRole('EMPLOYEE'); };
+  const resetForm = () => { setFormName(''); setFormEmail(''); setFormPassword(''); setFormPhone(''); setFormRole('RECEPTIONIST'); };
 
   const openEdit = (m: TeamMember) => {
     setEditMember(m);
     setFormName(m.name);
     setFormPhone(m.phone || '');
-    setFormRole(m.role === 'OWNER' ? 'MANAGER' : (m.role as 'MANAGER' | 'EMPLOYEE'));
+    setFormRole(m.role === 'OWNER' ? 'MANAGER' : (m.role as any));
   };
 
-  const roleLabel: Record<string, string> = { SUPER_ADMIN: 'Super Admin', OWNER: 'Proprietario', MANAGER: 'Gerente', EMPLOYEE: 'Funcionario' };
+  const roleLabel: Record<string, string> = { SUPER_ADMIN: 'Super Admin', OWNER: 'Proprietario', MANAGER: 'Gerente', DOCTOR: 'Medico', RECEPTIONIST: 'Recepcionista', FINANCIAL: 'Financeiro', STOCK: 'Estoque', EMPLOYEE: 'Funcionario' };
   const roleBadge: Record<string, string> = {
     SUPER_ADMIN: 'bg-purple-100 text-purple-700',
     OWNER: 'bg-blue-100 text-[#1E3A5F]',
     MANAGER: 'bg-blue-100 text-blue-700',
+    DOCTOR: 'bg-emerald-100 text-emerald-700',
+    RECEPTIONIST: 'bg-amber-100 text-amber-700',
+    FINANCIAL: 'bg-cyan-100 text-cyan-700',
+    STOCK: 'bg-orange-100 text-orange-700',
     EMPLOYEE: 'bg-slate-100 text-slate-700',
   };
 
@@ -221,8 +225,12 @@ export function TeamPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
                 <select value={formRole} onChange={e => setFormRole(e.target.value as any)} className={inputCls}>
-                  <option value="EMPLOYEE">Funcionario</option>
+                  <option value="OWNER">Proprietario</option>
                   <option value="MANAGER">Gerente</option>
+                  <option value="DOCTOR">Medico</option>
+                  <option value="RECEPTIONIST">Recepcionista</option>
+                  <option value="FINANCIAL">Financeiro</option>
+                  <option value="STOCK">Estoque</option>
                 </select>
               </div>
               <button onClick={handleCreate} disabled={submitting}
@@ -258,8 +266,12 @@ export function TeamPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
                 <select value={formRole} onChange={e => setFormRole(e.target.value as any)} className={inputCls}>
-                  <option value="EMPLOYEE">Funcionario</option>
+                  <option value="OWNER">Proprietario</option>
                   <option value="MANAGER">Gerente</option>
+                  <option value="DOCTOR">Medico</option>
+                  <option value="RECEPTIONIST">Recepcionista</option>
+                  <option value="FINANCIAL">Financeiro</option>
+                  <option value="STOCK">Estoque</option>
                 </select>
               </div>
               <button onClick={handleUpdate} disabled={submitting}

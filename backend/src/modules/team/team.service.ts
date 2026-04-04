@@ -7,7 +7,7 @@ interface CreateMemberData {
   email: string;
   password: string;
   phone?: string;
-  role: 'MANAGER' | 'EMPLOYEE';
+  role: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
 }
 
 export const teamService = {
@@ -60,7 +60,7 @@ export const teamService = {
     return user;
   },
 
-  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'MANAGER' | 'EMPLOYEE' }) {
+  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE' }) {
     const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario nao encontrado');
 

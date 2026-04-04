@@ -125,7 +125,11 @@ enum Role {
   SUPER_ADMIN // Angel
   OWNER // Dono da empresa cliente
   MANAGER // Gerente
-  EMPLOYEE // Funcionário
+  DOCTOR // Médico
+  RECEPTIONIST // Recepcionista
+  FINANCIAL // Financeiro
+  STOCK // Estoque
+  EMPLOYEE // Funcionário (legado)
 }
 
 model RefreshToken {
