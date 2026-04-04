@@ -110,6 +110,10 @@ export function SchedulingPage() {
   // Status update
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  // Toast
+  const [toastMsg, setToastMsg] = useState('');
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 4000); };
+
   const fetchAppointments = useCallback(async () => {
     try {
       const { data } = await api.get('/scheduling/calls');
@@ -199,7 +203,11 @@ export function SchedulingPage() {
       setShowBookModal(false);
       fetchAppointments();
       fetchDates();
-    } catch {} finally { setSaving(false); }
+      showToast('Agendamento criado com sucesso!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || 'Erro ao criar agendamento. Tente novamente.';
+      showToast(msg);
+    } finally { setSaving(false); }
   };
 
   const handleStatusChange = async (id: string, status: string) => {
@@ -207,7 +215,7 @@ export function SchedulingPage() {
     try {
       await api.patch(`/scheduling/calls/${id}`, { status });
       fetchAppointments();
-    } catch {} finally { setUpdatingId(null); }
+    } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao atualizar status.'); } finally { setUpdatingId(null); }
   };
 
   const handleCancel = async (id: string) => {
@@ -215,7 +223,8 @@ export function SchedulingPage() {
       await api.delete(`/scheduling/calls/${id}`);
       fetchAppointments();
       fetchDates();
-    } catch {}
+      showToast('Agendamento cancelado.');
+    } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao cancelar agendamento.'); }
   };
 
   const upcomingAppointments = appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed');
@@ -467,6 +476,12 @@ export function SchedulingPage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-lg shadow-lg text-sm z-[9999] max-w-sm">
+          {toastMsg}
         </div>
       )}
     </div>

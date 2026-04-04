@@ -266,17 +266,22 @@ export function InventoryPage() {
         const Quagga = (await import('@ericblade/quagga2')).default;
         scannerRef.current = Quagga;
 
+        // Check camera availability before initializing Quagga
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setToast({ message: 'Seu navegador nao suporta acesso a camera. Use Chrome ou Firefox.', type: 'error' });
+          setCameraOpen(false);
+          return;
+        }
+
         Quagga.init({
           inputStream: {
             name: 'Live',
             type: 'LiveStream',
             target: document.querySelector('#scanner-region') as Element,
             constraints: {
-              facingMode: 'environment',
-              width: { min: 1280, ideal: 1920 },
-              height: { min: 720, ideal: 1080 },
-              // @ts-ignore
-              focusMode: 'continuous',
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
             },
             // Tight capture area — only center strip, ignores screen edges/text
             area: { top: '40%', right: '10%', bottom: '40%', left: '10%' },
@@ -298,7 +303,16 @@ export function InventoryPage() {
         }, (err: any) => {
           if (err) {
             console.error('Quagga init error:', err);
-            setToast({ message: 'Erro ao acessar camera. Verifique as permissoes.', type: 'error' });
+            const errMsg = String(err?.message || err || '');
+            if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission')) {
+              setToast({ message: 'Permissao de camera negada. Libere o acesso nas configuracoes do navegador.', type: 'error' });
+            } else if (errMsg.includes('NotFoundError') || errMsg.includes('DevicesNotFound')) {
+              setToast({ message: 'Nenhuma camera encontrada. Conecte uma webcam ou use um celular.', type: 'error' });
+            } else if (errMsg.includes('NotReadableError') || errMsg.includes('TrackStartError')) {
+              setToast({ message: 'Camera em uso por outro aplicativo. Feche outros apps e tente novamente.', type: 'error' });
+            } else {
+              setToast({ message: `Erro ao acessar camera: ${errMsg || 'verifique as permissoes'}`, type: 'error' });
+            }
             setCameraOpen(false);
             return;
           }
@@ -328,9 +342,16 @@ export function InventoryPage() {
             }
           });
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error('Camera error:', err);
-        setToast({ message: 'Erro ao acessar camera. Verifique as permissoes.', type: 'error' });
+        const errMsg = String(err?.message || err || '');
+        if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission')) {
+          setToast({ message: 'Permissao de camera negada. Libere o acesso nas configuracoes do navegador.', type: 'error' });
+        } else if (errMsg.includes('NotFoundError') || errMsg.includes('DevicesNotFound')) {
+          setToast({ message: 'Nenhuma camera encontrada. Conecte uma webcam ou use um celular.', type: 'error' });
+        } else {
+          setToast({ message: `Erro ao acessar camera: ${errMsg || 'verifique as permissoes'}`, type: 'error' });
+        }
         setCameraOpen(false);
       }
     }, 150);

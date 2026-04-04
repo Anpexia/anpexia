@@ -80,7 +80,16 @@ export const messagingService = {
 
     try {
       // Enviar via Evolution API (resolve tenantId → instanceName)
-      await evolutionApi.sendTextByTenant(tenantId, data.phone, data.body);
+      const sendResult = await evolutionApi.sendTextByTenant(tenantId, data.phone, data.body);
+
+      if (sendResult === null) {
+        // No WhatsApp instance configured — mark as failed, not sent
+        await prisma.messageSent.update({
+          where: { id: message.id },
+          data: { status: 'FAILED', error: 'Instancia WhatsApp nao configurada para este tenant' },
+        });
+        throw new AppError(400, 'NO_WHATSAPP_INSTANCE', 'WhatsApp nao esta configurado. Conecte uma instancia em Configuracoes > WhatsApp.');
+      }
 
       // Atualizar status para enviado
       await prisma.messageSent.update({

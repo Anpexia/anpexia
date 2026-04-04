@@ -95,6 +95,10 @@ export function MessagesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
 
+  // Toast
+  const [toastMsg, setToastMsg] = useState('');
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 4000); };
+
   // Template edit
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -162,7 +166,11 @@ export function MessagesPage() {
       setShowSendModal(false);
       setSendPhone(''); setSendBody(''); setSendCustomerId('');
       fetchData();
-    } catch {} finally { setSending(false); }
+      showToast('Mensagem enviada!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || 'Erro ao enviar mensagem. Verifique se o WhatsApp esta conectado.';
+      showToast(msg);
+    } finally { setSending(false); }
   };
 
   const selectCustomerForSend = (c: Customer) => {
@@ -585,6 +593,12 @@ export function MessagesPage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-lg shadow-lg text-sm z-[9999] max-w-sm">
+          {toastMsg}
         </div>
       )}
     </div>

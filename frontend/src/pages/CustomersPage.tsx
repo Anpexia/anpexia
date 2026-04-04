@@ -217,7 +217,11 @@ export function CustomersPage() {
       setSelectedCustomer(data.data);
       setFormData(populateForm(data.data));
       fetchCustomers();
-    } catch {} finally { setSaving(false); }
+      showToast('Dados salvos com sucesso!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || 'Erro ao salvar dados. Tente novamente.';
+      showToast(msg);
+    } finally { setSaving(false); }
   };
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
@@ -232,11 +236,15 @@ export function CustomersPage() {
       };
       await api.post('/customers', payload);
       setModalMode('closed'); setFormData(emptyForm); fetchCustomers();
-    } catch {} finally { setSaving(false); }
+      showToast('Cliente criado com sucesso!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || 'Erro ao criar cliente. Tente novamente.';
+      showToast(msg);
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
-    try { await api.delete(`/customers/${id}`); setDeleteConfirm(null); setModalMode('closed'); fetchCustomers(); } catch {}
+    try { await api.delete(`/customers/${id}`); setDeleteConfirm(null); setModalMode('closed'); fetchCustomers(); showToast('Cliente removido.'); } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao remover cliente.'); }
   };
 
   const handleSaveMedical = async () => {
@@ -245,7 +253,8 @@ export function CustomersPage() {
     try {
       const { data } = await api.put(`/customers/${selectedCustomer.id}/medical-record`, medForm);
       setSelectedCustomer({ ...selectedCustomer, medicalRecord: data.data });
-    } catch {} finally { setSavingMed(false); }
+      showToast('Prontuario salvo!');
+    } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao salvar prontuario.'); } finally { setSavingMed(false); }
   };
 
   const handleAddEntry = async (e: React.FormEvent) => {
