@@ -114,10 +114,10 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 ### Deploy do backend (Railway)
 
 Railway nao tem auto-deploy configurado (GitHub App nao instalado no org Anpexia).
-Para fazer deploy manual, usar `githubRepoDeploy` via GraphQL:
+Para fazer deploy manual, usar `serviceInstanceDeployV2` via GraphQL com o commit SHA:
 
 ```graphql
-mutation { githubRepoDeploy(input: { projectId: "fe1fbef3-fd5b-4e6c-9c92-231b651a3766", repo: "Anpexia/anpexia", branch: "main", environmentId: "3e6ea3dc-dd1c-4901-99fa-9e87a019cf5a" }) }
+mutation { serviceInstanceDeployV2(serviceId: "7e31155f-ad65-4257-891b-8c2c301e72d4", environmentId: "3e6ea3dc-dd1c-4901-99fa-9e87a019cf5a", commitSha: "<COMMIT_SHA>") }
 ```
 
 ### Pendencias
