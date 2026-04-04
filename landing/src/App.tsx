@@ -138,35 +138,36 @@ function LandingPage() {
         {/* Decorative rectangle */}
         <div style={{ position: 'absolute', top: 80, right: 60, width: 200, height: 200, border: '1px solid rgba(249,115,22,0.2)', borderRadius: 20, transform: 'rotate(12deg)' }} className="hidden lg:block" />
 
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', flexDirection: 'column', minHeight: 460, justifyContent: 'space-between' }}>
-          {/* Badge */}
-          <div>
-            <span style={{ color: '#F97316', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
-              Automação inteligente para empresas
-            </span>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', flexDirection: 'column' as const, minHeight: 460, justifyContent: 'flex-end' }}>
+          <span style={{ color: '#F97316', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' as const, marginBottom: 20 }}>
+            Automação inteligente para empresas
+          </span>
+          <h1 style={{ fontSize: 'clamp(32px, 4.5vw, 52px)', fontWeight: 800, lineHeight: 1.1, margin: '0 0 20px', maxWidth: 700 }}>
+            <span style={{ color: '#FEF3C7' }}>Substitua trabalho manual por </span>
+            <span style={{ color: '#F97316' }}>automação inteligente</span>
+          </h1>
+          <p style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.95rem', lineHeight: 1.7, margin: '0 0 28px', maxWidth: 520 }}>
+            Por menos que o custo de um funcionário, a Anpexia automatiza processos, atende seus clientes e organiza sua operação 24 horas por dia, 7 dias por semana.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 12 }}>
+            <a href="/agendar" style={btnPrimary}><Calendar size={16} /> Agendar conversa gratuita</a>
+            <a href="#recursos" style={btnSecDark}>Ver recursos</a>
           </div>
-
-          {/* Bottom area: title left, subtitle+buttons right */}
-          <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 48, alignItems: 'flex-end', marginTop: 'auto' }}>
-            <div style={{ flex: '1 1 500px', minWidth: 280 }}>
-              <h1 style={{ fontSize: 'clamp(32px, 4.5vw, 54px)', fontWeight: 800, lineHeight: 1.1, margin: 0 }}>
-                <span style={{ color: '#FEF3C7' }}>Substitua trabalho manual por </span>
-                <span style={{ color: '#F97316' }}>automação inteligente</span>
-              </h1>
-            </div>
-            <div style={{ flex: '1 1 340px', minWidth: 280 }}>
-              <p style={{ color: 'rgba(254,243,199,0.5)', fontSize: '0.95rem', lineHeight: 1.7, margin: '0 0 28px' }}>
-                Por menos que o custo de um funcionário, a Anpexia automatiza processos, atende seus clientes e organiza sua operação 24 horas por dia, 7 dias por semana.
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 12 }}>
-                <a href="/agendar" style={btnPrimary}><Calendar size={16} /> Agendar conversa gratuita</a>
-                <a href="#recursos" style={btnSecDark}>Ver recursos</a>
-              </div>
-              <p style={{ color: 'rgba(254,243,199,0.3)', fontSize: '0.75rem', marginTop: 20 }}>Sem compromisso · Conversa de 30 min · 100% online</p>
-            </div>
-          </div>
+          <p style={{ color: 'rgba(254,243,199,0.3)', fontSize: '0.75rem', marginTop: 20 }}>Sem compromisso · Conversa de 30 min · 100% online</p>
         </div>
       </section>
+
+      {/* ═══ MARQUEE ═══ */}
+      <div style={{ backgroundColor: '#F97316', height: 44, overflow: 'hidden', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>
+        <style>{`@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
+        <div style={{ display: 'flex', animation: 'marquee 25s linear infinite' }}>
+          {[0, 1].map(i => (
+            <span key={i} style={{ color: '#fff', fontSize: 14, fontWeight: 600, letterSpacing: '0.05em', paddingRight: 0 }}>
+              Automação inteligente para empresas &nbsp;·&nbsp; Chatbot com IA &nbsp;·&nbsp; Agendamentos automáticos &nbsp;·&nbsp; Financeiro integrado &nbsp;·&nbsp; WhatsApp automático &nbsp;·&nbsp;&nbsp;
+            </span>
+          ))}
+        </div>
+      </div>
 
       {/* ═══ 3. NÚMEROS ═══ */}
       <section style={{ backgroundColor: '#fff8f0', borderBottom: '1px solid #FCD34D', padding: '40px 24px' }}>
