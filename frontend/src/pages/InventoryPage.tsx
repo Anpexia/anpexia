@@ -107,6 +107,7 @@ export function InventoryPage() {
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [manualEntryMode, setManualEntryMode] = useState(false);
+  const [scanDuplicateProduct, setScanDuplicateProduct] = useState<Product | null>(null);
   const [manualCode, setManualCode] = useState('');
   const [torchOn, setTorchOn] = useState(false);
   const scannerRef = useRef<any>(null);
@@ -183,16 +184,27 @@ export function InventoryPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [modalMode, cameraOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Validate barcode: must be 8+ purely numeric digits (EAN-8, EAN-13, UPC)
-  // Rejects codes matching SKUs already visible in the loaded product table
+  // EAN/UPC check digit validation
+  const isValidEanCheckDigit = (code: string): boolean => {
+    if (!/^\d+$/.test(code)) return false;
+    // Works for EAN-13, EAN-8, UPC-A (12 digits)
+    if (![8, 12, 13].includes(code.length)) return false;
+    const digits = code.split('').map(Number);
+    const checkDigit = digits.pop()!;
+    let sum = 0;
+    for (let i = 0; i < digits.length; i++) {
+      sum += digits[i] * (i % 2 === 0 ? 1 : 3);
+    }
+    return (10 - (sum % 10)) % 10 === checkDigit;
+  };
+
+  // Validate barcode: must be numeric, valid EAN/UPC check digit
   const isValidBarcode = (code: string): boolean => {
     const cleaned = code.trim();
-    // Must be at least 8 digits (EAN-8 minimum)
     if (cleaned.length < 8) return false;
-    // Must be purely numeric (real barcodes are numeric; mixed alpha+digit = screen text)
     if (!/^\d+$/.test(cleaned)) return false;
-    // Reject if it matches a SKU already loaded in the products table (ghost read from screen)
-    if (productsRef.current.some((p) => p.sku === cleaned)) return false;
+    // Validate check digit for standard barcode lengths
+    if ([8, 12, 13].includes(cleaned.length) && !isValidEanCheckDigit(cleaned)) return false;
     return true;
   };
 
@@ -213,13 +225,9 @@ export function InventoryPage() {
       const result = data.data;
 
       if (result.found && result.source === 'local') {
-        // CASE 1: Product exists locally → movement modal
+        // CASE 1: Product exists locally → show choice dialog
         setScanSource('local');
-        setSelectedProduct(result.product);
-        setMovType('IN');
-        setMovQty(1);
-        setMovReason('');
-        setModalMode('movement');
+        setScanDuplicateProduct(result.product);
       } else if (!result.found && result.source === 'cosmos' && result.product) {
         // CASE 2: Found in Cosmos → pre-fill create modal
         setScanSource('cosmos');
@@ -296,7 +304,7 @@ export function InventoryPage() {
           },
           locator: { patchSize: 'large', halfSample: true },
           numOfWorkers: navigator.hardwareConcurrency || 4,
-          frequency: 15,
+          frequency: 20,
           decoder: {
             readers: [
               'ean_reader',
@@ -336,15 +344,22 @@ export function InventoryPage() {
 
           Quagga.onDetected((result: any) => {
             const code = result?.codeResult?.code;
-            if (!code || !isValidBarcode(code)) return;
+            if (!code || !isValidBarcode(code)) {
+              // Invalid read breaks the streak
+              votingBufferRef.current = [];
+              return;
+            }
 
-            // 3-of-5 voting system
+            // Require 3 consecutive identical reads
             const buffer = votingBufferRef.current;
+            if (buffer.length > 0 && buffer[buffer.length - 1] !== code) {
+              // Different code — reset streak
+              votingBufferRef.current = [code];
+              return;
+            }
             buffer.push(code);
-            if (buffer.length > 5) buffer.shift();
 
-            const count = buffer.filter((c) => c === code).length;
-            if (count >= 3) {
+            if (buffer.length >= 3) {
               votingBufferRef.current = [];
               processScannedCode(code);
             }
@@ -900,6 +915,51 @@ export function InventoryPage() {
                 <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Scan Duplicate Choice Dialog */}
+      {scanDuplicateProduct && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setScanDuplicateProduct(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">Produto ja cadastrado</h2>
+            <p className="text-sm text-slate-600 mb-1">
+              <strong>{scanDuplicateProduct.name}</strong>
+            </p>
+            <p className="text-sm text-slate-500 mb-5">
+              Estoque atual: {scanDuplicateProduct.quantity} {scanDuplicateProduct.unit}
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setSelectedProduct(scanDuplicateProduct);
+                  setMovType('IN');
+                  setMovQty(1);
+                  setMovReason('');
+                  setModalMode('movement');
+                  setScanDuplicateProduct(null);
+                }}
+                className="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
+              >
+                Atualizar quantidade
+              </button>
+              <button
+                onClick={() => {
+                  openEdit(scanDuplicateProduct);
+                  setScanDuplicateProduct(null);
+                }}
+                className="w-full px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200"
+              >
+                Editar produto
+              </button>
+              <button
+                onClick={() => setScanDuplicateProduct(null)}
+                className="w-full px-4 py-2.5 text-slate-500 text-sm hover:text-slate-700"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
