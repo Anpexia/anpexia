@@ -45,6 +45,8 @@ function drawSignature(
   doc: PDFKit.PDFDocument,
   doctorName: string,
   signatureImage?: string | null,
+  registration?: string | null,
+  especialidade?: string | null,
 ) {
   doc.moveDown(2);
 
@@ -55,7 +57,6 @@ function drawSignature(
       doc.image(imgBuffer, x, doc.y, { width: 150 });
       doc.moveDown(1);
     } catch {
-      // If image fails, fall back to blank line
       doc.moveDown(2);
       const lineY = doc.y;
       const center = doc.page.width / 2;
@@ -71,6 +72,12 @@ function drawSignature(
   }
 
   doc.fontSize(12).font('Helvetica-Bold').text(doctorName, { align: 'center' });
+  if (registration) {
+    doc.fontSize(10).font('Helvetica').text(registration, { align: 'center' });
+  }
+  if (especialidade) {
+    doc.fontSize(10).font('Helvetica').text(especialidade, { align: 'center' });
+  }
 }
 
 export async function generateCertificatePdf(tenantId: string, certificateId: string): Promise<Buffer> {
@@ -138,7 +145,9 @@ export async function generateCertificatePdf(tenantId: string, certificateId: st
   );
 
   // Signature
-  drawSignature(doc, doctor.name, doctorSignature?.signatureImage);
+  const reg = doctor.tipoRegistro && doctor.numeroRegistro
+    ? `${doctor.tipoRegistro} ${doctor.numeroRegistro}` : null;
+  drawSignature(doc, doctor.name, doctorSignature?.signatureImage, reg, doctor.especialidade);
 
   doc.end();
   return bufferPromise;
@@ -194,7 +203,9 @@ export async function generatePrescriptionPdf(tenantId: string, prescriptionId: 
   );
 
   // Signature
-  drawSignature(doc, doctor.name, doctorSignature?.signatureImage);
+  const regP = doctor.tipoRegistro && doctor.numeroRegistro
+    ? `${doctor.tipoRegistro} ${doctor.numeroRegistro}` : null;
+  drawSignature(doc, doctor.name, doctorSignature?.signatureImage, regP, doctor.especialidade);
 
   doc.end();
   return bufferPromise;

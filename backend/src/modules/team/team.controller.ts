@@ -10,6 +10,16 @@ teamRouter.use(requireTenant);
 
 // --- /me routes MUST come before /:id routes ---
 
+// Get own profile — any authenticated user
+teamRouter.get('/me/profile', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = await teamService.getProfile(req.auth!.userId);
+    return success(res, user);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Update own profile — any authenticated user
 teamRouter.put('/me/profile', async (req: Request, res: Response, next: NextFunction) => {
   try {

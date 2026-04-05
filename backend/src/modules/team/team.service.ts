@@ -97,11 +97,30 @@ export const teamService = {
     });
   },
 
-  async updateProfile(userId: string, data: { name?: string; phone?: string }) {
+  async getProfile(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, name: true, email: true, phone: true, role: true,
+        especialidade: true, tipoRegistro: true, numeroRegistro: true,
+        duracaoConsulta: true, bio: true,
+      },
+    });
+  },
+
+  async updateProfile(userId: string, data: {
+    name?: string; phone?: string; especialidade?: string;
+    tipoRegistro?: string; numeroRegistro?: string;
+    duracaoConsulta?: number; bio?: string;
+  }) {
     return prisma.user.update({
       where: { id: userId },
       data,
-      select: { id: true, name: true, email: true, phone: true, role: true },
+      select: {
+        id: true, name: true, email: true, phone: true, role: true,
+        especialidade: true, tipoRegistro: true, numeroRegistro: true,
+        duracaoConsulta: true, bio: true,
+      },
     });
   },
 

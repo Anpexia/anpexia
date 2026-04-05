@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, ChevronDown, ChevronUp, Download, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -72,7 +72,7 @@ interface Customer {
 }
 
 type ModalMode = 'closed' | 'create' | 'detail';
-type DetailTab = 'info' | 'prontuario' | 'appointments' | 'whatsapp';
+type DetailTab = 'info' | 'prontuario' | 'appointments' | 'documents' | 'whatsapp';
 
 const emptyForm = { name: '', phone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } };
 
@@ -425,6 +425,14 @@ export function CustomersPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prontuarioSection, selectedCustomer?.id, detailTab]);
 
+  // Load documents when switching to documents tab
+  useEffect(() => {
+    if (!selectedCustomer || detailTab !== 'documents') return;
+    fetchPrescricoes(selectedCustomer.id);
+    fetchAtestados(selectedCustomer.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomer?.id, detailTab]);
+
   const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
   // Compute summary from real scheduled calls
@@ -669,6 +677,7 @@ export function CustomersPage() {
                 { key: 'info', label: 'Informacoes', icon: User },
                 { key: 'prontuario', label: 'Prontuario', icon: Heart },
                 { key: 'appointments', label: 'Consultas', icon: Calendar },
+                { key: 'documents', label: 'Documentos', icon: FileText },
                 { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
               ] as const).map((tab) => (
                 <button key={tab.key} onClick={() => setDetailTab(tab.key)}
@@ -676,6 +685,9 @@ export function CustomersPage() {
                   <tab.icon size={14} />{tab.label}
                   {tab.key === 'appointments' && selectedCustomer.scheduledCalls && selectedCustomer.scheduledCalls.length > 0 && (
                     <span className="bg-[#EFF6FF] text-[#1E3A5F] text-xs px-1.5 py-0.5 rounded">{selectedCustomer.scheduledCalls.length}</span>
+                  )}
+                  {tab.key === 'documents' && (prescricoes.length > 0 || atestados.length > 0) && (
+                    <span className="bg-violet-50 text-violet-600 text-xs px-1.5 py-0.5 rounded">{prescricoes.length + atestados.length}</span>
                   )}
                   {tab.key === 'whatsapp' && selectedCustomer.chatMessages && selectedCustomer.chatMessages.length > 0 && (
                     <span className="bg-green-50 text-green-600 text-xs px-1.5 py-0.5 rounded">{selectedCustomer.chatMessages.length}</span>
@@ -1469,6 +1481,98 @@ export function CustomersPage() {
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* DOCUMENTS TAB */}
+              {detailTab === 'documents' && (
+                <div className="space-y-6">
+                  {/* Prescricoes section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-slate-800 flex items-center gap-2">
+                        <FileText size={16} className="text-blue-600" /> Prescricoes
+                      </h4>
+                      <button onClick={() => { setDetailTab('prontuario'); setProntuarioSection('prescricoes'); setShowNewPrescricao(true); setPrescricaoType('MEDICAMENTO'); setPrescricaoItems([]); }}
+                        className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#2A4D7A]">
+                        <Plus size={14} /> Nova Prescricao
+                      </button>
+                    </div>
+                    {loadingPrescricoes ? (
+                      <p className="text-sm text-slate-500 text-center py-4">Carregando...</p>
+                    ) : prescricoes.length === 0 ? (
+                      <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-lg">Nenhuma prescricao emitida.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {prescricoes.map((p: any) => {
+                          const typeLabels: Record<string, { label: string; cls: string }> = {
+                            MEDICAMENTO: { label: 'Medicamento', cls: 'bg-blue-100 text-blue-700' },
+                            EXAME_EXTERNO: { label: 'Exame Externo', cls: 'bg-amber-100 text-amber-700' },
+                            OCULOS: { label: 'Oculos', cls: 'bg-violet-100 text-violet-700' },
+                            EXAME_INTERNO: { label: 'Exame Interno', cls: 'bg-emerald-100 text-emerald-700' },
+                          };
+                          const tl = typeLabels[p.type] || { label: p.type, cls: 'bg-gray-100 text-gray-600' };
+                          return (
+                            <div key={p.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${tl.cls}`}>{tl.label}</span>
+                                <span className="text-sm text-slate-700">
+                                  {p.items && p.items.length > 0
+                                    ? p.items.map((item: any) => item.name).join(', ')
+                                    : p.oculosData ? `Receita de oculos` : p.type}
+                                </span>
+                                <span className="text-xs text-slate-400">{format(new Date(p.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                              </div>
+                              <button onClick={() => handleDownloadPdf('prescriptions', p.id)} className="flex items-center gap-1 text-sm text-[#1E3A5F] hover:text-[#2A4D7A] font-medium">
+                                <Download size={14} /> PDF
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Atestados section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-slate-800 flex items-center gap-2">
+                        <FileText size={16} className="text-emerald-600" /> Atestados e Declaracoes
+                      </h4>
+                      <button onClick={() => { setDetailTab('prontuario'); setProntuarioSection('atestados'); setShowNewAtestado(true); }}
+                        className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#2A4D7A]">
+                        <Plus size={14} /> Emitir Atestado
+                      </button>
+                    </div>
+                    {loadingAtestados ? (
+                      <p className="text-sm text-slate-500 text-center py-4">Carregando...</p>
+                    ) : atestados.length === 0 ? (
+                      <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-lg">Nenhum atestado emitido.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {atestados.map((a: any) => {
+                          const atTypes: Record<string, { label: string; cls: string }> = {
+                            ATESTADO: { label: 'Atestado', cls: 'bg-blue-100 text-blue-700' },
+                            DECLARACAO: { label: 'Declaracao', cls: 'bg-emerald-100 text-emerald-700' },
+                          };
+                          const at = atTypes[a.type] || { label: a.type, cls: 'bg-gray-100 text-gray-600' };
+                          return (
+                            <div key={a.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${at.cls}`}>{at.label}</span>
+                                <span className="text-sm text-slate-700 truncate max-w-[300px]">{a.reason}</span>
+                                <span className="text-xs text-slate-400">{format(new Date(a.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                                {a.daysOff && <span className="text-xs text-slate-500">{a.daysOff}d</span>}
+                              </div>
+                              <button onClick={() => handleDownloadPdf('medical-certificates', a.id)} className="flex items-center gap-1 text-sm text-[#1E3A5F] hover:text-[#2A4D7A] font-medium">
+                                <Download size={14} /> PDF
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

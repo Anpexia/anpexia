@@ -10,6 +10,13 @@ export function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
 
+  // Professional fields
+  const [especialidade, setEspecialidade] = useState('');
+  const [tipoRegistro, setTipoRegistro] = useState('');
+  const [numeroRegistro, setNumeroRegistro] = useState('');
+  const [duracaoConsulta, setDuracaoConsulta] = useState('');
+  const [bio, setBio] = useState('');
+
   // Password change
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -30,7 +37,17 @@ export function ProfilePage() {
       setName(user.name);
       setPhone('');
       // fetch full profile
-      api.get('/team/me/profile').catch(() => {});
+      api.get('/team/me/profile').then(({ data }) => {
+        const p = data.data;
+        if (p) {
+          if (p.phone) setPhone(p.phone);
+          if (p.especialidade) setEspecialidade(p.especialidade);
+          if (p.tipoRegistro) setTipoRegistro(p.tipoRegistro);
+          if (p.numeroRegistro) setNumeroRegistro(p.numeroRegistro);
+          if (p.duracaoConsulta) setDuracaoConsulta(String(p.duracaoConsulta));
+          if (p.bio) setBio(p.bio);
+        }
+      }).catch(() => {});
       // fetch signature
       api.get(`/doctors/${user.id}/signature`).then(({ data }) => {
         if (data.data?.signatureImage) {
@@ -106,18 +123,22 @@ export function ProfilePage() {
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
-      const payload: Record<string, string> = {};
+      const payload: Record<string, any> = {};
       if (name && name !== user?.name) payload.name = name;
       if (phone) payload.phone = phone;
-      if (Object.keys(payload).length) {
-        await api.put('/team/me/profile', payload);
-        // Update sessionStorage
-        const stored = sessionStorage.getItem('user');
-        if (stored) {
-          const u = JSON.parse(stored);
-          if (payload.name) u.name = payload.name;
-          sessionStorage.setItem('user', JSON.stringify(u));
-        }
+      if (especialidade) payload.especialidade = especialidade;
+      if (tipoRegistro) payload.tipoRegistro = tipoRegistro;
+      if (numeroRegistro) payload.numeroRegistro = numeroRegistro;
+      if (duracaoConsulta) payload.duracaoConsulta = parseInt(duracaoConsulta, 10) || undefined;
+      if (bio) payload.bio = bio;
+
+      await api.put('/team/me/profile', payload);
+      // Update sessionStorage
+      const stored = sessionStorage.getItem('user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (payload.name) u.name = payload.name;
+        sessionStorage.setItem('user', JSON.stringify(u));
       }
       showToast('Perfil atualizado!');
     } catch (err: any) {
@@ -195,6 +216,40 @@ export function ProfilePage() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
               <input value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} placeholder="5571999999999" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
+              <input value={especialidade} onChange={e => setEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Oftalmologia" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de registro</label>
+                <select value={tipoRegistro} onChange={e => setTipoRegistro(e.target.value)} className={inputCls}>
+                  <option value="">Selecione</option>
+                  <option value="CRM">CRM</option>
+                  <option value="CRO">CRO</option>
+                  <option value="CRF">CRF</option>
+                  <option value="COREN">COREN</option>
+                  <option value="CRP">CRP</option>
+                  <option value="CRN">CRN</option>
+                  <option value="CREFITO">CREFITO</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Numero do registro</label>
+                <input value={numeroRegistro} onChange={e => setNumeroRegistro(e.target.value)} className={inputCls} placeholder="12345/BA" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Duracao da consulta (min)</label>
+                <input type="number" value={duracaoConsulta} onChange={e => setDuracaoConsulta(e.target.value)} className={inputCls} placeholder="30" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Bio / Apresentacao</label>
+              <textarea value={bio} onChange={e => setBio(e.target.value)} className={inputCls + ' h-16 resize-none'} placeholder="Breve apresentacao profissional..." />
             </div>
             <button onClick={handleSaveProfile} disabled={saving} className="w-full flex items-center justify-center gap-2 btn-pill btn-primary">
               <Save size={16} /> {saving ? 'Salvando...' : 'Salvar Perfil'}

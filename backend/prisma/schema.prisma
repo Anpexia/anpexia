@@ -111,6 +111,11 @@ model User {
   name         String
   phone        String? // WhatsApp para receber alertas
   role         Role      @default(EMPLOYEE)
+  especialidade    String?  @map("especialidade")
+  tipoRegistro     String?  @map("tipo_registro")  // CRM, CRO, CRF, COREN, etc.
+  numeroRegistro   String?  @map("numero_registro") // ex: 12345/BA
+  duracaoConsulta  Int?     @map("duracao_consulta") // minutos
+  bio              String?
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime? @map("last_login_at")
   createdAt    DateTime  @default(now()) @map("created_at")
