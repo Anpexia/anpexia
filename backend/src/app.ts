@@ -131,6 +131,41 @@ async function loadRoutes() {
     const { conveniosRouter } = await import('./modules/convenios/convenios.controller');
     const { settingsRouter } = await import('./modules/settings/settings.controller');
 
+    // Temporary test route — public, no auth (remove after testing)
+    app.get('/api/v1/inventory/test-low-stock-email', async (_req, res) => {
+      try {
+        const TENANT_ID = 'cmnjmu0jm0001o30p9jaqj4ys';
+        const db = (await import('./config/database')).default;
+        const product = await db.product.findFirst({
+          where: { tenantId: TENANT_ID, quantity: { lte: 5 } },
+          select: { id: true, name: true, sku: true, quantity: true, minQuantity: true, unit: true },
+        });
+        if (!product) return res.json({ success: false, error: 'No low-stock product found' });
+
+        const link = await db.supplierProduct.findFirst({
+          where: { productId: product.id, tenantId: TENANT_ID },
+          orderBy: { isPrimary: 'desc' },
+          include: { supplier: true },
+        });
+
+        const { sendEmail } = await import('./services/email.service');
+        const result = await sendEmail({
+          to: 'angelolarocca10@gmail.com',
+          subject: `[TESTE] Estoque baixo — ${product.name}`,
+          html: `<h2>Teste de email estoque baixo</h2>
+            <p>Produto: <strong>${product.name}</strong> (SKU: ${product.sku || 'N/A'})</p>
+            <p>Quantidade: <strong style="color:red">${product.quantity}</strong> / Min: ${product.minQuantity}</p>
+            <p>Fornecedor: ${link?.supplier?.name || 'Nenhum'} (${link?.supplier?.email || 'sem email'})</p>
+            <p>RESEND_API_KEY: ${process.env.RESEND_API_KEY ? 'configurada' : 'NAO CONFIGURADA'}</p>
+            <p>EMAIL_FROM: ${process.env.EMAIL_FROM || 'nao definido'}</p>`,
+        });
+        return res.json({ success: true, messageId: result.id, product: product.name, supplier: link?.supplier?.name || null });
+      } catch (err: any) {
+        console.error('[TEST-LOW-STOCK] Error:', err.message, err.stack);
+        return res.json({ success: false, error: err.message, details: err.statusCode || err.code });
+      }
+    });
+
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/tenants', tenantRouter);
     app.use('/api/v1/customers', customerRouter);
@@ -177,40 +212,6 @@ async function loadRoutes() {
       }
     });
     app.use('/api/v1/demo-eloy', demoEloyRouter);
-
-    // Temporary test route — public, no auth (remove after testing)
-    app.get('/api/v1/inventory/test-low-stock-email', async (_req, res) => {
-      try {
-        const TENANT_ID = 'cmnjmu0jm0001o30p9jaqj4ys';
-        const product = await (await import('./config/database')).default.product.findFirst({
-          where: { tenantId: TENANT_ID, quantity: { lte: 5 } },
-          select: { id: true, name: true, sku: true, quantity: true, minQuantity: true, unit: true },
-        });
-        if (!product) return res.json({ success: false, error: 'No low-stock product found' });
-
-        const link = await (await import('./config/database')).default.supplierProduct.findFirst({
-          where: { productId: product.id, tenantId: TENANT_ID },
-          orderBy: { isPrimary: 'desc' },
-          include: { supplier: true },
-        });
-
-        const { sendEmail } = await import('./services/email.service');
-        const result = await sendEmail({
-          to: 'angelolarocca10@gmail.com',
-          subject: `[TESTE] Estoque baixo — ${product.name}`,
-          html: `<h2>Teste de email estoque baixo</h2>
-            <p>Produto: <strong>${product.name}</strong> (SKU: ${product.sku || 'N/A'})</p>
-            <p>Quantidade: <strong style="color:red">${product.quantity}</strong> / Min: ${product.minQuantity}</p>
-            <p>Fornecedor: ${link?.supplier?.name || 'Nenhum'} (${link?.supplier?.email || 'sem email'})</p>
-            <p>RESEND_API_KEY: ${process.env.RESEND_API_KEY ? 'configurada' : 'NAO CONFIGURADA'}</p>
-            <p>EMAIL_FROM: ${process.env.EMAIL_FROM || 'nao definido'}</p>`,
-        });
-        return res.json({ success: true, messageId: result.id, product: product.name, supplier: link?.supplier?.name || null });
-      } catch (err: any) {
-        console.error('[TEST-LOW-STOCK] Error:', err.message, err.stack);
-        return res.json({ success: false, error: err.message, details: err.statusCode || err.code });
-      }
-    });
 
     app.use('/api/v1/scheduling', schedulingRouter);
     app.use('/api/v1/sales', salesRouter);
