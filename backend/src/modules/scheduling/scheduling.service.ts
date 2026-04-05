@@ -296,6 +296,8 @@ async function listCalls(tenantId: string, filters: {
   skip: number;
   status?: string;
   date?: string;
+  from?: string;
+  to?: string;
 }) {
   const where: Record<string, unknown> = { tenantId };
 
@@ -303,7 +305,12 @@ async function listCalls(tenantId: string, filters: {
     where.status = filters.status;
   }
 
-  if (filters.date) {
+  if (filters.from && filters.to) {
+    where.date = {
+      gte: new Date(filters.from + 'T00:00:00' + SP_OFFSET),
+      lte: new Date(filters.to + 'T23:59:59.999' + SP_OFFSET),
+    };
+  } else if (filters.date) {
     const startOfDay = new Date(filters.date + 'T00:00:00');
     const endOfDay = new Date(filters.date + 'T23:59:59');
     where.date = { gte: startOfDay, lte: endOfDay };

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle } from 'lucide-react';
-import { format } from 'date-fns';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
 
@@ -107,6 +107,11 @@ export function SchedulingPage() {
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [selectedBookCustomer, setSelectedBookCustomer] = useState<CustomerSearch | null>(null);
 
+  // Calendar month view
+  const [calMonth, setCalMonth] = useState(() => startOfMonth(new Date()));
+  const [monthAppointments, setMonthAppointments] = useState<Appointment[]>([]);
+  const [loadingMonth, setLoadingMonth] = useState(false);
+
   // Status update
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -128,7 +133,44 @@ export function SchedulingPage() {
     } catch {}
   }, []);
 
+  const fetchMonthAppointments = useCallback(async (month: Date) => {
+    setLoadingMonth(true);
+    try {
+      const from = format(month, 'yyyy-MM-dd');
+      const to = format(endOfMonth(month), 'yyyy-MM-dd');
+      const { data } = await api.get('/scheduling/calls', { params: { from, to, limit: 200 } });
+      setMonthAppointments(data.data || []);
+    } catch {} finally { setLoadingMonth(false); }
+  }, []);
+
   useEffect(() => { fetchAppointments(); fetchDates(); }, [fetchAppointments, fetchDates]);
+
+  useEffect(() => {
+    if (view === 'calendar') fetchMonthAppointments(calMonth);
+  }, [view, calMonth, fetchMonthAppointments]);
+
+  // Build calendar grid
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(calMonth);
+    const monthEnd = endOfMonth(calMonth);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const days: Date[] = [];
+    let d = gridStart;
+    while (d <= gridEnd) { days.push(d); d = addDays(d, 1); }
+    return days;
+  }, [calMonth]);
+
+  // Map appointments per day
+  const appointmentsByDay = useMemo(() => {
+    const map = new Map<string, Appointment[]>();
+    for (const a of monthAppointments) {
+      const dayKey = format(new Date(a.date), 'yyyy-MM-dd');
+      if (!map.has(dayKey)) map.set(dayKey, []);
+      map.get(dayKey)!.push(a);
+    }
+    return map;
+  }, [monthAppointments]);
 
   // Customer search debounce
   useEffect(() => {
@@ -344,48 +386,136 @@ export function SchedulingPage() {
 
           {/* Calendar View */}
           {view === 'calendar' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Available dates */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                <h3 className="font-semibold text-slate-800 mb-4">Datas disponiveis</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {availableDates.map((d) => (
-                    <button
-                      key={d.date}
-                      onClick={() => handleDateClick(d.date)}
-                      className={`p-3 rounded-lg border text-left transition-colors ${selectedDate === d.date ? 'border-[#1E3A5F] bg-[#EFF6FF]/50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
-                    >
-                      <p className="text-sm font-medium text-slate-800">{format(new Date(d.date + 'T12:00:00'), 'EEEE', { locale: ptBR })}</p>
-                      <p className="text-xs text-slate-500">{format(new Date(d.date + 'T12:00:00'), 'dd/MM/yyyy')}</p>
-                      <p className="text-xs text-[#1E3A5F] mt-1">{d.availableSlots} vagas</p>
-                    </button>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Monthly calendar — spans 2 cols */}
+              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6">
+                {/* Month navigation */}
+                <div className="flex items-center justify-between mb-4">
+                  <button onClick={() => setCalMonth(subMonths(calMonth, 1))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"><ChevronLeft size={20} /></button>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold text-slate-800 capitalize">
+                      {format(calMonth, 'MMMM yyyy', { locale: ptBR })}
+                    </h3>
+                    {!isSameMonth(calMonth, new Date()) && (
+                      <button onClick={() => setCalMonth(startOfMonth(new Date()))} className="text-xs px-2 py-1 rounded bg-[#EFF6FF] text-[#1E3A5F] font-medium hover:bg-[#DBEAFE]">
+                        Hoje
+                      </button>
+                    )}
+                  </div>
+                  <button onClick={() => setCalMonth(addMonths(calMonth, 1))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"><ChevronRight size={20} /></button>
+                </div>
+
+                {/* Day of week headers */}
+                <div className="grid grid-cols-7 mb-1">
+                  {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map(d => (
+                    <div key={d} className="text-center text-xs font-medium text-slate-500 py-2">{d}</div>
                   ))}
                 </div>
+
+                {/* Day cells */}
+                <div className="grid grid-cols-7">
+                  {calendarDays.map((day) => {
+                    const dayStr = format(day, 'yyyy-MM-dd');
+                    const inMonth = isSameMonth(day, calMonth);
+                    const today = isToday(day);
+                    const past = isBefore(day, new Date()) && !today;
+                    const selected = selectedDate === dayStr;
+                    const dayAppts = appointmentsByDay.get(dayStr) || [];
+                    const activeAppts = dayAppts.filter(a => a.status !== 'cancelled');
+                    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+
+                    return (
+                      <button
+                        key={dayStr}
+                        onClick={() => { if (!past && inMonth) handleDateClick(dayStr); }}
+                        disabled={past || !inMonth}
+                        className={`relative aspect-square flex flex-col items-center justify-center rounded-lg text-sm transition-colors
+                          ${!inMonth ? 'text-slate-300 cursor-default' : ''}
+                          ${inMonth && past ? 'text-slate-300 cursor-not-allowed' : ''}
+                          ${inMonth && !past && !selected ? 'text-slate-700 hover:bg-slate-50 cursor-pointer' : ''}
+                          ${inMonth && !past && isWeekend && !selected ? 'text-slate-400' : ''}
+                          ${selected ? 'bg-[#1E3A5F] text-white font-semibold' : ''}
+                          ${today && !selected ? 'ring-2 ring-[#2563EB] ring-inset font-semibold' : ''}
+                        `}
+                      >
+                        <span>{format(day, 'd')}</span>
+                        {inMonth && activeAppts.length > 0 && (
+                          <span className={`absolute bottom-1 flex items-center gap-0.5 ${selected ? 'text-white/80' : ''}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${selected ? 'bg-white/80' : 'bg-[#2563EB]'}`} />
+                            {activeAppts.length > 1 && (
+                              <span className={`text-[9px] font-medium ${selected ? 'text-white/80' : 'text-[#2563EB]'}`}>{activeAppts.length}</span>
+                            )}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {loadingMonth && (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#1E3A5F]" />
+                  </div>
+                )}
               </div>
 
-              {/* Slots for selected date */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              {/* Right panel — Slots & day appointments */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 max-h-[600px] overflow-y-auto">
                 {!selectedDate ? (
-                  <p className="text-sm text-slate-500 text-center py-12">Selecione uma data para ver os horarios.</p>
+                  <div className="text-center py-12">
+                    <Calendar size={32} className="mx-auto text-slate-300 mb-3" />
+                    <p className="text-sm text-slate-500">Selecione um dia no calendario</p>
+                  </div>
                 ) : loadingSlots ? (
                   <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" /></div>
                 ) : (
                   <>
-                    <h3 className="font-semibold text-slate-800 mb-4">
-                      Horarios — {format(new Date(selectedDate + 'T12:00:00'), "dd 'de' MMMM", { locale: ptBR })}
+                    <h3 className="font-semibold text-slate-800 mb-1">
+                      {format(new Date(selectedDate + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                     </h3>
-                    <div className="grid grid-cols-3 gap-2">
+
+                    {/* Day's existing appointments */}
+                    {(() => {
+                      const dayAppts = (appointmentsByDay.get(selectedDate) || []).filter(a => a.status !== 'cancelled');
+                      if (dayAppts.length === 0) return null;
+                      return (
+                        <div className="mb-4">
+                          <p className="text-xs text-slate-500 mb-2 mt-3">Agendados ({dayAppts.length})</p>
+                          <div className="space-y-1.5">
+                            {dayAppts.map(a => {
+                              const st = statusMap[a.status];
+                              return (
+                                <div key={a.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-[#1E3A5F] w-12">{format(new Date(a.date), 'HH:mm')}</span>
+                                    <span className="text-sm text-slate-700 truncate max-w-[120px]">{a.customer?.name || a.name}</span>
+                                  </div>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${st?.cls || ''}`}>{st?.label || a.status}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Available slots */}
+                    <p className="text-xs text-slate-500 mb-2">Horarios disponiveis</p>
+                    <div className="grid grid-cols-3 gap-1.5">
                       {slots.map((s) => (
                         <button
                           key={s.time}
                           onClick={() => s.available && openBookWithSlot(selectedDate, s.time)}
                           disabled={!s.available}
-                          className={`py-2.5 rounded-lg text-sm font-medium transition-colors ${s.available ? 'border border-green-200 text-green-700 hover:bg-green-50' : 'bg-slate-100 text-slate-400 cursor-not-allowed line-through'}`}
+                          className={`py-2 rounded-lg text-xs font-medium transition-colors ${s.available ? 'border border-green-200 text-green-700 hover:bg-green-50' : 'bg-slate-100 text-slate-400 cursor-not-allowed line-through'}`}
                         >
                           {s.time}
                         </button>
                       ))}
                     </div>
+                    {slots.filter(s => s.available).length === 0 && (
+                      <p className="text-xs text-red-500 mt-2 text-center">Sem vagas disponiveis</p>
+                    )}
                   </>
                 )}
               </div>

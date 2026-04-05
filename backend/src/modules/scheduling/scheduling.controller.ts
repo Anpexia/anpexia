@@ -87,10 +87,15 @@ router.get('/calls', authenticate, requireTenant, async (req: Request, res: Resp
   const status = req.query.status as string | undefined;
   const date = req.query.date as string | undefined;
 
+  const from = req.query.from as string | undefined;
+  const to = req.query.to as string | undefined;
+
   const { calls, total } = await schedulingService.listCalls(req.auth!.tenantId!, {
     ...pagination,
     status,
     date,
+    from,
+    to,
   });
 
   console.log('[AGENDAMENTOS] tenantId:', req.auth!.tenantId);
