@@ -108,16 +108,18 @@ export function EloyDemo() {
     }
   }
 
-  async function sendMessage(text: string) {
+  async function sendMessage(text: string, displayText?: string) {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
+
+    const display = displayText?.trim() || trimmed;
 
     // Build history from current messages (before adding the new user msg)
     const history = messages
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .map(m => ({ role: m.role, content: m.content }));
 
-    setMessages(prev => [...prev, { role: 'user', content: trimmed, time: timeNow() }]);
+    setMessages(prev => [...prev, { role: 'user', content: display, time: timeNow() }]);
     setInput('');
     setButtons([]);
     setSending(true);
@@ -295,7 +297,7 @@ export function EloyDemo() {
                         fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer',
                         whiteSpace: 'nowrap', transition: 'background 0.15s, transform 0.1s',
                       }}
-                      onClick={() => sendMessage(b.label)}
+                      onClick={() => sendMessage(b.id, b.label)}
                       onMouseEnter={e => {
                         if (!isConfirm) e.currentTarget.style.backgroundColor = '#f0f7ee';
                         e.currentTarget.style.transform = 'scale(1.03)';

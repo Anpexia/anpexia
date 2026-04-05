@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../config/env';
 import prisma from '../../config/database';
+import { schedulingService } from '../scheduling/scheduling.service';
 
 const anthropic = new Anthropic({ apiKey: env.anthropicApiKey });
 
@@ -87,6 +88,7 @@ REGRAS ABSOLUTAS:
 - Seja DIRETA e OBJETIVA sempre
 - Maximo 2 linhas por resposta
 - Tom: simpatico e profissional
+- Quando o paciente escolher "Particular", diga "Pagamento: Particular" e NAO "Convenio: Particular"
 
 FLUXO DE AGENDAMENTO:
 Quando o paciente quiser agendar, voce coleta UM dado por vez. O sistema controla os passos automaticamente.
@@ -102,17 +104,50 @@ Especialidades: Catarata, Glaucoma, Retina, Cirurgia Refrativa, Lentes de Contat
 Responda sempre em portugues brasileiro. Maximo 2 linhas.`;
 
 const INSURANCE_OPTIONS = ['Particular', 'Bradesco Saude', 'SulAmerica', 'Unimed', 'Outro'];
-const TIME_OPTIONS = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
+const FALLBACK_TIME_OPTIONS = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
 
-// Detect if user wants to schedule from free-text
+const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+
+// Label: "Pagamento: Particular" or "Convenio: X"
+function insuranceLabel(value: string): string {
+  return value.toLowerCase() === 'particular' ? 'Pagamento' : 'Convenio';
+}
+
+// Fetch available dates from scheduling module (max 6)
+async function fetchAvailableDates(): Promise<Array<{ date: string; label: string }>> {
+  try {
+    const dates = await schedulingService.getAvailableDates();
+    return dates.slice(0, 6).map(d => {
+      const dayName = DAY_NAMES[d.dayOfWeek];
+      const formatted = `${d.date.slice(8, 10)}/${d.date.slice(5, 7)}`;
+      return { date: d.date, label: `${formatted} (${dayName})` };
+    });
+  } catch (err: any) {
+    console.error('[DEMO-ELOY] Failed to fetch available dates:', err.message);
+    return [];
+  }
+}
+
+// Fetch available slots for a date from scheduling module
+async function fetchAvailableSlots(date: string): Promise<string[]> {
+  try {
+    const slots = await schedulingService.getAvailableSlots(date);
+    return slots.filter(s => s.available).map(s => s.time);
+  } catch (err: any) {
+    console.error('[DEMO-ELOY] Failed to fetch slots for', date, ':', err.message);
+    return FALLBACK_TIME_OPTIONS;
+  }
+}
+
+// Detect if user wants to schedule from free-text or button click
 function wantsToSchedule(text: string): boolean {
   const lower = text.toLowerCase();
-  return /agend|consult|marc|hora|agendar|marcar/.test(lower);
+  return /agend|consult|marc|hora|agendar|marcar|^schedule$/.test(lower);
 }
 
 // Handle the structured scheduling flow without AI calls
 // Mutates state in-place and returns response (state is owned by caller)
-function handleSchedulingStep(state: SessionState, userMessage: string): Omit<ChatResponse, 'sessionData'> | null {
+async function handleSchedulingStep(state: SessionState, userMessage: string): Promise<Omit<ChatResponse, 'sessionData'> | null> {
   const msg = userMessage.trim();
   const lower = msg.toLowerCase();
 
@@ -200,12 +235,21 @@ function handleSchedulingStep(state: SessionState, userMessage: string): Omit<Ch
       const matched = INSURANCE_OPTIONS.find(o => o.toLowerCase() === lower || o.toLowerCase().replace(/\s/g, '_') === lower);
       state.data.insurance = matched || msg;
       state.step = 'insurance_confirm';
-      return { reply: `Convenio: ${state.data.insurance}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'insurance_confirm' };
+      const lbl = insuranceLabel(state.data.insurance);
+      return { reply: `${lbl}: ${state.data.insurance}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'insurance_confirm' };
     }
 
     case 'insurance_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
         state.step = 'date';
+        const availDates = await fetchAvailableDates();
+        if (availDates.length > 0) {
+          return {
+            reply: 'Qual data prefere para a consulta?',
+            buttons: availDates.map(d => ({ id: d.date, label: d.label })),
+            currentStep: 'date',
+          };
+        }
         return { reply: 'Qual data prefere para a consulta? (ex: 15/05/2026)', currentStep: 'date', inputHint: 'date' };
       }
       state.step = 'insurance';
@@ -217,12 +261,17 @@ function handleSchedulingStep(state: SessionState, userMessage: string): Omit<Ch
 
     case 'date': {
       let dateStr = '';
-      const ddmm = msg.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
-      if (ddmm) {
-        dateStr = `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`;
+      // Accept YYYY-MM-DD (button click) directly
+      if (/^\d{4}-\d{2}-\d{2}$/.test(msg)) {
+        dateStr = msg;
       } else {
-        const iso = msg.match(/(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
-        if (iso) dateStr = `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+        const ddmm = msg.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
+        if (ddmm) {
+          dateStr = `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`;
+        } else {
+          const iso = msg.match(/(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
+          if (iso) dateStr = `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+        }
       }
       if (!dateStr) return { reply: 'Data invalida. Use o formato DD/MM/AAAA (ex: 15/05/2026).', currentStep: 'date', inputHint: 'date' };
 
@@ -242,25 +291,37 @@ function handleSchedulingStep(state: SessionState, userMessage: string): Omit<Ch
     case 'date_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
         state.step = 'time';
+        const availSlots = await fetchAvailableSlots(state.data.date!);
+        const slots = availSlots.length > 0 ? availSlots : FALLBACK_TIME_OPTIONS;
         return {
-          reply: 'Qual horario prefere? Temos das 8h as 18h (intervalo 12h-13h).',
-          buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
+          reply: 'Qual horario prefere?',
+          buttons: slots.map(t => ({ id: t, label: t })),
           currentStep: 'time',
         };
       }
       state.step = 'date';
+      const refetchDates = await fetchAvailableDates();
+      if (refetchDates.length > 0) {
+        return {
+          reply: 'Qual data prefere para a consulta?',
+          buttons: refetchDates.map(d => ({ id: d.date, label: d.label })),
+          currentStep: 'date',
+        };
+      }
       return { reply: 'Qual data prefere? (ex: 15/05/2026)', currentStep: 'date', inputHint: 'date' };
 
     case 'time': {
-      const matched = TIME_OPTIONS.find(t => t === msg || msg.includes(t));
-      if (!matched) return {
-        reply: 'Horario invalido. Escolha um dos horarios disponiveis.',
-        buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
-        currentStep: 'time',
-      };
-      state.data.time = matched;
+      // Accept HH:MM format (button click or typed)
+      const timeMatch = msg.match(/^(\d{1,2}):(\d{2})$/);
+      if (!timeMatch) {
+        const slots = await fetchAvailableSlots(state.data.date!);
+        const btns = (slots.length > 0 ? slots : FALLBACK_TIME_OPTIONS).map(t => ({ id: t, label: t }));
+        return { reply: 'Horario invalido. Escolha um dos horarios disponiveis.', buttons: btns, currentStep: 'time' };
+      }
+      const selectedTime = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+      state.data.time = selectedTime;
       state.step = 'time_confirm';
-      return { reply: `Horario ${matched}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'time_confirm' };
+      return { reply: `Horario ${selectedTime}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'time_confirm' };
     }
 
     case 'time_confirm':
@@ -268,6 +329,7 @@ function handleSchedulingStep(state: SessionState, userMessage: string): Omit<Ch
         state.step = 'final_confirm';
         const d = state.data;
         const dateFormatted = d.date ? `${d.date.slice(8, 10)}/${d.date.slice(5, 7)}/${d.date.slice(0, 4)}` : '';
+        const lbl = insuranceLabel(d.insurance || '');
         return {
           reply: `Resumo do agendamento:\n\n` +
             `Nome: ${d.name}\n` +
@@ -275,7 +337,7 @@ function handleSchedulingStep(state: SessionState, userMessage: string): Omit<Ch
             `CPF: ${d.cpf}\n` +
             `Email: ${d.email}\n` +
             `Endereco: ${d.address}\n` +
-            `Convenio: ${d.insurance}\n` +
+            `${lbl}: ${d.insurance}\n` +
             `Data: ${dateFormatted} as ${d.time}\n\n` +
             `Confirma o agendamento?`,
           buttons: [{ id: 'confirm', label: 'Sim, confirmar' }, { id: 'correct', label: 'Corrigir algo' }],
@@ -283,11 +345,11 @@ function handleSchedulingStep(state: SessionState, userMessage: string): Omit<Ch
         };
       }
       state.step = 'time';
-      return {
-        reply: 'Qual horario prefere?',
-        buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
-        currentStep: 'time',
-      };
+      {
+        const slots = await fetchAvailableSlots(state.data.date!);
+        const btns = (slots.length > 0 ? slots : FALLBACK_TIME_OPTIONS).map(t => ({ id: t, label: t }));
+        return { reply: 'Qual horario prefere?', buttons: btns, currentStep: 'time' };
+      }
 
     case 'final_confirm':
       // Handled separately in chat() to do DB operations
@@ -338,7 +400,7 @@ async function finalizeAppointment(data: SchedulingData): Promise<{ callId: stri
       date: callDate,
       duration: 30,
       status: 'scheduled',
-      notes: `Convenio: ${d.insurance || 'Nao informado'}. Agendado via demo chat.`,
+      notes: `${insuranceLabel(d.insurance || '')}: ${d.insurance || 'Nao informado'}. Agendado via demo chat.`,
     },
   });
 
@@ -393,7 +455,8 @@ export const demoEloyService = {
           try {
             const { callId } = await finalizeAppointment(state.data);
             state.step = 'done';
-            const reply = `Agendamento confirmado! Protocolo: ${callId.slice(-8).toUpperCase()}\n\nNossa equipe entrara em contato para confirmar. Ate breve!`;
+            const dateFormatted = state.data.date ? `${state.data.date.slice(8, 10)}/${state.data.date.slice(5, 7)}/${state.data.date.slice(0, 4)}` : '';
+            const reply = `Agendamento confirmado! \u2705 Protocolo: ${callId.slice(-8).toUpperCase()}\n\nSua consulta esta marcada para ${dateFormatted} as ${state.data.time}. Entraremos em contato para lembra-la antes da consulta. Ate breve! \uD83D\uDE0A`;
             return { reply, currentStep: 'done', sessionData: state };
           } catch (err: any) {
             console.error('[DEMO-ELOY] Appointment error:', err.message);
@@ -407,7 +470,7 @@ export const demoEloyService = {
         }
       }
 
-      const stepResult = handleSchedulingStep(state, trimmed);
+      const stepResult = await handleSchedulingStep(state, trimmed);
       if (stepResult) {
         return { ...stepResult, sessionData: state };
       }
