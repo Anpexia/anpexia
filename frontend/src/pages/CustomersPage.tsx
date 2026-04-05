@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
 import { isOftalmologia } from '../utils/segment';
 import { useAuth } from '../hooks/useAuth';
+import { useCepLookup, formatarCep } from '../hooks/useCepLookup';
 
 interface ScheduledCall {
   id: string;
@@ -112,6 +113,28 @@ function populateForm(c: Customer) {
 export function CustomersPage() {
   const { user } = useAuth();
   const tenant = user?.tenant;
+  const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
+  const numberInputRef = useCallback((node: HTMLInputElement | null) => { if (node) node.dataset.numberInput = 'true'; }, []);
+
+  const handleCepBlur = async (cepValue: string) => {
+    const endereco = await buscarCep(cepValue);
+    if (endereco) {
+      setFormData(prev => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          cep: formatarCep(cepValue),
+          street: endereco.logradouro,
+          neighborhood: endereco.bairro,
+          city: endereco.localidade,
+          state: endereco.uf,
+        },
+      }));
+      // Focus number field after auto-fill
+      const numInput = document.querySelector<HTMLInputElement>('input[data-number-input="true"]');
+      if (numInput) numInput.focus();
+    }
+  };
 
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -557,12 +580,16 @@ export function CustomersPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Endereco</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <input type="text" placeholder="CEP" value={formData.address.cep} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, cep: e.target.value } })} className={inputCls} />
+                  <div>
+                    <input type="text" placeholder="00000-000" value={formData.address.cep} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, cep: formatarCep(e.target.value) } })} onBlur={(e) => handleCepBlur(e.target.value)} className={inputCls} maxLength={9} />
+                    {cepLoading && <span className="text-xs text-slate-400 mt-1 block">Buscando endereco...</span>}
+                    {cepErro && <span className="text-xs text-red-500 mt-1 block">{cepErro}</span>}
+                  </div>
                   <input type="text" placeholder="Rua" value={formData.address.street} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, street: e.target.value } })} className={inputCls + ' col-span-2'} />
-                  <input type="text" placeholder="Numero" value={formData.address.number} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, number: e.target.value } })} className={inputCls} />
+                  <input type="text" placeholder="Numero" value={formData.address.number} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, number: e.target.value } })} className={inputCls} ref={numberInputRef} />
                   <input type="text" placeholder="Bairro" value={formData.address.neighborhood} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, neighborhood: e.target.value } })} className={inputCls} />
                   <input type="text" placeholder="Cidade" value={formData.address.city} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })} className={inputCls} />
-                  <input type="text" placeholder="Estado" value={formData.address.state} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })} className={inputCls} maxLength={2} />
+                  <input type="text" placeholder="UF" value={formData.address.state} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })} className={inputCls} maxLength={2} />
                 </div>
               </div>
               <div>
@@ -709,12 +736,16 @@ export function CustomersPage() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Endereco</label>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      <input type="text" placeholder="CEP" value={formData.address.cep} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, cep: e.target.value } })} className={inputCls} />
+                      <div>
+                        <input type="text" placeholder="00000-000" value={formData.address.cep} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, cep: formatarCep(e.target.value) } })} onBlur={(e) => handleCepBlur(e.target.value)} className={inputCls} maxLength={9} />
+                        {cepLoading && <span className="text-xs text-slate-400 mt-1 block">Buscando endereco...</span>}
+                        {cepErro && <span className="text-xs text-red-500 mt-1 block">{cepErro}</span>}
+                      </div>
                       <input type="text" placeholder="Rua" value={formData.address.street} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, street: e.target.value } })} className={inputCls + ' col-span-2'} />
-                      <input type="text" placeholder="Numero" value={formData.address.number} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, number: e.target.value } })} className={inputCls} />
+                      <input type="text" placeholder="Numero" value={formData.address.number} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, number: e.target.value } })} className={inputCls} ref={numberInputRef} />
                       <input type="text" placeholder="Bairro" value={formData.address.neighborhood} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, neighborhood: e.target.value } })} className={inputCls} />
                       <input type="text" placeholder="Cidade" value={formData.address.city} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })} className={inputCls} />
-                      <input type="text" placeholder="Estado" value={formData.address.state} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })} className={inputCls} maxLength={2} />
+                      <input type="text" placeholder="UF" value={formData.address.state} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })} className={inputCls} maxLength={2} />
                     </div>
                   </div>
                   <div>
