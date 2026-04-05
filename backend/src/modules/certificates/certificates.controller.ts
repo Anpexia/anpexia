@@ -29,12 +29,22 @@ certificatesRouter.get('/medical-certificates', async (req: Request, res: Respon
 
 certificatesRouter.post('/medical-certificates', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log('[ATESTADO] body:', JSON.stringify(req.body, null, 2));
+    console.log('[ATESTADO] userId:', req.auth!.userId, 'tenantId:', req.auth!.tenantId);
+
+    // Inject doctorId from authenticated user if not provided
+    const body = { ...req.body };
+    if (!body.doctorId) {
+      body.doctorId = req.auth!.userId;
+    }
+
     const certificate = await certificatesService.create(
       req.auth!.tenantId!,
-      req.body,
+      body,
     );
     return created(res, certificate);
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[ATESTADO] erro:', err.message, err.stack);
     next(err);
   }
 });

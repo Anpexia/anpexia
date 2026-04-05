@@ -18,10 +18,35 @@ export const prescriptionsService = {
 
     const prescriptions = await prisma.prescription.findMany({
       where,
+      include: {
+        patient: { select: { name: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
-    return prescriptions;
+    // Map data JSON into items/oculosData for frontend consumption
+    return prescriptions.map((p) => {
+      const data = p.data as Record<string, any> || {};
+      let items: any[] | undefined;
+      let oculosData: any | undefined;
+
+      if (p.type === 'MEDICAMENTO') {
+        items = data.medications || [];
+      } else if (p.type === 'EXAME_EXTERNO' || p.type === 'EXAME_INTERNO') {
+        items = data.exams || [];
+      } else if (p.type === 'OCULOS') {
+        oculosData = { tipoLente: data.lensType, ...data };
+      }
+
+      return {
+        id: p.id,
+        type: p.type,
+        items,
+        oculosData,
+        createdAt: p.createdAt,
+        doctorId: p.doctorId,
+      };
+    });
   },
 
   async create(tenantId: string, data: CreatePrescriptionData) {
