@@ -179,13 +179,18 @@ async function loadRoutes() {
     app.post('/api/v1/demo-eloy/chat', async (req, res) => {
       try {
         const { messages, systemPrompt } = req.body;
+        console.log('[DEMO-ELOY] mensagem recebida:', messages?.length, 'msgs');
         if (!messages || !systemPrompt) {
           return res.status(400).json({ success: false, error: 'Missing messages or systemPrompt' });
         }
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) {
+          console.error('[DEMO-ELOY] ANTHROPIC_API_KEY not configured');
           return res.status(500).json({ success: false, error: 'ANTHROPIC_API_KEY not configured' });
         }
+        console.log('[DEMO-ELOY] chamando Anthropic...');
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000);
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -199,11 +204,14 @@ async function loadRoutes() {
             system: systemPrompt,
             messages,
           }),
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
         const data = await response.json();
+        console.log('[DEMO-ELOY] resposta ok, stop_reason:', (data as any).stop_reason);
         return res.json({ success: true, data });
       } catch (err: any) {
-        console.error('[DEMO-CHAT] Error:', err.message);
+        console.error('[DEMO-ELOY] Error:', err.message);
         return res.status(500).json({ success: false, error: err.message });
       }
     });

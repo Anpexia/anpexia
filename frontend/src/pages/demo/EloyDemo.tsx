@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, X, MessageCircle } from 'lucide-react';
+import { Send, X, MessageCircle, Phone, MapPin, Clock } from 'lucide-react';
 
 interface Msg {
   role: 'assistant' | 'user';
@@ -80,6 +80,12 @@ export function EloyDemo() {
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-open chat after 2 seconds
+  useEffect(() => {
+    const t = setTimeout(() => setOpen(true), 2000);
+    return () => clearTimeout(t);
+  }, []);
+
   // scroll
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -112,12 +118,13 @@ export function EloyDemo() {
     setButtons([]);
     setTyping(true);
 
-    // check L2 buttons
     const l2 = BUTTONS_L2[text.trim()];
-
     const delay = 1500 + Math.random() * 1000;
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+
       const res = await fetch(`${API_URL}/demo-eloy/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,15 +132,19 @@ export function EloyDemo() {
           systemPrompt: SYSTEM,
           messages: updated.map(m => ({ role: m.role, content: m.content })),
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+
       const json = await res.json();
       const reply = json.data?.content?.[0]?.text || 'Desculpa, não consegui responder agora. Pode repetir?';
 
       await new Promise(r => setTimeout(r, delay));
       setMessages(prev => [...prev, { role: 'assistant', content: reply, time: now() }]);
       if (l2) setButtons(l2);
-    } catch {
-      await new Promise(r => setTimeout(r, delay));
+    } catch (err) {
+      console.error('[DEMO] fetch error:', err);
+      await new Promise(r => setTimeout(r, Math.min(delay, 1000)));
       setMessages(prev => [...prev, { role: 'assistant', content: 'Ops, tive um probleminha aqui. Pode mandar de novo?', time: now() }]);
     } finally {
       setTyping(false);
@@ -151,7 +162,88 @@ export function EloyDemo() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8faf7' }}>
+
+      {/* Landing content */}
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '40px 20px', fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', margin: '0 auto 16px',
+            backgroundColor: '#2D5A1B', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(45,90,27,0.3)',
+          }}>
+            <img src="/logo-eloy.jpg" alt="Dr. Eloy Chicata" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          </div>
+          <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#1a1a1a', margin: '0 0 8px' }}>
+            Clinica Dr. Eloy Chicata
+          </h1>
+          <p style={{ fontSize: '1rem', color: '#666', margin: 0 }}>
+            Oftalmologia Avancada — Para de Minas/MG
+          </p>
+        </div>
+
+        {/* Info cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 40 }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <Phone size={18} color="#2D5A1B" />
+              <span style={{ fontWeight: 600, color: '#333', fontSize: '0.9rem' }}>Contato</span>
+            </div>
+            <p style={{ margin: 0, color: '#666', fontSize: '0.85rem' }}>(37) 3231-1234</p>
+          </div>
+          <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <MapPin size={18} color="#2D5A1B" />
+              <span style={{ fontWeight: 600, color: '#333', fontSize: '0.9rem' }}>Endereco</span>
+            </div>
+            <p style={{ margin: 0, color: '#666', fontSize: '0.85rem' }}>Para de Minas, MG</p>
+          </div>
+          <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <Clock size={18} color="#2D5A1B" />
+              <span style={{ fontWeight: 600, color: '#333', fontSize: '0.9rem' }}>Horario</span>
+            </div>
+            <p style={{ margin: 0, color: '#666', fontSize: '0.85rem' }}>Seg a Sex, 8h as 18h</p>
+          </div>
+        </div>
+
+        {/* Specialties */}
+        <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '24px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: 40 }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1a1a1a', marginTop: 0, marginBottom: 16 }}>Especialidades</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {['Catarata', 'Glaucoma', 'Retina', 'Cirurgia Refrativa', 'Lentes de Contato', 'Oftalmopediatria'].map(s => (
+              <span key={s} style={{
+                padding: '6px 14px', borderRadius: 999, backgroundColor: '#f0f7ee', color: '#2D5A1B',
+                fontSize: '0.8rem', fontWeight: 500,
+              }}>{s}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div style={{ textAlign: 'center' }}>
+          <button
+            onClick={() => setOpen(true)}
+            style={{
+              padding: '14px 32px', borderRadius: 999, border: 'none', backgroundColor: '#2D5A1B',
+              color: '#fff', fontSize: '1rem', fontWeight: 600, cursor: 'pointer',
+              boxShadow: '0 4px 16px rgba(45,90,27,0.3)', transition: 'transform 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.03)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <MessageCircle size={20} />
+              Fale com a Ana pelo chat
+            </span>
+          </button>
+          <p style={{ marginTop: 12, color: '#999', fontSize: '0.8rem' }}>
+            Atendimento imediato via chat — sem fila
+          </p>
+        </div>
+      </div>
 
       {/* ── Widget ── */}
       {open && (
@@ -169,7 +261,7 @@ export function EloyDemo() {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Clínica Dr. Eloy Chicata
+                Clinica Dr. Eloy Chicata
               </div>
               <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>Ana • Online agora</div>
             </div>
@@ -215,7 +307,7 @@ export function EloyDemo() {
                   boxShadow: '0 1px 1px rgba(0,0,0,0.06)', fontSize: '0.8rem', color: '#999',
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
-                  Ana está digitando
+                  Ana esta digitando
                   <style>{`@keyframes dotblink{0%,80%{opacity:.2}40%{opacity:1}}`}</style>
                   <span style={{ display: 'inline-flex', gap: 2 }}>
                     <span style={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: '#999', animation: 'dotblink 1.4s infinite 0s' }} />
