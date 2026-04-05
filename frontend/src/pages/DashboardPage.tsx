@@ -30,6 +30,14 @@ interface AlertProduct {
   supplier: string | null;
 }
 
+interface ExpiringProduct {
+  id: string;
+  name: string;
+  quantity: number;
+  expiresAt: string | null;
+  isExpired: boolean;
+}
+
 interface StatCardProps {
   title: string;
   value: string | number;
@@ -87,7 +95,7 @@ export function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lowStockProducts, setLowStockProducts] = useState<AlertProduct[]>([]);
-  const [expiringProducts, setExpiringProducts] = useState<AlertProduct[]>([]);
+  const [expiringProducts, setExpiringProducts] = useState<ExpiringProduct[]>([]);
   const [pendingAutorizacoes, setPendingAutorizacoes] = useState<{ total: number; items: any[] }>({ total: 0, items: [] });
 
   useEffect(() => {
@@ -178,7 +186,7 @@ export function DashboardPage() {
             <StatCard
               title="Alertas"
               value={totalAlerts}
-              subtitle={`${d.inventory.lowStock} estoque baixo / ${d.inventory.expiringSoon} vencendo`}
+              subtitle={`${d.inventory.lowStock} estoque baixo / ${d.inventory.expiringSoon} vencidos/vencendo`}
               icon={AlertTriangle}
               alert={totalAlerts > 0}
               color="orange"
@@ -341,7 +349,7 @@ export function DashboardPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Clock size={18} className="text-red-500" />
-                  <h3 className="font-semibold text-slate-800">Vencendo em 30 dias</h3>
+                  <h3 className="font-semibold text-slate-800">Vencidos e vencendo em 30 dias</h3>
                 </div>
                 {expiringProducts.length > 0 && (
                   <button onClick={() => navigate('/estoque')} className="text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium flex items-center gap-1">
@@ -350,15 +358,21 @@ export function DashboardPage() {
                 )}
               </div>
               {expiringProducts.length === 0 ? (
-                <p className="text-sm text-slate-500">Nenhum produto perto do vencimento.</p>
+                <p className="text-sm text-slate-500">Nenhum produto vencido ou perto do vencimento.</p>
               ) : (
                 <div className="space-y-2">
                   {expiringProducts.slice(0, 5).map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-2.5 bg-red-50 rounded-lg">
-                      <span className="text-sm font-medium text-slate-800">{p.name}</span>
-                      <span className="text-xs text-red-600 font-medium">
-                        {p.expires_at ? new Date(p.expires_at).toLocaleDateString('pt-BR') : '-'}
-                      </span>
+                    <div key={p.id} className={`flex items-center justify-between p-2.5 rounded-lg ${p.isExpired ? 'bg-red-100' : 'bg-amber-50'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-800">{p.name}</span>
+                        {p.isExpired && <span className="text-[10px] px-1.5 py-0.5 bg-red-600 text-white rounded font-bold">VENCIDO</span>}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-500">Qtd: {p.quantity}</span>
+                        <span className={`text-xs font-medium ${p.isExpired ? 'text-red-700' : 'text-amber-700'}`}>
+                          {p.expiresAt ? new Date(p.expiresAt).toLocaleDateString('pt-BR') : '-'}
+                        </span>
+                      </div>
                     </div>
                   ))}
                   {expiringProducts.length > 5 && (

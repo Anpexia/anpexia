@@ -45,14 +45,14 @@ export const dashboardService = {
         select: { quantity: true, minQuantity: true },
       }),
 
-      // Produtos perto do vencimento (30 dias)
+      // Produtos vencidos + perto do vencimento (30 dias)
       prisma.product.count({
         where: {
           tenantId,
           isActive: true,
           expiresAt: {
+            not: null,
             lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            gte: new Date(),
           },
         },
       }),

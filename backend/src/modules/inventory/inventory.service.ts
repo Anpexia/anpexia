@@ -236,16 +236,23 @@ export const inventoryService = {
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + days);
 
-    return prisma.product.findMany({
+    // Returns both already-expired AND expiring within `days`
+    const products = await prisma.product.findMany({
       where: {
         tenantId,
         isActive: true,
         expiresAt: {
+          not: null,
           lte: deadline,
-          gte: new Date(),
         },
       },
       orderBy: { expiresAt: 'asc' },
     });
+
+    const now = new Date();
+    return products.map(p => ({
+      ...p,
+      isExpired: p.expiresAt! < now,
+    }));
   },
 };

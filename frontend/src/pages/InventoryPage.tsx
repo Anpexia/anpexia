@@ -48,6 +48,14 @@ interface AlertProduct {
   supplier: string | null;
 }
 
+interface ExpiringProduct {
+  id: string;
+  name: string;
+  quantity: number;
+  expiresAt: string | null;
+  isExpired: boolean;
+}
+
 interface SupplierOption {
   id: string;
   name: string;
@@ -76,7 +84,7 @@ export function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<AlertProduct[]>([]);
-  const [expiringProducts, setExpiringProducts] = useState<AlertProduct[]>([]);
+  const [expiringProducts, setExpiringProducts] = useState<ExpiringProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalMode, setModalMode] = useState<ModalMode>('closed');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -614,10 +622,18 @@ export function InventoryPage() {
           <AlertTriangle size={16} />
           <span>{lowStockProducts.length} produtos com estoque baixo</span>
         </button>
-        <button onClick={() => setShowAlertPanel(showAlertPanel === 'expiring' ? null : 'expiring')} className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 hover:bg-red-100 transition-colors">
-          <Clock size={16} />
-          <span>{expiringProducts.length} produtos perto do vencimento</span>
-        </button>
+        {expiringProducts.filter(p => p.isExpired).length > 0 && (
+          <button onClick={() => setShowAlertPanel(showAlertPanel === 'expiring' ? null : 'expiring')} className="flex items-center gap-2 px-4 py-2 bg-red-100 border border-red-300 rounded-lg text-sm text-red-800 hover:bg-red-200 transition-colors">
+            <AlertTriangle size={16} />
+            <span>{expiringProducts.filter(p => p.isExpired).length} produtos vencidos</span>
+          </button>
+        )}
+        {expiringProducts.filter(p => !p.isExpired).length > 0 && (
+          <button onClick={() => setShowAlertPanel(showAlertPanel === 'expiring' ? null : 'expiring')} className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 hover:bg-amber-100 transition-colors">
+            <Clock size={16} />
+            <span>{expiringProducts.filter(p => !p.isExpired).length} produtos vencem em 30 dias</span>
+          </button>
+        )}
       </div>
 
       {/* Alert Detail Panels */}
@@ -641,13 +657,15 @@ export function InventoryPage() {
 
       {showAlertPanel === 'expiring' && expiringProducts.length > 0 && (
         <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
-          <h4 className="font-medium text-red-900 mb-3">Produtos perto do vencimento</h4>
+          <h4 className="font-medium text-red-900 mb-3">Produtos vencidos e perto do vencimento</h4>
           <div className="space-y-2">
             {expiringProducts.map((p) => (
-              <div key={p.id} className="flex items-center justify-between bg-white rounded-lg px-4 py-2 border border-red-100">
+              <div key={p.id} className={`flex items-center justify-between bg-white rounded-lg px-4 py-2 border ${p.isExpired ? 'border-red-300' : 'border-amber-200'}`}>
                 <span className="text-sm font-medium text-slate-800">{p.name}</span>
                 <div className="flex items-center gap-4 text-sm">
-                  <span className="text-red-600 font-medium">Vence: {p.expires_at ? format(new Date(p.expires_at), 'dd/MM/yyyy') : '-'}</span>
+                  <span className={p.isExpired ? 'text-red-600 font-semibold' : 'text-amber-600 font-medium'}>
+                    {p.isExpired ? 'Vencido' : 'Vence'}: {p.expiresAt ? format(new Date(p.expiresAt), 'dd/MM/yyyy') : '-'}
+                  </span>
                   <span className="text-slate-500">Qtd: {p.quantity}</span>
                 </div>
               </div>
