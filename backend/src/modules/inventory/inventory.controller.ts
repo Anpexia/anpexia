@@ -213,6 +213,18 @@ inventoryRouter.get('/alerts/low-stock', async (req: Request, res: Response, nex
   }
 });
 
+// Trigger low stock email check for a product (debug/test)
+inventoryRouter.post('/alerts/test-email/:productId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.auth!.tenantId!;
+    const productId = req.params.productId as string;
+    const result = await inventoryService.testLowStockEmail(tenantId, productId);
+    return success(res, result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Alertas de produtos próximos do vencimento
 inventoryRouter.get('/alerts/expiring', async (req: Request, res: Response, next: NextFunction) => {
   try {
