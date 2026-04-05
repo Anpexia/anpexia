@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, X, CheckCircle, UserCheck, UserX, Shield, Edit2 } from 'lucide-react';
+import { Users, Plus, X, CheckCircle, UserCheck, UserX, Shield, Edit2, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -17,11 +17,13 @@ interface TeamMember {
 export function TeamPage() {
   const { user } = useAuth();
   const isOwner = user?.role === 'OWNER' || user?.role === 'SUPER_ADMIN';
+  const canManage = isOwner || user?.role === 'MANAGER';
 
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<TeamMember | null>(null);
   const [toast, setToast] = useState('');
 
   // Create form
@@ -83,6 +85,18 @@ export function TeamPage() {
       fetchMembers();
     } catch (err: any) {
       showToast(err.response?.data?.error?.message || 'Erro ao alterar status');
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!removeConfirm) return;
+    try {
+      await api.delete(`/team/${removeConfirm.id}`);
+      showToast('Membro removido!');
+      setRemoveConfirm(null);
+      fetchMembers();
+    } catch (err: any) {
+      showToast(err.response?.data?.error?.message || 'Erro ao remover');
     }
   };
 
@@ -149,7 +163,7 @@ export function TeamPage() {
                   <th className="text-left px-4 py-3 text-slate-600 font-medium">Cargo</th>
                   <th className="text-left px-4 py-3 text-slate-600 font-medium">Status</th>
                   <th className="text-left px-4 py-3 text-slate-600 font-medium">Ultimo Login</th>
-                  {isOwner && <th className="text-right px-4 py-3 text-slate-600 font-medium">Acoes</th>}
+                  {canManage && <th className="text-right px-4 py-3 text-slate-600 font-medium">Acoes</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -172,16 +186,23 @@ export function TeamPage() {
                     <td className="px-4 py-3 text-slate-500 text-xs">
                       {m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleDateString('pt-BR') : 'Nunca'}
                     </td>
-                    {isOwner && (
+                    {canManage && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {m.role !== 'OWNER' && (
                             <>
-                              <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-slate-100 text-slate-500" title="Editar">
-                                <Edit2 size={15} />
-                              </button>
-                              <button onClick={() => handleToggle(m.id)} className={`p-1.5 rounded hover:bg-slate-100 ${m.isActive ? 'text-red-500' : 'text-emerald-500'}`} title={m.isActive ? 'Desativar' : 'Ativar'}>
-                                {m.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
+                              {isOwner && (
+                                <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-slate-100 text-slate-500" title="Editar">
+                                  <Edit2 size={15} />
+                                </button>
+                              )}
+                              {isOwner && (
+                                <button onClick={() => handleToggle(m.id)} className={`p-1.5 rounded hover:bg-slate-100 ${m.isActive ? 'text-red-500' : 'text-emerald-500'}`} title={m.isActive ? 'Desativar' : 'Ativar'}>
+                                  {m.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
+                                </button>
+                              )}
+                              <button onClick={() => setRemoveConfirm(m)} className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600" title="Remover">
+                                <Trash2 size={15} />
                               </button>
                             </>
                           )}
@@ -236,6 +257,26 @@ export function TeamPage() {
               <button onClick={handleCreate} disabled={submitting}
                 className="w-full btn-pill btn-primary justify-center">
                 {submitting ? 'Adicionando...' : 'Adicionar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Confirmation Modal */}
+      {removeConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setRemoveConfirm(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-slate-800 mb-3">Remover membro</h2>
+            <p className="text-sm text-slate-600 mb-6">
+              Tem certeza que deseja remover <strong>{removeConfirm.name}</strong> da equipe? Esta acao nao pode ser desfeita.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setRemoveConfirm(null)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">
+                Cancelar
+              </button>
+              <button onClick={handleRemove} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">
+                Remover
               </button>
             </div>
           </div>

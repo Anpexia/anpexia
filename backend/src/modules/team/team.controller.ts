@@ -83,3 +83,13 @@ teamRouter.patch('/:id/toggle', requireRole('OWNER'), async (req: Request, res: 
     next(err);
   }
 });
+
+// Remove member — OWNER and MANAGER
+teamRouter.delete('/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await teamService.remove(req.auth!.tenantId!, req.params.id as string, req.auth!.userId);
+    return success(res, result);
+  } catch (err) {
+    next(err);
+  }
+});

@@ -97,6 +97,16 @@ export const teamService = {
     });
   },
 
+  async remove(tenantId: string, userId: string, requesterId: string) {
+    const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
+    if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario nao encontrado');
+    if (user.role === 'OWNER') throw new AppError(400, 'CANNOT_REMOVE_OWNER', 'Nao e possivel remover o proprietario');
+    if (userId === requesterId) throw new AppError(400, 'CANNOT_REMOVE_SELF', 'Voce nao pode remover a si mesmo');
+
+    await prisma.user.delete({ where: { id: userId } });
+    return { id: userId, removed: true };
+  },
+
   async getProfile(userId: string) {
     return prisma.user.findUnique({
       where: { id: userId },
