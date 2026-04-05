@@ -50,8 +50,8 @@ const PLACEHOLDERS: Record<string, string> = {
 
 const INITIAL_BUTTONS: ChatButton[] = [
   { id: 'schedule', label: 'Quero agendar uma consulta' },
-  { id: 'vision', label: 'Tenho um problema de visao' },
-  { id: 'treatments', label: 'Quero saber sobre os tratamentos' },
+  { id: 'urgency', label: 'Urgencia / Problema ocular' },
+  { id: 'treatments', label: 'Conhecer os tratamentos' },
   { id: 'question', label: 'Tenho uma duvida' },
 ];
 
