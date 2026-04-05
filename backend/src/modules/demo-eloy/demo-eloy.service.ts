@@ -27,11 +27,16 @@ interface SchedulingData {
   time?: string;
 }
 
-interface Session {
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+// Session state sent by the frontend and returned by the backend (stateless)
+interface SessionState {
   step: Step;
   data: SchedulingData;
-  createdAt: number;
+}
+
+interface ChatRequest {
+  message: string;
+  sessionData?: SessionState;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 interface ChatResponse {
@@ -39,26 +44,7 @@ interface ChatResponse {
   buttons?: Array<{ id: string; label: string }>;
   currentStep?: string;
   inputHint?: 'text' | 'phone' | 'cpf' | 'email' | 'date';
-}
-
-// In-memory session store
-const sessions = new Map<string, Session>();
-
-// Cleanup expired sessions every 15 min
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, s] of sessions) {
-    if (now - s.createdAt > 60 * 60 * 1000) sessions.delete(id);
-  }
-}, 15 * 60 * 1000);
-
-function getOrCreateSession(sessionId: string): Session {
-  let session = sessions.get(sessionId);
-  if (!session) {
-    session = { messages: [], step: 'idle', data: {}, createdAt: Date.now() };
-    sessions.set(sessionId, session);
-  }
-  return session;
+  sessionData: SessionState;
 }
 
 // Format CPF
@@ -125,104 +111,104 @@ function wantsToSchedule(text: string): boolean {
 }
 
 // Handle the structured scheduling flow without AI calls
-function handleSchedulingStep(session: Session, userMessage: string): ChatResponse | null {
+// Mutates state in-place and returns response (state is owned by caller)
+function handleSchedulingStep(state: SessionState, userMessage: string): Omit<ChatResponse, 'sessionData'> | null {
   const msg = userMessage.trim();
   const lower = msg.toLowerCase();
 
-  switch (session.step) {
+  switch (state.step) {
     case 'name':
       if (msg.length < 3) return { reply: 'Por favor, digite seu nome completo.', currentStep: 'name', inputHint: 'text' };
-      session.data.name = msg;
-      session.step = 'name_confirm';
+      state.data.name = msg;
+      state.step = 'name_confirm';
       return { reply: `Seu nome e ${msg}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'name_confirm' };
 
     case 'name_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
-        session.step = 'phone';
+        state.step = 'phone';
         return { reply: 'Qual e o seu telefone com DDD?', currentStep: 'phone', inputHint: 'phone' };
       }
-      session.step = 'name';
+      state.step = 'name';
       return { reply: 'Qual e o seu nome completo?', currentStep: 'name', inputHint: 'text' };
 
     case 'phone': {
       const digits = msg.replace(/\D/g, '');
       if (digits.length < 10 || digits.length > 11) return { reply: 'Telefone invalido. Digite com DDD (ex: 37 99999-1234).', currentStep: 'phone', inputHint: 'phone' };
-      session.data.phone = formatPhone(digits);
-      session.step = 'phone_confirm';
-      return { reply: `Telefone ${session.data.phone}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'phone_confirm' };
+      state.data.phone = formatPhone(digits);
+      state.step = 'phone_confirm';
+      return { reply: `Telefone ${state.data.phone}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'phone_confirm' };
     }
 
     case 'phone_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
-        session.step = 'cpf';
+        state.step = 'cpf';
         return { reply: 'Qual e o seu CPF?', currentStep: 'cpf', inputHint: 'cpf' };
       }
-      session.step = 'phone';
+      state.step = 'phone';
       return { reply: 'Qual e o seu telefone com DDD?', currentStep: 'phone', inputHint: 'phone' };
 
     case 'cpf': {
       const digits = msg.replace(/\D/g, '');
       if (digits.length !== 11 || !isValidCPF(digits)) return { reply: 'CPF invalido. Digite os 11 digitos.', currentStep: 'cpf', inputHint: 'cpf' };
-      session.data.cpf = formatCPF(digits);
-      session.step = 'cpf_confirm';
-      return { reply: `CPF ${session.data.cpf}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'cpf_confirm' };
+      state.data.cpf = formatCPF(digits);
+      state.step = 'cpf_confirm';
+      return { reply: `CPF ${state.data.cpf}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'cpf_confirm' };
     }
 
     case 'cpf_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
-        session.step = 'email';
+        state.step = 'email';
         return { reply: 'Qual e o seu e-mail?', currentStep: 'email', inputHint: 'email' };
       }
-      session.step = 'cpf';
+      state.step = 'cpf';
       return { reply: 'Qual e o seu CPF?', currentStep: 'cpf', inputHint: 'cpf' };
 
     case 'email': {
       if (!msg.includes('@') || !msg.includes('.')) return { reply: 'E-mail invalido. Ex: seu@email.com', currentStep: 'email', inputHint: 'email' };
-      session.data.email = msg.toLowerCase();
-      session.step = 'email_confirm';
-      return { reply: `E-mail ${session.data.email}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'email_confirm' };
+      state.data.email = msg.toLowerCase();
+      state.step = 'email_confirm';
+      return { reply: `E-mail ${state.data.email}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'email_confirm' };
     }
 
     case 'email_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
-        session.step = 'address';
+        state.step = 'address';
         return { reply: 'Qual e o seu endereco completo? (rua, numero, cidade)', currentStep: 'address', inputHint: 'text' };
       }
-      session.step = 'email';
+      state.step = 'email';
       return { reply: 'Qual e o seu e-mail?', currentStep: 'email', inputHint: 'email' };
 
     case 'address':
       if (msg.length < 5) return { reply: 'Por favor, informe o endereco completo.', currentStep: 'address', inputHint: 'text' };
-      session.data.address = msg;
-      session.step = 'address_confirm';
+      state.data.address = msg;
+      state.step = 'address_confirm';
       return { reply: `Endereco: ${msg}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'address_confirm' };
 
     case 'address_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
-        session.step = 'insurance';
+        state.step = 'insurance';
         return {
           reply: 'Voce possui convenio ou sera particular?',
           buttons: INSURANCE_OPTIONS.map(o => ({ id: o.toLowerCase().replace(/\s/g, '_'), label: o })),
           currentStep: 'insurance',
         };
       }
-      session.step = 'address';
+      state.step = 'address';
       return { reply: 'Qual e o seu endereco completo?', currentStep: 'address', inputHint: 'text' };
 
     case 'insurance': {
-      // Accept button click or free text
       const matched = INSURANCE_OPTIONS.find(o => o.toLowerCase() === lower || o.toLowerCase().replace(/\s/g, '_') === lower);
-      session.data.insurance = matched || msg;
-      session.step = 'insurance_confirm';
-      return { reply: `Convenio: ${session.data.insurance}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'insurance_confirm' };
+      state.data.insurance = matched || msg;
+      state.step = 'insurance_confirm';
+      return { reply: `Convenio: ${state.data.insurance}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'insurance_confirm' };
     }
 
     case 'insurance_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
-        session.step = 'date';
+        state.step = 'date';
         return { reply: 'Qual data prefere para a consulta? (ex: 15/05/2026)', currentStep: 'date', inputHint: 'date' };
       }
-      session.step = 'insurance';
+      state.step = 'insurance';
       return {
         reply: 'Voce possui convenio ou sera particular?',
         buttons: INSURANCE_OPTIONS.map(o => ({ id: o.toLowerCase().replace(/\s/g, '_'), label: o })),
@@ -230,7 +216,6 @@ function handleSchedulingStep(session: Session, userMessage: string): ChatRespon
       };
 
     case 'date': {
-      // Parse dd/mm/yyyy or yyyy-mm-dd
       let dateStr = '';
       const ddmm = msg.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
       if (ddmm) {
@@ -248,22 +233,22 @@ function handleSchedulingStep(session: Session, userMessage: string): ChatRespon
       const day = d.getDay();
       if (day === 0 || day === 6) return { reply: 'Atendemos apenas de segunda a sexta. Escolha outra data.', currentStep: 'date', inputHint: 'date' };
 
-      session.data.date = dateStr;
+      state.data.date = dateStr;
       const formatted = `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}/${dateStr.slice(0, 4)}`;
-      session.step = 'date_confirm';
+      state.step = 'date_confirm';
       return { reply: `Data ${formatted}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'date_confirm' };
     }
 
     case 'date_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
-        session.step = 'time';
+        state.step = 'time';
         return {
           reply: 'Qual horario prefere? Temos das 8h as 18h (intervalo 12h-13h).',
           buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
           currentStep: 'time',
         };
       }
-      session.step = 'date';
+      state.step = 'date';
       return { reply: 'Qual data prefere? (ex: 15/05/2026)', currentStep: 'date', inputHint: 'date' };
 
     case 'time': {
@@ -273,15 +258,15 @@ function handleSchedulingStep(session: Session, userMessage: string): ChatRespon
         buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
         currentStep: 'time',
       };
-      session.data.time = matched;
-      session.step = 'time_confirm';
+      state.data.time = matched;
+      state.step = 'time_confirm';
       return { reply: `Horario ${matched}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'time_confirm' };
     }
 
     case 'time_confirm':
       if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
-        session.step = 'final_confirm';
-        const d = session.data;
+        state.step = 'final_confirm';
+        const d = state.data;
         const dateFormatted = d.date ? `${d.date.slice(8, 10)}/${d.date.slice(5, 7)}/${d.date.slice(0, 4)}` : '';
         return {
           reply: `Resumo do agendamento:\n\n` +
@@ -297,7 +282,7 @@ function handleSchedulingStep(session: Session, userMessage: string): ChatRespon
           currentStep: 'final_confirm',
         };
       }
-      session.step = 'time';
+      state.step = 'time';
       return {
         reply: 'Qual horario prefere?',
         buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
@@ -316,8 +301,8 @@ function handleSchedulingStep(session: Session, userMessage: string): ChatRespon
   }
 }
 
-async function finalizeAppointment(session: Session): Promise<{ callId: string }> {
-  const d = session.data;
+async function finalizeAppointment(data: SchedulingData): Promise<{ callId: string }> {
+  const d = data;
 
   // Find or create customer
   const phoneSuffix = (d.phone || '').replace(/\D/g, '').slice(-8);
@@ -360,57 +345,79 @@ async function finalizeAppointment(session: Session): Promise<{ callId: string }
   return { callId: call.id };
 }
 
-export const demoEloyService = {
-  async chat(sessionId: string, message: string): Promise<ChatResponse> {
-    const session = getOrCreateSession(sessionId);
-    const trimmed = message.trim();
+// Valid steps to prevent tampering
+const VALID_STEPS: Set<string> = new Set([
+  'idle', 'name', 'name_confirm', 'phone', 'phone_confirm',
+  'cpf', 'cpf_confirm', 'email', 'email_confirm',
+  'address', 'address_confirm', 'insurance', 'insurance_confirm',
+  'date', 'date_confirm', 'time', 'time_confirm',
+  'final_confirm', 'done',
+]);
 
-    // Add user message to history
-    session.messages.push({ role: 'user', content: trimmed });
-    if (session.messages.length > MAX_MESSAGES) {
-      session.messages = session.messages.slice(-MAX_MESSAGES);
-    }
+function sanitizeSessionData(raw?: any): SessionState {
+  if (!raw || typeof raw !== 'object') return { step: 'idle', data: {} };
+  const step = VALID_STEPS.has(raw.step) ? raw.step as Step : 'idle';
+  const d = raw.data && typeof raw.data === 'object' ? raw.data : {};
+  return {
+    step,
+    data: {
+      name: typeof d.name === 'string' ? d.name.slice(0, 200) : undefined,
+      phone: typeof d.phone === 'string' ? d.phone.slice(0, 30) : undefined,
+      cpf: typeof d.cpf === 'string' ? d.cpf.slice(0, 20) : undefined,
+      email: typeof d.email === 'string' ? d.email.slice(0, 100) : undefined,
+      address: typeof d.address === 'string' ? d.address.slice(0, 300) : undefined,
+      insurance: typeof d.insurance === 'string' ? d.insurance.slice(0, 100) : undefined,
+      date: typeof d.date === 'string' ? d.date.slice(0, 10) : undefined,
+      time: typeof d.time === 'string' ? d.time.slice(0, 5) : undefined,
+    },
+  };
+}
+
+export const demoEloyService = {
+  async chat(req: ChatRequest): Promise<ChatResponse> {
+    const trimmed = req.message.trim();
+    const state = sanitizeSessionData(req.sessionData);
+    const history: Array<{ role: 'user' | 'assistant'; content: string }> = Array.isArray(req.history)
+      ? req.history.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-MAX_MESSAGES)
+      : [];
+
+    // Add the current user message to history for AI calls
+    history.push({ role: 'user', content: trimmed });
 
     // If in scheduling flow (not idle), handle structured steps
-    if (session.step !== 'idle') {
+    if (state.step !== 'idle') {
       // Handle final confirmation
-      if (session.step === 'final_confirm') {
+      if (state.step === 'final_confirm') {
         const lower = trimmed.toLowerCase();
         if (lower === 'sim, confirmar' || lower === 'sim' || lower === 'confirm' || lower === 'yes') {
           try {
-            const { callId } = await finalizeAppointment(session);
-            session.step = 'done';
+            const { callId } = await finalizeAppointment(state.data);
+            state.step = 'done';
             const reply = `Agendamento confirmado! Protocolo: ${callId.slice(-8).toUpperCase()}\n\nNossa equipe entrara em contato para confirmar. Ate breve!`;
-            session.messages.push({ role: 'assistant', content: reply });
-            return { reply, currentStep: 'done' };
+            return { reply, currentStep: 'done', sessionData: state };
           } catch (err: any) {
             console.error('[DEMO-ELOY] Appointment error:', err.message);
             const reply = 'Desculpe, houve um erro ao confirmar o agendamento. Tente novamente.';
-            session.messages.push({ role: 'assistant', content: reply });
-            return { reply, currentStep: 'final_confirm', buttons: [{ id: 'confirm', label: 'Sim, confirmar' }, { id: 'correct', label: 'Corrigir algo' }] };
+            return { reply, currentStep: 'final_confirm', buttons: [{ id: 'confirm', label: 'Sim, confirmar' }, { id: 'correct', label: 'Corrigir algo' }], sessionData: state };
           }
         } else {
-          // User wants to correct — restart from name
-          session.step = 'name';
+          state.step = 'name';
           const reply = 'Sem problema! Vamos corrigir. Qual e o seu nome completo?';
-          session.messages.push({ role: 'assistant', content: reply });
-          return { reply, currentStep: 'name', inputHint: 'text' };
+          return { reply, currentStep: 'name', inputHint: 'text', sessionData: state };
         }
       }
 
-      const stepResult = handleSchedulingStep(session, trimmed);
+      const stepResult = handleSchedulingStep(state, trimmed);
       if (stepResult) {
-        session.messages.push({ role: 'assistant', content: stepResult.reply });
-        return stepResult;
+        return { ...stepResult, sessionData: state };
       }
     }
 
     // Check if user wants to schedule
-    if (session.step === 'idle' && wantsToSchedule(trimmed)) {
-      session.step = 'name';
+    if (state.step === 'idle' && wantsToSchedule(trimmed)) {
+      state.step = 'name';
       const reply = 'Otimo! Vamos agendar sua consulta. Qual e o seu nome completo?';
-      session.messages.push({ role: 'assistant', content: reply });
-      return { reply, currentStep: 'name', inputHint: 'text' };
+      return { reply, currentStep: 'name', inputHint: 'text', sessionData: state };
     }
 
     // Free-text: use Claude for general questions
@@ -419,24 +426,21 @@ export const demoEloyService = {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 200,
         system: SYSTEM_PROMPT,
-        messages: session.messages.map(m => ({ role: m.role, content: m.content })),
+        messages: history.map(m => ({ role: m.role, content: m.content })),
       });
 
       const reply = response.content[0]?.type === 'text'
         ? response.content[0].text
         : 'Desculpe, nao consegui responder. Pode repetir?';
 
-      session.messages.push({ role: 'assistant', content: reply });
-
-      // Check if AI suggested scheduling in its response
       const buttons = wantsToSchedule(reply)
         ? [{ id: 'schedule', label: 'Agendar consulta' }]
         : undefined;
 
-      return { reply, buttons, currentStep: 'idle' };
+      return { reply, buttons, currentStep: 'idle', sessionData: state };
     } catch (err: any) {
       console.error('[DEMO-ELOY] AI error:', err.message);
-      return { reply: 'Desculpe, estou com dificuldades tecnicas. Tente novamente em instantes.' };
+      return { reply: 'Desculpe, estou com dificuldades tecnicas. Tente novamente em instantes.', sessionData: state };
     }
   },
 };

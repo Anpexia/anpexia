@@ -25,7 +25,7 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
-// POST /api/v1/demo-eloy/chat — public, no auth
+// POST /api/v1/demo-eloy/chat — public, no auth, stateless
 router.post('/chat', async (req: Request, res: Response) => {
   try {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
@@ -33,18 +33,15 @@ router.post('/chat', async (req: Request, res: Response) => {
       return res.status(429).json({ error: 'Limite de mensagens atingido. Tente novamente mais tarde.' });
     }
 
-    const { message, sessionId } = req.body;
+    const { message, sessionData, history } = req.body;
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Campo "message" obrigatorio.' });
-    }
-    if (!sessionId || typeof sessionId !== 'string') {
-      return res.status(400).json({ error: 'Campo "sessionId" obrigatorio.' });
     }
     if (message.length > 500) {
       return res.status(400).json({ error: 'Mensagem muito longa. Maximo 500 caracteres.' });
     }
 
-    const result = await demoEloyService.chat(sessionId, message);
+    const result = await demoEloyService.chat({ message, sessionData, history });
     return res.json(result);
   } catch (err: any) {
     console.error('[DEMO-ELOY] Controller error:', err.message);

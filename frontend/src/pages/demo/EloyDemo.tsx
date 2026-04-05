@@ -12,14 +12,15 @@ interface ChatButton {
   label: string;
 }
 
+interface SessionData {
+  step: string;
+  data: Record<string, string | undefined>;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://backend-production-e9a8.up.railway.app/api/v1';
 
 function timeNow() {
   return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 // Input masks
@@ -63,10 +64,10 @@ export function EloyDemo() {
   const [buttons, setButtons] = useState<ChatButton[]>([]);
   const [, setCurrentStep] = useState('idle');
   const [inputHint, setInputHint] = useState<string>('text');
+  const [sessionData, setSessionData] = useState<SessionData>({ step: 'idle', data: {} });
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initDone = useRef(false);
-  const sessionId = useRef(generateId());
 
   // Auto-open after 2s
   useEffect(() => {
@@ -111,6 +112,11 @@ export function EloyDemo() {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
 
+    // Build history from current messages (before adding the new user msg)
+    const history = messages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role, content: m.content }));
+
     setMessages(prev => [...prev, { role: 'user', content: trimmed, time: timeNow() }]);
     setInput('');
     setButtons([]);
@@ -123,7 +129,7 @@ export function EloyDemo() {
       const res = await fetch(`${API_URL}/demo-eloy/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed, sessionId: sessionId.current }),
+        body: JSON.stringify({ message: trimmed, sessionData, history }),
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -135,6 +141,11 @@ export function EloyDemo() {
       const newButtons: ChatButton[] = data.buttons || [];
       const step = data.currentStep || 'idle';
       const hint = data.inputHint || 'text';
+
+      // Update session data from backend response
+      if (data.sessionData) {
+        setSessionData(data.sessionData);
+      }
 
       // Small typing delay
       await new Promise(r => setTimeout(r, 600 + Math.random() * 500));
