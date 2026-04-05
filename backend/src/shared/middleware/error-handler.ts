@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
+import { ZodError } from 'zod';
 
 export class AppError extends Error {
   constructor(
@@ -25,6 +26,15 @@ export function errorHandler(
         code: err.code,
         message: err.message,
       },
+    });
+  }
+
+  // Zod validation errors (schema validation)
+  if (err instanceof ZodError) {
+    const messages = err.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: `Dados invalidos: ${messages}` },
     });
   }
 

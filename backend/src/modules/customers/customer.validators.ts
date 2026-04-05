@@ -5,7 +5,8 @@ export const createCustomerSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   cpfCnpj: z.string().optional(),
-  birthDate: z.string().datetime().optional().or(z.literal('')),
+  birthDate: z.string().optional().or(z.literal('')),
+  insurance: z.string().optional(),
   address: z.object({
     cep: z.string().optional(),
     street: z.string().optional(),
