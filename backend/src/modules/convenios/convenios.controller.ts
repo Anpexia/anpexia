@@ -13,6 +13,7 @@ conveniosRouter.use(requireTenant);
 conveniosRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await conveniosService.list(req.auth!.tenantId!);
+    console.log('[CONVENIOS] tenantId:', req.auth!.tenantId, 'resultado:', data.length);
     return success(res, data);
   } catch (err) { next(err); }
 });

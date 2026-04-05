@@ -215,7 +215,11 @@ export function CustomersPage() {
 
   // Fetch convenios list for dropdown
   useEffect(() => {
-    api.get('/convenios').then(({ data }) => setConveniosList((data.data || []).filter((c: any) => c.ativo))).catch(() => {});
+    api.get('/convenios').then(({ data }) => {
+      const ativos = (data.data || []).filter((c: any) => c.ativo);
+      ativos.sort((a: any, b: any) => a.nome === 'Particular' ? -1 : b.nome === 'Particular' ? 1 : a.nome.localeCompare(b.nome));
+      setConveniosList(ativos);
+    }).catch(() => {});
   }, []);
 
   const openCreate = () => { setFormData(emptyForm); setSelectedCustomer(null); setModalMode('create'); };
