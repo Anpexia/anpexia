@@ -72,7 +72,7 @@ interface Customer {
 }
 
 type ModalMode = 'closed' | 'create' | 'detail';
-type DetailTab = 'info' | 'prontuario' | 'appointments' | 'documents' | 'whatsapp';
+type DetailTab = 'info' | 'prontuario' | 'prescricoes' | 'atestados' | 'appointments' | 'whatsapp';
 
 const emptyForm = { name: '', phone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } };
 
@@ -420,16 +420,14 @@ export function CustomersPage() {
     if (!selectedCustomer || detailTab !== 'prontuario') return;
     if (prontuarioSection === 'anamnese') fetchAnamnese(selectedCustomer.id);
     if (prontuarioSection === 'evolucao') fetchEvolucoes(selectedCustomer.id);
-    if (prontuarioSection === 'prescricoes') fetchPrescricoes(selectedCustomer.id);
-    if (prontuarioSection === 'atestados') fetchAtestados(selectedCustomer.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prontuarioSection, selectedCustomer?.id, detailTab]);
 
-  // Load documents when switching to documents tab
+  // Load prescricoes/atestados when switching to their tabs
   useEffect(() => {
-    if (!selectedCustomer || detailTab !== 'documents') return;
-    fetchPrescricoes(selectedCustomer.id);
-    fetchAtestados(selectedCustomer.id);
+    if (!selectedCustomer) return;
+    if (detailTab === 'prescricoes') fetchPrescricoes(selectedCustomer.id);
+    if (detailTab === 'atestados') fetchAtestados(selectedCustomer.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer?.id, detailTab]);
 
@@ -676,18 +674,22 @@ export function CustomersPage() {
               {([
                 { key: 'info', label: 'Informacoes', icon: User },
                 { key: 'prontuario', label: 'Prontuario', icon: Heart },
+                { key: 'prescricoes', label: 'Prescricoes', icon: FileText },
+                { key: 'atestados', label: 'Atestados', icon: FileText },
                 { key: 'appointments', label: 'Consultas', icon: Calendar },
-                { key: 'documents', label: 'Documentos', icon: FileText },
                 { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
               ] as const).map((tab) => (
                 <button key={tab.key} onClick={() => setDetailTab(tab.key)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === tab.key ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                   <tab.icon size={14} />{tab.label}
+                  {tab.key === 'prescricoes' && prescricoes.length > 0 && (
+                    <span className="bg-blue-50 text-blue-600 text-xs px-1.5 py-0.5 rounded">{prescricoes.length}</span>
+                  )}
+                  {tab.key === 'atestados' && atestados.length > 0 && (
+                    <span className="bg-emerald-50 text-emerald-600 text-xs px-1.5 py-0.5 rounded">{atestados.length}</span>
+                  )}
                   {tab.key === 'appointments' && selectedCustomer.scheduledCalls && selectedCustomer.scheduledCalls.length > 0 && (
                     <span className="bg-[#EFF6FF] text-[#1E3A5F] text-xs px-1.5 py-0.5 rounded">{selectedCustomer.scheduledCalls.length}</span>
-                  )}
-                  {tab.key === 'documents' && (prescricoes.length > 0 || atestados.length > 0) && (
-                    <span className="bg-violet-50 text-violet-600 text-xs px-1.5 py-0.5 rounded">{prescricoes.length + atestados.length}</span>
                   )}
                   {tab.key === 'whatsapp' && selectedCustomer.chatMessages && selectedCustomer.chatMessages.length > 0 && (
                     <span className="bg-green-50 text-green-600 text-xs px-1.5 py-0.5 rounded">{selectedCustomer.chatMessages.length}</span>
@@ -782,8 +784,6 @@ export function CustomersPage() {
                       { key: 'dados', label: 'Dados Clinicos', show: true },
                       { key: 'anamnese', label: 'Anamnese', show: isOftalmologia(tenant) },
                       { key: 'evolucao', label: 'Evolucao', show: isOftalmologia(tenant) },
-                      { key: 'prescricoes', label: 'Prescricoes', show: true },
-                      { key: 'atestados', label: 'Atestados', show: true },
                     ].filter(t => t.show).map(t => (
                       <button key={t.key} onClick={() => setProntuarioSection(t.key)}
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${prontuarioSection === t.key ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
@@ -1206,243 +1206,252 @@ export function CustomersPage() {
                     </div>
                   )}
 
-                  {/* PRESCRICOES SECTION */}
-                  {prontuarioSection === 'prescricoes' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-slate-800">Prescricoes</h4>
-                        <button onClick={() => { setShowNewPrescricao(!showNewPrescricao); setPrescricaoType('MEDICAMENTO'); setPrescricaoItems([]); }} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
-                          <Plus size={16} /> Nova Prescricao
-                        </button>
+                </div>
+              )}
+
+              {/* PRESCRICOES TAB */}
+              {detailTab === 'prescricoes' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-slate-800 flex items-center gap-2">
+                      <FileText size={16} className="text-blue-600" /> Prescricoes
+                    </h4>
+                    <button onClick={() => { setShowNewPrescricao(!showNewPrescricao); setPrescricaoType('MEDICAMENTO'); setPrescricaoItems([]); }} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
+                      <Plus size={16} /> Nova Prescricao
+                    </button>
+                  </div>
+
+                  {showNewPrescricao && (
+                    <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+                        <select value={prescricaoType} onChange={(e) => { setPrescricaoType(e.target.value); setPrescricaoItems([]); }} className={inputCls}>
+                          <option value="MEDICAMENTO">Medicamento</option>
+                          <option value="EXAME_EXTERNO">Exame Externo</option>
+                          {isOftalmologia(tenant) && <option value="OCULOS">Oculos</option>}
+                          {isOftalmologia(tenant) && <option value="EXAME_INTERNO">Exame Interno</option>}
+                        </select>
                       </div>
 
-                      {showNewPrescricao && (
-                        <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
-                            <select value={prescricaoType} onChange={(e) => { setPrescricaoType(e.target.value); setPrescricaoItems([]); }} className={inputCls}>
-                              <option value="MEDICAMENTO">Medicamento</option>
-                              <option value="EXAME_EXTERNO">Exame Externo</option>
-                              {isOftalmologia(tenant) && <option value="OCULOS">Oculos</option>}
-                              {isOftalmologia(tenant) && <option value="EXAME_INTERNO">Exame Interno</option>}
-                            </select>
-                          </div>
-
-                          {/* MEDICAMENTO form */}
-                          {prescricaoType === 'MEDICAMENTO' && (
-                            <div className="space-y-3">
-                              {prescricaoItems.map((item: any, idx: number) => (
-                                <div key={idx} className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-slate-500">Medicamento {idx + 1}</span>
-                                    <button type="button" onClick={() => setPrescricaoItems(prescricaoItems.filter((_: any, i: number) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <input type="text" placeholder="Nome" value={item.name || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, name: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
-                                    <input type="text" placeholder="Dosagem" value={item.dosage || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, dosage: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
-                                    <input type="text" placeholder="Posologia" value={item.posologia || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, posologia: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
-                                    <input type="text" placeholder="Duracao" value={item.duration || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, duration: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
-                                    <input type="text" placeholder="Via" value={item.via || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, via: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
-                                  </div>
-                                </div>
-                              ))}
-                              <button type="button" onClick={() => setPrescricaoItems([...prescricaoItems, { name: '', dosage: '', posologia: '', duration: '', via: '' }])} className="text-sm text-[#1E3A5F] hover:text-[#1E3A5F] font-medium">+ Adicionar medicamento</button>
-                            </div>
-                          )}
-
-                          {/* EXAME_EXTERNO / EXAME_INTERNO form */}
-                          {(prescricaoType === 'EXAME_EXTERNO' || prescricaoType === 'EXAME_INTERNO') && (
-                            <div className="space-y-3">
-                              {prescricaoItems.map((item: any, idx: number) => (
-                                <div key={idx} className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-slate-500">Exame {idx + 1}</span>
-                                    <button type="button" onClick={() => setPrescricaoItems(prescricaoItems.filter((_: any, i: number) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <input type="text" placeholder="Nome do exame" value={item.name || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, name: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
-                                    {prescricaoType === 'EXAME_EXTERNO' && <input type="text" placeholder="Especialidade" value={item.specialty || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, specialty: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />}
-                                    <input type="text" placeholder="Indicacao" value={item.indication || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, indication: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
-                                    <select value={item.urgency || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, urgency: e.target.value }; setPrescricaoItems(updated); }} className={inputCls}>
-                                      <option value="">Urgencia</option>
-                                      <option value="normal">Normal</option>
-                                      <option value="urgente">Urgente</option>
-                                    </select>
-                                  </div>
-                                </div>
-                              ))}
-                              <button type="button" onClick={() => setPrescricaoItems([...prescricaoItems, { name: '', specialty: '', indication: '', urgency: '' }])} className="text-sm text-[#1E3A5F] hover:text-[#1E3A5F] font-medium">+ Adicionar exame</button>
-                            </div>
-                          )}
-
-                          {/* OCULOS form */}
-                          {prescricaoType === 'OCULOS' && (
-                            <div className="space-y-3">
-                              <p className="text-xs font-medium text-slate-600">Olho Direito (OD)</p>
-                              <div className="grid grid-cols-5 gap-2">
-                                <div><label className="block text-xs text-slate-500 mb-1">Esferico</label><input type="text" value={prescricaoOculos.od_esferico} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_esferico: e.target.value })} className={inputCls} /></div>
-                                <div><label className="block text-xs text-slate-500 mb-1">Cilindrico</label><input type="text" value={prescricaoOculos.od_cilindrico} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_cilindrico: e.target.value })} className={inputCls} /></div>
-                                <div><label className="block text-xs text-slate-500 mb-1">Eixo</label><input type="text" value={prescricaoOculos.od_eixo} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_eixo: e.target.value })} className={inputCls} /></div>
-                                <div><label className="block text-xs text-slate-500 mb-1">Adicao</label><input type="text" value={prescricaoOculos.od_adicao} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_adicao: e.target.value })} className={inputCls} /></div>
-                                <div><label className="block text-xs text-slate-500 mb-1">DNP</label><input type="text" value={prescricaoOculos.od_dnp} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_dnp: e.target.value })} className={inputCls} /></div>
-                              </div>
-                              <p className="text-xs font-medium text-slate-600">Olho Esquerdo (OE)</p>
-                              <div className="grid grid-cols-5 gap-2">
-                                <div><label className="block text-xs text-slate-500 mb-1">Esferico</label><input type="text" value={prescricaoOculos.oe_esferico} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_esferico: e.target.value })} className={inputCls} /></div>
-                                <div><label className="block text-xs text-slate-500 mb-1">Cilindrico</label><input type="text" value={prescricaoOculos.oe_cilindrico} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_cilindrico: e.target.value })} className={inputCls} /></div>
-                                <div><label className="block text-xs text-slate-500 mb-1">Eixo</label><input type="text" value={prescricaoOculos.oe_eixo} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_eixo: e.target.value })} className={inputCls} /></div>
-                                <div><label className="block text-xs text-slate-500 mb-1">Adicao</label><input type="text" value={prescricaoOculos.oe_adicao} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_adicao: e.target.value })} className={inputCls} /></div>
-                                <div><label className="block text-xs text-slate-500 mb-1">DNP</label><input type="text" value={prescricaoOculos.oe_dnp} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_dnp: e.target.value })} className={inputCls} /></div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de lente</label>
-                                  <input type="text" value={prescricaoOculos.tipoLente} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, tipoLente: e.target.value })} className={inputCls} />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Validade</label>
-                                  <input type="text" value={prescricaoOculos.validade} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, validade: e.target.value })} className={inputCls} placeholder="Ex: 1 ano" />
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                                <textarea value={prescricaoOculos.observacoes} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, observacoes: e.target.value })} className={inputCls + ' h-16 resize-none'} />
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="flex gap-2 pt-2">
-                            <button type="button" onClick={() => setShowNewPrescricao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                            <button type="button" onClick={handleAddPrescricao} disabled={savingPrescricao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
-                              {savingPrescricao ? 'Salvando...' : 'Criar prescricao'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {loadingPrescricoes ? (
-                        <p className="text-sm text-slate-500 text-center py-8">Carregando prescricoes...</p>
-                      ) : prescricoes.length === 0 ? (
-                        <p className="text-sm text-slate-500 text-center py-8">Nenhuma prescricao registrada.</p>
-                      ) : (
+                      {/* MEDICAMENTO form */}
+                      {prescricaoType === 'MEDICAMENTO' && (
                         <div className="space-y-3">
-                          {prescricoes.map((p: any) => {
-                            const typeLabels: Record<string, { label: string; cls: string }> = {
-                              MEDICAMENTO: { label: 'Medicamento', cls: 'bg-blue-100 text-blue-700' },
-                              EXAME_EXTERNO: { label: 'Exame Externo', cls: 'bg-amber-100 text-amber-700' },
-                              OCULOS: { label: 'Oculos', cls: 'bg-violet-100 text-violet-700' },
-                              EXAME_INTERNO: { label: 'Exame Interno', cls: 'bg-emerald-100 text-emerald-700' },
-                            };
-                            const tl = typeLabels[p.type] || { label: p.type, cls: 'bg-gray-100 text-gray-600' };
-                            return (
-                              <div key={p.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50/50 transition-colors">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${tl.cls}`}>{tl.label}</span>
-                                    <span className="text-xs text-slate-400">{format(new Date(p.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
-                                  </div>
-                                  <button onClick={() => handleDownloadPdf('prescriptions', p.id)} className="flex items-center gap-1 text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium" title="Baixar PDF">
-                                    <Download size={14} /> PDF
-                                  </button>
-                                </div>
-                                {p.items && p.items.length > 0 && (
-                                  <div className="text-sm text-slate-700">
-                                    {p.items.map((item: any, i: number) => (
-                                      <p key={i}>{item.name}{item.dosage ? ` - ${item.dosage}` : ''}{item.posologia ? ` (${item.posologia})` : ''}</p>
-                                    ))}
-                                  </div>
-                                )}
-                                {p.oculosData && <p className="text-sm text-slate-700">Receita de oculos - {p.oculosData.tipoLente || 'Tipo nao especificado'}</p>}
+                          {prescricaoItems.map((item: any, idx: number) => (
+                            <div key={idx} className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-slate-500">Medicamento {idx + 1}</span>
+                                <button type="button" onClick={() => setPrescricaoItems(prescricaoItems.filter((_: any, i: number) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
                               </div>
-                            );
-                          })}
+                              <div className="grid grid-cols-2 gap-2">
+                                <input type="text" placeholder="Nome" value={item.name || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, name: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
+                                <input type="text" placeholder="Dosagem" value={item.dosage || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, dosage: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
+                                <input type="text" placeholder="Posologia" value={item.posologia || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, posologia: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
+                                <input type="text" placeholder="Duracao" value={item.duration || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, duration: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
+                                <input type="text" placeholder="Via" value={item.via || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, via: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
+                              </div>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setPrescricaoItems([...prescricaoItems, { name: '', dosage: '', posologia: '', duration: '', via: '' }])} className="text-sm text-[#1E3A5F] hover:text-[#1E3A5F] font-medium">+ Adicionar medicamento</button>
                         </div>
                       )}
-                    </div>
-                  )}
 
-                  {/* ATESTADOS SECTION */}
-                  {prontuarioSection === 'atestados' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-slate-800">Atestados e Declaracoes</h4>
-                        <button onClick={() => setShowNewAtestado(!showNewAtestado)} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
-                          <Plus size={16} /> Emitir Atestado
-                        </button>
-                      </div>
+                      {/* EXAME_EXTERNO / EXAME_INTERNO form */}
+                      {(prescricaoType === 'EXAME_EXTERNO' || prescricaoType === 'EXAME_INTERNO') && (
+                        <div className="space-y-3">
+                          {prescricaoItems.map((item: any, idx: number) => (
+                            <div key={idx} className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-slate-500">Exame {idx + 1}</span>
+                                <button type="button" onClick={() => setPrescricaoItems(prescricaoItems.filter((_: any, i: number) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <input type="text" placeholder="Nome do exame" value={item.name || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, name: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
+                                {prescricaoType === 'EXAME_EXTERNO' && <input type="text" placeholder="Especialidade" value={item.specialty || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, specialty: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />}
+                                <input type="text" placeholder="Indicacao" value={item.indication || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, indication: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
+                                <select value={item.urgency || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, urgency: e.target.value }; setPrescricaoItems(updated); }} className={inputCls}>
+                                  <option value="">Urgencia</option>
+                                  <option value="normal">Normal</option>
+                                  <option value="urgente">Urgente</option>
+                                </select>
+                              </div>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setPrescricaoItems([...prescricaoItems, { name: '', specialty: '', indication: '', urgency: '' }])} className="text-sm text-[#1E3A5F] hover:text-[#1E3A5F] font-medium">+ Adicionar exame</button>
+                        </div>
+                      )}
 
-                      {showNewAtestado && (
-                        <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
+                      {/* OCULOS form */}
+                      {prescricaoType === 'OCULOS' && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-medium text-slate-600">Olho Direito (OD)</p>
+                          <div className="grid grid-cols-5 gap-2">
+                            <div><label className="block text-xs text-slate-500 mb-1">Esferico</label><input type="text" value={prescricaoOculos.od_esferico} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_esferico: e.target.value })} className={inputCls} /></div>
+                            <div><label className="block text-xs text-slate-500 mb-1">Cilindrico</label><input type="text" value={prescricaoOculos.od_cilindrico} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_cilindrico: e.target.value })} className={inputCls} /></div>
+                            <div><label className="block text-xs text-slate-500 mb-1">Eixo</label><input type="text" value={prescricaoOculos.od_eixo} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_eixo: e.target.value })} className={inputCls} /></div>
+                            <div><label className="block text-xs text-slate-500 mb-1">Adicao</label><input type="text" value={prescricaoOculos.od_adicao} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_adicao: e.target.value })} className={inputCls} /></div>
+                            <div><label className="block text-xs text-slate-500 mb-1">DNP</label><input type="text" value={prescricaoOculos.od_dnp} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, od_dnp: e.target.value })} className={inputCls} /></div>
+                          </div>
+                          <p className="text-xs font-medium text-slate-600">Olho Esquerdo (OE)</p>
+                          <div className="grid grid-cols-5 gap-2">
+                            <div><label className="block text-xs text-slate-500 mb-1">Esferico</label><input type="text" value={prescricaoOculos.oe_esferico} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_esferico: e.target.value })} className={inputCls} /></div>
+                            <div><label className="block text-xs text-slate-500 mb-1">Cilindrico</label><input type="text" value={prescricaoOculos.oe_cilindrico} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_cilindrico: e.target.value })} className={inputCls} /></div>
+                            <div><label className="block text-xs text-slate-500 mb-1">Eixo</label><input type="text" value={prescricaoOculos.oe_eixo} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_eixo: e.target.value })} className={inputCls} /></div>
+                            <div><label className="block text-xs text-slate-500 mb-1">Adicao</label><input type="text" value={prescricaoOculos.oe_adicao} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_adicao: e.target.value })} className={inputCls} /></div>
+                            <div><label className="block text-xs text-slate-500 mb-1">DNP</label><input type="text" value={prescricaoOculos.oe_dnp} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, oe_dnp: e.target.value })} className={inputCls} /></div>
+                          </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
-                              <select value={atestadoForm.type} onChange={(e) => setAtestadoForm({ ...atestadoForm, type: e.target.value })} className={inputCls}>
-                                <option value="ATESTADO">Atestado</option>
-                                <option value="DECLARACAO">Declaracao</option>
-                              </select>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de lente</label>
+                              <input type="text" value={prescricaoOculos.tipoLente} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, tipoLente: e.target.value })} className={inputCls} />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Dias de afastamento</label>
-                              <input type="number" value={atestadoForm.daysOff} onChange={(e) => setAtestadoForm({ ...atestadoForm, daysOff: e.target.value })} className={inputCls} min="0" />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Motivo</label>
-                            <textarea value={atestadoForm.reason} onChange={(e) => setAtestadoForm({ ...atestadoForm, reason: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Motivo do atestado..." />
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Data inicio</label>
-                              <input type="date" value={atestadoForm.startDate} onChange={(e) => setAtestadoForm({ ...atestadoForm, startDate: e.target.value })} className={inputCls} />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Data fim</label>
-                              <input type="date" value={atestadoForm.endDate} onChange={(e) => setAtestadoForm({ ...atestadoForm, endDate: e.target.value })} className={inputCls} />
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Validade</label>
+                              <input type="text" value={prescricaoOculos.validade} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, validade: e.target.value })} className={inputCls} placeholder="Ex: 1 ano" />
                             </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                            <textarea value={atestadoForm.observations} onChange={(e) => setAtestadoForm({ ...atestadoForm, observations: e.target.value })} className={inputCls + ' h-16 resize-none'} />
-                          </div>
-                          <div className="flex gap-2">
-                            <button type="button" onClick={() => setShowNewAtestado(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                            <button type="button" onClick={handleAddAtestado} disabled={savingAtestado} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
-                              {savingAtestado ? 'Emitindo...' : 'Emitir'}
-                            </button>
+                            <textarea value={prescricaoOculos.observacoes} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, observacoes: e.target.value })} className={inputCls + ' h-16 resize-none'} />
                           </div>
                         </div>
                       )}
 
-                      {loadingAtestados ? (
-                        <p className="text-sm text-slate-500 text-center py-8">Carregando atestados...</p>
-                      ) : atestados.length === 0 ? (
-                        <p className="text-sm text-slate-500 text-center py-8">Nenhum atestado emitido.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {atestados.map((a: any) => {
-                            const atTypes: Record<string, { label: string; cls: string }> = {
-                              ATESTADO: { label: 'Atestado', cls: 'bg-blue-100 text-blue-700' },
-                              DECLARACAO: { label: 'Declaracao', cls: 'bg-emerald-100 text-emerald-700' },
-                            };
-                            const at = atTypes[a.type] || { label: a.type, cls: 'bg-gray-100 text-gray-600' };
-                            return (
-                              <div key={a.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50/50 transition-colors">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${at.cls}`}>{at.label}</span>
-                                    <span className="text-xs text-slate-400">{format(new Date(a.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
-                                  </div>
-                                  <button onClick={() => handleDownloadPdf('medical-certificates', a.id)} className="flex items-center gap-1 text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium" title="Baixar PDF">
-                                    <Download size={14} /> PDF
-                                  </button>
-                                </div>
-                                <p className="text-sm text-slate-700">{a.reason}</p>
-                                {a.daysOff && <p className="text-xs text-slate-500 mt-1">{a.daysOff} dia(s) de afastamento</p>}
+                      <div className="flex gap-2 pt-2">
+                        <button type="button" onClick={() => setShowNewPrescricao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                        <button type="button" onClick={handleAddPrescricao} disabled={savingPrescricao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
+                          {savingPrescricao ? 'Salvando...' : 'Criar prescricao'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {loadingPrescricoes ? (
+                    <p className="text-sm text-slate-500 text-center py-8">Carregando prescricoes...</p>
+                  ) : prescricoes.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-8">Nenhuma prescricao registrada.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {prescricoes.map((p: any) => {
+                        const typeLabels: Record<string, { label: string; cls: string }> = {
+                          MEDICAMENTO: { label: 'Receituario', cls: 'bg-blue-100 text-blue-700' },
+                          EXAME_EXTERNO: { label: 'Exame Externo', cls: 'bg-amber-100 text-amber-700' },
+                          OCULOS: { label: 'Oculos', cls: 'bg-violet-100 text-violet-700' },
+                          EXAME_INTERNO: { label: 'Exame Interno', cls: 'bg-emerald-100 text-emerald-700' },
+                        };
+                        const tl = typeLabels[p.type] || { label: p.type, cls: 'bg-gray-100 text-gray-600' };
+                        const itemCount = p.items?.length || 0;
+                        const description = p.type === 'MEDICAMENTO' && itemCount > 0
+                          ? `${itemCount} medicamento(s)`
+                          : p.type === 'OCULOS' ? 'Receita de oculos'
+                          : p.items?.map((item: any) => item.name).join(', ') || p.type;
+                        return (
+                          <div key={p.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50/50 transition-colors">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${tl.cls}`}>{tl.label}</span>
+                                <span className="text-sm text-slate-700 truncate">
+                                  {p.doctorName ? `Dr(a). ${p.doctorName}` : ''}{p.doctorName && description ? ' - ' : ''}{description}
+                                </span>
                               </div>
-                            );
-                          })}
+                              <div className="flex items-center gap-3 shrink-0 ml-3">
+                                <span className="text-xs text-slate-400">{format(new Date(p.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                                <button onClick={() => handleDownloadPdf('prescriptions', p.id)} className="flex items-center gap-1 text-sm text-[#1E3A5F] hover:text-[#2A4D7A] font-medium" title="Baixar PDF">
+                                  <Download size={14} /> PDF
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ATESTADOS TAB */}
+              {detailTab === 'atestados' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-slate-800 flex items-center gap-2">
+                      <FileText size={16} className="text-emerald-600" /> Atestados
+                    </h4>
+                    <button onClick={() => setShowNewAtestado(!showNewAtestado)} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
+                      <Plus size={16} /> Emitir Atestado
+                    </button>
+                  </div>
+
+                  {showNewAtestado && (
+                    <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+                          <select value={atestadoForm.type} onChange={(e) => setAtestadoForm({ ...atestadoForm, type: e.target.value })} className={inputCls}>
+                            <option value="ATESTADO">Atestado</option>
+                            <option value="DECLARACAO">Declaracao</option>
+                          </select>
                         </div>
-                      )}
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Dias de afastamento</label>
+                          <input type="number" value={atestadoForm.daysOff} onChange={(e) => setAtestadoForm({ ...atestadoForm, daysOff: e.target.value })} className={inputCls} min="0" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Motivo</label>
+                        <textarea value={atestadoForm.reason} onChange={(e) => setAtestadoForm({ ...atestadoForm, reason: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Motivo do atestado..." />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Data inicio</label>
+                          <input type="date" value={atestadoForm.startDate} onChange={(e) => setAtestadoForm({ ...atestadoForm, startDate: e.target.value })} className={inputCls} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Data fim</label>
+                          <input type="date" value={atestadoForm.endDate} onChange={(e) => setAtestadoForm({ ...atestadoForm, endDate: e.target.value })} className={inputCls} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
+                        <textarea value={atestadoForm.observations} onChange={(e) => setAtestadoForm({ ...atestadoForm, observations: e.target.value })} className={inputCls + ' h-16 resize-none'} />
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setShowNewAtestado(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                        <button type="button" onClick={handleAddAtestado} disabled={savingAtestado} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
+                          {savingAtestado ? 'Emitindo...' : 'Emitir'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {loadingAtestados ? (
+                    <p className="text-sm text-slate-500 text-center py-8">Carregando atestados...</p>
+                  ) : atestados.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-8">Nenhum atestado emitido.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {atestados.map((a: any) => {
+                        const atTypes: Record<string, { label: string; cls: string }> = {
+                          ATESTADO: { label: 'Atestado', cls: 'bg-blue-100 text-blue-700' },
+                          DECLARACAO: { label: 'Declaracao', cls: 'bg-emerald-100 text-emerald-700' },
+                        };
+                        const at = atTypes[a.type] || { label: a.type, cls: 'bg-gray-100 text-gray-600' };
+                        return (
+                          <div key={a.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50/50 transition-colors">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${at.cls}`}>{at.label}</span>
+                                <span className="text-sm text-slate-700 truncate">{a.reason}</span>
+                                {a.daysOff && <span className="text-xs text-slate-500 shrink-0">{a.daysOff} dia(s) de afastamento</span>}
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0 ml-3">
+                                <span className="text-xs text-slate-400">{format(new Date(a.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                                <button onClick={() => handleDownloadPdf('medical-certificates', a.id)} className="flex items-center gap-1 text-sm text-[#1E3A5F] hover:text-[#2A4D7A] font-medium" title="Baixar PDF">
+                                  <Download size={14} /> PDF
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1481,98 +1490,6 @@ export function CustomersPage() {
                       })}
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* DOCUMENTS TAB */}
-              {detailTab === 'documents' && (
-                <div className="space-y-6">
-                  {/* Prescricoes section */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-slate-800 flex items-center gap-2">
-                        <FileText size={16} className="text-blue-600" /> Prescricoes
-                      </h4>
-                      <button onClick={() => { setDetailTab('prontuario'); setProntuarioSection('prescricoes'); setShowNewPrescricao(true); setPrescricaoType('MEDICAMENTO'); setPrescricaoItems([]); }}
-                        className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#2A4D7A]">
-                        <Plus size={14} /> Nova Prescricao
-                      </button>
-                    </div>
-                    {loadingPrescricoes ? (
-                      <p className="text-sm text-slate-500 text-center py-4">Carregando...</p>
-                    ) : prescricoes.length === 0 ? (
-                      <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-lg">Nenhuma prescricao emitida.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {prescricoes.map((p: any) => {
-                          const typeLabels: Record<string, { label: string; cls: string }> = {
-                            MEDICAMENTO: { label: 'Medicamento', cls: 'bg-blue-100 text-blue-700' },
-                            EXAME_EXTERNO: { label: 'Exame Externo', cls: 'bg-amber-100 text-amber-700' },
-                            OCULOS: { label: 'Oculos', cls: 'bg-violet-100 text-violet-700' },
-                            EXAME_INTERNO: { label: 'Exame Interno', cls: 'bg-emerald-100 text-emerald-700' },
-                          };
-                          const tl = typeLabels[p.type] || { label: p.type, cls: 'bg-gray-100 text-gray-600' };
-                          return (
-                            <div key={p.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50/50 transition-colors">
-                              <div className="flex items-center gap-3">
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${tl.cls}`}>{tl.label}</span>
-                                <span className="text-sm text-slate-700">
-                                  {p.items && p.items.length > 0
-                                    ? p.items.map((item: any) => item.name).join(', ')
-                                    : p.oculosData ? `Receita de oculos` : p.type}
-                                </span>
-                                <span className="text-xs text-slate-400">{format(new Date(p.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                              </div>
-                              <button onClick={() => handleDownloadPdf('prescriptions', p.id)} className="flex items-center gap-1 text-sm text-[#1E3A5F] hover:text-[#2A4D7A] font-medium">
-                                <Download size={14} /> PDF
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Atestados section */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-slate-800 flex items-center gap-2">
-                        <FileText size={16} className="text-emerald-600" /> Atestados e Declaracoes
-                      </h4>
-                      <button onClick={() => { setDetailTab('prontuario'); setProntuarioSection('atestados'); setShowNewAtestado(true); }}
-                        className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#2A4D7A]">
-                        <Plus size={14} /> Emitir Atestado
-                      </button>
-                    </div>
-                    {loadingAtestados ? (
-                      <p className="text-sm text-slate-500 text-center py-4">Carregando...</p>
-                    ) : atestados.length === 0 ? (
-                      <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-lg">Nenhum atestado emitido.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {atestados.map((a: any) => {
-                          const atTypes: Record<string, { label: string; cls: string }> = {
-                            ATESTADO: { label: 'Atestado', cls: 'bg-blue-100 text-blue-700' },
-                            DECLARACAO: { label: 'Declaracao', cls: 'bg-emerald-100 text-emerald-700' },
-                          };
-                          const at = atTypes[a.type] || { label: a.type, cls: 'bg-gray-100 text-gray-600' };
-                          return (
-                            <div key={a.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50/50 transition-colors">
-                              <div className="flex items-center gap-3">
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${at.cls}`}>{at.label}</span>
-                                <span className="text-sm text-slate-700 truncate max-w-[300px]">{a.reason}</span>
-                                <span className="text-xs text-slate-400">{format(new Date(a.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                                {a.daysOff && <span className="text-xs text-slate-500">{a.daysOff}d</span>}
-                              </div>
-                              <button onClick={() => handleDownloadPdf('medical-certificates', a.id)} className="flex items-center gap-1 text-sm text-[#1E3A5F] hover:text-[#2A4D7A] font-medium">
-                                <Download size={14} /> PDF
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
 
