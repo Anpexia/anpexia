@@ -49,7 +49,7 @@ export function Layout() {
       <aside
         className={clsx(
           'flex flex-col z-50 transition-transform duration-200',
-          'fixed md:static inset-y-0 left-0 w-64',
+          'fixed inset-y-0 left-0 w-64 h-screen overflow-y-auto',
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         )}
         style={{ backgroundColor: '#1E3A5F' }}
@@ -95,7 +95,7 @@ export function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto pt-14 md:pt-0" style={{ backgroundColor: '#F8FAFC' }}>
+      <main className="md:ml-64 flex-1 h-screen overflow-y-auto pt-14 md:pt-0" style={{ backgroundColor: '#F8FAFC' }}>
         <div className="max-w-7xl mx-auto p-4 md:p-8">
           <Outlet />
         </div>
