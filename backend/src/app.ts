@@ -120,6 +120,7 @@ async function loadRoutes() {
     const { supplierRouter } = await import('./modules/suppliers/supplier.controller');
     const { demoRouter } = await import('./modules/demo/demo.controller');
     const { demoJFRouter } = await import('./modules/demo-jf/demo-jf.controller');
+    const { demoEloyRouter } = await import('./modules/demo-eloy/demo-eloy.controller');
     const { financialRouter } = await import('./modules/financial/financial.controller');
     const { signaturesRouter } = await import('./modules/signatures/signatures.controller');
     const { certificatesRouter } = await import('./modules/certificates/certificates.controller');
@@ -175,46 +176,7 @@ async function loadRoutes() {
         return res.status(500).json({ success: false, error: err.message });
       }
     });
-    // Demo chat proxy — no auth, proxies to Anthropic API
-    app.post('/api/v1/demo-eloy/chat', async (req, res) => {
-      try {
-        const { messages, systemPrompt } = req.body;
-        console.log('[DEMO-ELOY] mensagem recebida:', messages?.length, 'msgs');
-        if (!messages || !systemPrompt) {
-          return res.status(400).json({ success: false, error: 'Missing messages or systemPrompt' });
-        }
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-          console.error('[DEMO-ELOY] ANTHROPIC_API_KEY not configured');
-          return res.status(500).json({ success: false, error: 'ANTHROPIC_API_KEY not configured' });
-        }
-        console.log('[DEMO-ELOY] chamando Anthropic...');
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 25000);
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 300,
-            system: systemPrompt,
-            messages,
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        const data = await response.json();
-        console.log('[DEMO-ELOY] resposta ok, stop_reason:', (data as any).stop_reason);
-        return res.json({ success: true, data });
-      } catch (err: any) {
-        console.error('[DEMO-ELOY] Error:', err.message);
-        return res.status(500).json({ success: false, error: err.message });
-      }
-    });
+    app.use('/api/v1/demo-eloy', demoEloyRouter);
 
     app.use('/api/v1/scheduling', schedulingRouter);
     app.use('/api/v1/sales', salesRouter);

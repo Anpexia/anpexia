@@ -1,0 +1,442 @@
+import Anthropic from '@anthropic-ai/sdk';
+import { env } from '../../config/env';
+import prisma from '../../config/database';
+
+const anthropic = new Anthropic({ apiKey: env.anthropicApiKey });
+
+// The Eloy demo uses the "Clinica Saude Total" tenant (CLINICA_OFTALMOLOGICA)
+const ELOY_TENANT_ID = 'cmnjmu0jm0001o30p9jaqj4ys';
+const MAX_MESSAGES = 40;
+const SP_OFFSET = '-03:00';
+
+// Scheduling steps in order
+type Step = 'idle' | 'name' | 'name_confirm' | 'phone' | 'phone_confirm'
+  | 'cpf' | 'cpf_confirm' | 'email' | 'email_confirm'
+  | 'address' | 'address_confirm' | 'insurance' | 'insurance_confirm'
+  | 'date' | 'date_confirm' | 'time' | 'time_confirm'
+  | 'final_confirm' | 'done';
+
+interface SchedulingData {
+  name?: string;
+  phone?: string;
+  cpf?: string;
+  email?: string;
+  address?: string;
+  insurance?: string;
+  date?: string;
+  time?: string;
+}
+
+interface Session {
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  step: Step;
+  data: SchedulingData;
+  createdAt: number;
+}
+
+interface ChatResponse {
+  reply: string;
+  buttons?: Array<{ id: string; label: string }>;
+  currentStep?: string;
+  inputHint?: 'text' | 'phone' | 'cpf' | 'email' | 'date';
+}
+
+// In-memory session store
+const sessions = new Map<string, Session>();
+
+// Cleanup expired sessions every 15 min
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, s] of sessions) {
+    if (now - s.createdAt > 60 * 60 * 1000) sessions.delete(id);
+  }
+}, 15 * 60 * 1000);
+
+function getOrCreateSession(sessionId: string): Session {
+  let session = sessions.get(sessionId);
+  if (!session) {
+    session = { messages: [], step: 'idle', data: {}, createdAt: Date.now() };
+    sessions.set(sessionId, session);
+  }
+  return session;
+}
+
+// Format CPF
+function formatCPF(raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  if (d.length !== 11) return raw;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+// Format phone
+function formatPhone(raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return raw;
+}
+
+// Validate CPF digits
+function isValidCPF(raw: string): boolean {
+  const d = raw.replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(d[i]) * (10 - i);
+  let check = 11 - (sum % 11);
+  if (check >= 10) check = 0;
+  if (Number(d[9]) !== check) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += Number(d[i]) * (11 - i);
+  check = 11 - (sum % 11);
+  if (check >= 10) check = 0;
+  return Number(d[10]) === check;
+}
+
+const SYSTEM_PROMPT = `Voce e Ana, atendente virtual da Clinica Dr. Eloy Chicata, oftalmologia em Para de Minas/MG.
+
+REGRAS ABSOLUTAS:
+- NUNCA faca mais de uma pergunta por mensagem
+- NUNCA pergunte o motivo da consulta ou historico medico durante o agendamento
+- NUNCA faca perguntas desnecessarias
+- Seja DIRETA e OBJETIVA sempre
+- Maximo 2 linhas por resposta
+- Tom: simpatico e profissional
+
+FLUXO DE AGENDAMENTO:
+Quando o paciente quiser agendar, voce coleta UM dado por vez. O sistema controla os passos automaticamente.
+Voce apenas responde de forma natural e curta conforme o dado solicitado.
+
+OUTROS FLUXOS:
+- Problema ocular/urgencia: "Para urgencias ligue: (37) 3231-1234. Seg a Sex 8h as 18h."
+- Tratamentos: liste especialidades em ate 3 linhas e ofereca agendar
+- Duvidas: responda diretamente sem perguntas desnecessarias
+
+Especialidades: Catarata, Glaucoma, Retina, Cirurgia Refrativa, Lentes de Contato, Oftalmopediatria.
+
+Responda sempre em portugues brasileiro. Maximo 2 linhas.`;
+
+const INSURANCE_OPTIONS = ['Particular', 'Bradesco Saude', 'SulAmerica', 'Unimed', 'Outro'];
+const TIME_OPTIONS = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
+
+// Detect if user wants to schedule from free-text
+function wantsToSchedule(text: string): boolean {
+  const lower = text.toLowerCase();
+  return /agend|consult|marc|hora|agendar|marcar/.test(lower);
+}
+
+// Handle the structured scheduling flow without AI calls
+function handleSchedulingStep(session: Session, userMessage: string): ChatResponse | null {
+  const msg = userMessage.trim();
+  const lower = msg.toLowerCase();
+
+  switch (session.step) {
+    case 'name':
+      if (msg.length < 3) return { reply: 'Por favor, digite seu nome completo.', currentStep: 'name', inputHint: 'text' };
+      session.data.name = msg;
+      session.step = 'name_confirm';
+      return { reply: `Seu nome e ${msg}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'name_confirm' };
+
+    case 'name_confirm':
+      if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
+        session.step = 'phone';
+        return { reply: 'Qual e o seu telefone com DDD?', currentStep: 'phone', inputHint: 'phone' };
+      }
+      session.step = 'name';
+      return { reply: 'Qual e o seu nome completo?', currentStep: 'name', inputHint: 'text' };
+
+    case 'phone': {
+      const digits = msg.replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 11) return { reply: 'Telefone invalido. Digite com DDD (ex: 37 99999-1234).', currentStep: 'phone', inputHint: 'phone' };
+      session.data.phone = formatPhone(digits);
+      session.step = 'phone_confirm';
+      return { reply: `Telefone ${session.data.phone}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'phone_confirm' };
+    }
+
+    case 'phone_confirm':
+      if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
+        session.step = 'cpf';
+        return { reply: 'Qual e o seu CPF?', currentStep: 'cpf', inputHint: 'cpf' };
+      }
+      session.step = 'phone';
+      return { reply: 'Qual e o seu telefone com DDD?', currentStep: 'phone', inputHint: 'phone' };
+
+    case 'cpf': {
+      const digits = msg.replace(/\D/g, '');
+      if (digits.length !== 11 || !isValidCPF(digits)) return { reply: 'CPF invalido. Digite os 11 digitos.', currentStep: 'cpf', inputHint: 'cpf' };
+      session.data.cpf = formatCPF(digits);
+      session.step = 'cpf_confirm';
+      return { reply: `CPF ${session.data.cpf}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'cpf_confirm' };
+    }
+
+    case 'cpf_confirm':
+      if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
+        session.step = 'email';
+        return { reply: 'Qual e o seu e-mail?', currentStep: 'email', inputHint: 'email' };
+      }
+      session.step = 'cpf';
+      return { reply: 'Qual e o seu CPF?', currentStep: 'cpf', inputHint: 'cpf' };
+
+    case 'email': {
+      if (!msg.includes('@') || !msg.includes('.')) return { reply: 'E-mail invalido. Ex: seu@email.com', currentStep: 'email', inputHint: 'email' };
+      session.data.email = msg.toLowerCase();
+      session.step = 'email_confirm';
+      return { reply: `E-mail ${session.data.email}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'email_confirm' };
+    }
+
+    case 'email_confirm':
+      if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
+        session.step = 'address';
+        return { reply: 'Qual e o seu endereco completo? (rua, numero, cidade)', currentStep: 'address', inputHint: 'text' };
+      }
+      session.step = 'email';
+      return { reply: 'Qual e o seu e-mail?', currentStep: 'email', inputHint: 'email' };
+
+    case 'address':
+      if (msg.length < 5) return { reply: 'Por favor, informe o endereco completo.', currentStep: 'address', inputHint: 'text' };
+      session.data.address = msg;
+      session.step = 'address_confirm';
+      return { reply: `Endereco: ${msg}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'address_confirm' };
+
+    case 'address_confirm':
+      if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
+        session.step = 'insurance';
+        return {
+          reply: 'Voce possui convenio ou sera particular?',
+          buttons: INSURANCE_OPTIONS.map(o => ({ id: o.toLowerCase().replace(/\s/g, '_'), label: o })),
+          currentStep: 'insurance',
+        };
+      }
+      session.step = 'address';
+      return { reply: 'Qual e o seu endereco completo?', currentStep: 'address', inputHint: 'text' };
+
+    case 'insurance': {
+      // Accept button click or free text
+      const matched = INSURANCE_OPTIONS.find(o => o.toLowerCase() === lower || o.toLowerCase().replace(/\s/g, '_') === lower);
+      session.data.insurance = matched || msg;
+      session.step = 'insurance_confirm';
+      return { reply: `Convenio: ${session.data.insurance}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'insurance_confirm' };
+    }
+
+    case 'insurance_confirm':
+      if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
+        session.step = 'date';
+        return { reply: 'Qual data prefere para a consulta? (ex: 15/05/2026)', currentStep: 'date', inputHint: 'date' };
+      }
+      session.step = 'insurance';
+      return {
+        reply: 'Voce possui convenio ou sera particular?',
+        buttons: INSURANCE_OPTIONS.map(o => ({ id: o.toLowerCase().replace(/\s/g, '_'), label: o })),
+        currentStep: 'insurance',
+      };
+
+    case 'date': {
+      // Parse dd/mm/yyyy or yyyy-mm-dd
+      let dateStr = '';
+      const ddmm = msg.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
+      if (ddmm) {
+        dateStr = `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`;
+      } else {
+        const iso = msg.match(/(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
+        if (iso) dateStr = `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+      }
+      if (!dateStr) return { reply: 'Data invalida. Use o formato DD/MM/AAAA (ex: 15/05/2026).', currentStep: 'date', inputHint: 'date' };
+
+      const d = new Date(`${dateStr}T12:00:00${SP_OFFSET}`);
+      if (isNaN(d.getTime())) return { reply: 'Data invalida. Use o formato DD/MM/AAAA.', currentStep: 'date', inputHint: 'date' };
+      if (d < new Date()) return { reply: 'A data precisa ser futura. Qual data prefere?', currentStep: 'date', inputHint: 'date' };
+
+      const day = d.getDay();
+      if (day === 0 || day === 6) return { reply: 'Atendemos apenas de segunda a sexta. Escolha outra data.', currentStep: 'date', inputHint: 'date' };
+
+      session.data.date = dateStr;
+      const formatted = `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}/${dateStr.slice(0, 4)}`;
+      session.step = 'date_confirm';
+      return { reply: `Data ${formatted}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'date_confirm' };
+    }
+
+    case 'date_confirm':
+      if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
+        session.step = 'time';
+        return {
+          reply: 'Qual horario prefere? Temos das 8h as 18h (intervalo 12h-13h).',
+          buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
+          currentStep: 'time',
+        };
+      }
+      session.step = 'date';
+      return { reply: 'Qual data prefere? (ex: 15/05/2026)', currentStep: 'date', inputHint: 'date' };
+
+    case 'time': {
+      const matched = TIME_OPTIONS.find(t => t === msg || msg.includes(t));
+      if (!matched) return {
+        reply: 'Horario invalido. Escolha um dos horarios disponiveis.',
+        buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
+        currentStep: 'time',
+      };
+      session.data.time = matched;
+      session.step = 'time_confirm';
+      return { reply: `Horario ${matched}, correto?`, buttons: [{ id: 'yes', label: 'Sim' }, { id: 'no', label: 'Corrigir' }], currentStep: 'time_confirm' };
+    }
+
+    case 'time_confirm':
+      if (lower === 'sim' || lower === 'yes' || msg === 'Sim') {
+        session.step = 'final_confirm';
+        const d = session.data;
+        const dateFormatted = d.date ? `${d.date.slice(8, 10)}/${d.date.slice(5, 7)}/${d.date.slice(0, 4)}` : '';
+        return {
+          reply: `Resumo do agendamento:\n\n` +
+            `Nome: ${d.name}\n` +
+            `Tel: ${d.phone}\n` +
+            `CPF: ${d.cpf}\n` +
+            `Email: ${d.email}\n` +
+            `Endereco: ${d.address}\n` +
+            `Convenio: ${d.insurance}\n` +
+            `Data: ${dateFormatted} as ${d.time}\n\n` +
+            `Confirma o agendamento?`,
+          buttons: [{ id: 'confirm', label: 'Sim, confirmar' }, { id: 'correct', label: 'Corrigir algo' }],
+          currentStep: 'final_confirm',
+        };
+      }
+      session.step = 'time';
+      return {
+        reply: 'Qual horario prefere?',
+        buttons: TIME_OPTIONS.map(t => ({ id: t, label: t })),
+        currentStep: 'time',
+      };
+
+    case 'final_confirm':
+      // Handled separately in chat() to do DB operations
+      return null;
+
+    case 'done':
+      return { reply: 'Seu agendamento ja foi confirmado! Se precisar de algo mais, estou aqui.', currentStep: 'done' };
+
+    default:
+      return null;
+  }
+}
+
+async function finalizeAppointment(session: Session): Promise<{ callId: string }> {
+  const d = session.data;
+
+  // Find or create customer
+  const phoneSuffix = (d.phone || '').replace(/\D/g, '').slice(-8);
+  let customer = phoneSuffix.length >= 8
+    ? await prisma.customer.findFirst({ where: { tenantId: ELOY_TENANT_ID, phone: { contains: phoneSuffix } } })
+    : null;
+
+  if (!customer) {
+    customer = await prisma.customer.create({
+      data: {
+        tenantId: ELOY_TENANT_ID,
+        name: d.name!,
+        phone: d.phone,
+        cpfCnpj: d.cpf,
+        email: d.email,
+        insurance: d.insurance,
+        address: d.address ? { full: d.address } : undefined,
+        origin: 'demo_eloy_chat',
+        optInWhatsApp: true,
+      },
+    });
+  }
+
+  // Create scheduled call
+  const callDate = new Date(`${d.date}T${d.time}:00${SP_OFFSET}`);
+  const call = await prisma.scheduledCall.create({
+    data: {
+      tenantId: ELOY_TENANT_ID,
+      customerId: customer.id,
+      name: d.name!,
+      phone: d.phone!,
+      email: d.email,
+      date: callDate,
+      duration: 30,
+      status: 'scheduled',
+      notes: `Convenio: ${d.insurance || 'Nao informado'}. Agendado via demo chat.`,
+    },
+  });
+
+  return { callId: call.id };
+}
+
+export const demoEloyService = {
+  async chat(sessionId: string, message: string): Promise<ChatResponse> {
+    const session = getOrCreateSession(sessionId);
+    const trimmed = message.trim();
+
+    // Add user message to history
+    session.messages.push({ role: 'user', content: trimmed });
+    if (session.messages.length > MAX_MESSAGES) {
+      session.messages = session.messages.slice(-MAX_MESSAGES);
+    }
+
+    // If in scheduling flow (not idle), handle structured steps
+    if (session.step !== 'idle') {
+      // Handle final confirmation
+      if (session.step === 'final_confirm') {
+        const lower = trimmed.toLowerCase();
+        if (lower === 'sim, confirmar' || lower === 'sim' || lower === 'confirm' || lower === 'yes') {
+          try {
+            const { callId } = await finalizeAppointment(session);
+            session.step = 'done';
+            const reply = `Agendamento confirmado! Protocolo: ${callId.slice(-8).toUpperCase()}\n\nNossa equipe entrara em contato para confirmar. Ate breve!`;
+            session.messages.push({ role: 'assistant', content: reply });
+            return { reply, currentStep: 'done' };
+          } catch (err: any) {
+            console.error('[DEMO-ELOY] Appointment error:', err.message);
+            const reply = 'Desculpe, houve um erro ao confirmar o agendamento. Tente novamente.';
+            session.messages.push({ role: 'assistant', content: reply });
+            return { reply, currentStep: 'final_confirm', buttons: [{ id: 'confirm', label: 'Sim, confirmar' }, { id: 'correct', label: 'Corrigir algo' }] };
+          }
+        } else {
+          // User wants to correct — restart from name
+          session.step = 'name';
+          const reply = 'Sem problema! Vamos corrigir. Qual e o seu nome completo?';
+          session.messages.push({ role: 'assistant', content: reply });
+          return { reply, currentStep: 'name', inputHint: 'text' };
+        }
+      }
+
+      const stepResult = handleSchedulingStep(session, trimmed);
+      if (stepResult) {
+        session.messages.push({ role: 'assistant', content: stepResult.reply });
+        return stepResult;
+      }
+    }
+
+    // Check if user wants to schedule
+    if (session.step === 'idle' && wantsToSchedule(trimmed)) {
+      session.step = 'name';
+      const reply = 'Otimo! Vamos agendar sua consulta. Qual e o seu nome completo?';
+      session.messages.push({ role: 'assistant', content: reply });
+      return { reply, currentStep: 'name', inputHint: 'text' };
+    }
+
+    // Free-text: use Claude for general questions
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 200,
+        system: SYSTEM_PROMPT,
+        messages: session.messages.map(m => ({ role: m.role, content: m.content })),
+      });
+
+      const reply = response.content[0]?.type === 'text'
+        ? response.content[0].text
+        : 'Desculpe, nao consegui responder. Pode repetir?';
+
+      session.messages.push({ role: 'assistant', content: reply });
+
+      // Check if AI suggested scheduling in its response
+      const buttons = wantsToSchedule(reply)
+        ? [{ id: 'schedule', label: 'Agendar consulta' }]
+        : undefined;
+
+      return { reply, buttons, currentStep: 'idle' };
+    } catch (err: any) {
+      console.error('[DEMO-ELOY] AI error:', err.message);
+      return { reply: 'Desculpe, estou com dificuldades tecnicas. Tente novamente em instantes.' };
+    }
+  },
+};
