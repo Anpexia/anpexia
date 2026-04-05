@@ -80,18 +80,30 @@ export function Layout() {
           ))}
         </nav>
 
-        {/* Logout */}
-        <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full"
-            style={{ color: '#BFDBFE' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#FFFFFF'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#BFDBFE'; }}
-          >
-            <LogOut size={20} />
-            Sair
-          </button>
+        {/* User info + Logout */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          {user && (
+            <div className="px-3 pt-3 pb-1 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+                {user.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+              <span className="text-sm font-medium text-white truncate">
+                {user.role === 'DOCTOR' ? `Dr. ${user.name}` : user.name}
+              </span>
+            </div>
+          )}
+          <div className="p-3 pt-1">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full"
+              style={{ color: '#BFDBFE' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#FFFFFF'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#BFDBFE'; }}
+            >
+              <LogOut size={20} />
+              Sair
+            </button>
+          </div>
         </div>
       </aside>
 
