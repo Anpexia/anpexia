@@ -122,6 +122,20 @@ async function sendAppointmentReminders() {
         where: { id: call.id },
         data: { confirmationSentAt: now },
       });
+
+      // Send email reminder (non-blocking)
+      if (call.email && call.tenantId) {
+        try {
+          const { sendAppointmentReminderEmail } = await import('../services/email-templates');
+          await sendAppointmentReminderEmail(call.tenantId, {
+            name: call.name,
+            email: call.email,
+            date: call.date,
+          });
+        } catch (err) {
+          console.error(`${TAG} Email reminder failed for ${call.email}:`, err);
+        }
+      }
     }
 
     // --- 2h reminder ---

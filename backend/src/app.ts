@@ -128,6 +128,7 @@ async function loadRoutes() {
     const { evolutionsRouter } = await import('./modules/evolutions/evolutions.controller');
     const { teamRouter } = await import('./modules/team/team.controller');
     const { conveniosRouter } = await import('./modules/convenios/convenios.controller');
+    const { settingsRouter } = await import('./modules/settings/settings.controller');
 
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/tenants', tenantRouter);
@@ -222,6 +223,7 @@ async function loadRoutes() {
     app.use('/api/v1', evolutionsRouter);
     app.use('/api/v1/team', teamRouter);
     app.use('/api/v1/convenios', conveniosRouter);
+    app.use('/api/v1/settings', settingsRouter);
 
     const { errorHandler } = await import('./shared/middleware/error-handler');
     app.use(errorHandler);

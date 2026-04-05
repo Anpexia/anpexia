@@ -62,6 +62,7 @@ model Tenant {
   scheduledCalls        ScheduledCall[]
   convenios             Convenio[]
   autorizacoes          Autorizacao[]
+  settings              TenantSettings?
 
   @@map("tenants")
 }
@@ -1044,4 +1045,28 @@ model Autorizacao {
   @@index([patientConvenioId])
   @@index([tenantId])
   @@map("autorizacoes")
+}
+
+// ==========================================
+// TENANT SETTINGS
+// ==========================================
+
+model TenantSettings {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique @map("tenant_id")
+  cnpj      String?
+  horarios  Json?    // { seg: { ativo: true, inicio: "08:00", fim: "18:00" }, ... }
+  duracaoConsultaPadrao Int? @default(30) @map("duracao_consulta_padrao") // minutos
+  emailEnabled     Boolean @default(false) @map("email_enabled")
+  emailFrom        String? @map("email_from")
+  emailWelcome     Boolean @default(true) @map("email_welcome")
+  emailConfirmacao Boolean @default(true) @map("email_confirmacao")
+  emailLembrete    Boolean @default(true) @map("email_lembrete")
+  emailCancelamento Boolean @default(true) @map("email_cancelamento")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
 }

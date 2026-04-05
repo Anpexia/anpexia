@@ -51,6 +51,14 @@ customerRouter.post('/', async (req: Request, res: Response, next: NextFunction)
       changes: { after: customer },
     });
 
+    // Send welcome email (non-blocking)
+    if (customer.email) {
+      import('../../services/email-templates').then(({ sendWelcomeEmail }) => {
+        sendWelcomeEmail(req.auth!.tenantId!, { name: customer.name, email: customer.email! })
+          .catch(err => console.error('[EMAIL] Welcome email failed:', err.message));
+      });
+    }
+
     return created(res, customer);
   } catch (err) {
     next(err);

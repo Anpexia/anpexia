@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Shield, Settings } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
 
-const navItems = [
+const allNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/clientes', label: 'Clientes', icon: Users },
   { path: '/estoque', label: 'Estoque', icon: Package },
@@ -15,13 +15,29 @@ const navItems = [
   { path: '/convenios', label: 'Convenios', icon: Shield },
   { path: '/assinatura', label: 'Assinatura', icon: PenLine },
   { path: '/equipe', label: 'Equipe', icon: UsersRound },
+  { path: '/configuracoes', label: 'Configurações', icon: Settings },
   { path: '/perfil', label: 'Meu Perfil', icon: UserCircle },
 ];
+
+const roleAllowedPaths: Record<string, string[]> = {
+  SUPER_ADMIN: allNavItems.map(i => i.path),
+  OWNER: allNavItems.map(i => i.path),
+  MANAGER: allNavItems.map(i => i.path),
+  DOCTOR: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/convenios', '/assinatura', '/equipe', '/perfil'],
+  RECEPTIONIST: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/convenios', '/perfil'],
+  FINANCIAL: ['/dashboard', '/financeiro', '/perfil'],
+  EMPLOYEE: ['/dashboard', '/clientes', '/agendamentos', '/perfil'],
+};
 
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navItems = allNavItems.filter(item => {
+    const allowed = roleAllowedPaths[user?.role || 'EMPLOYEE'] || roleAllowedPaths.EMPLOYEE;
+    return allowed.includes(item.path);
+  });
 
   const handleLogout = async () => {
     await logout();

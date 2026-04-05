@@ -52,6 +52,18 @@ router.post('/book', optionalAuth, async (req: Request, res: Response, next) => 
     // tenantId comes from auth if available, otherwise from body
     const tenantId = (req as any).auth?.tenantId || req.body.tenantId || null;
     const call = await schedulingService.bookCall(data, tenantId);
+
+    // Send confirmation email (non-blocking)
+    if (data.email && tenantId) {
+      import('../../services/email-templates').then(({ sendAppointmentConfirmationEmail }) => {
+        sendAppointmentConfirmationEmail(tenantId, {
+          name: data.name,
+          email: data.email!,
+          date: call.date,
+        }).catch(err => console.error('[EMAIL] Confirmation email failed:', err.message));
+      });
+    }
+
     return created(res, call);
   } catch (err) { next(err); }
 });
@@ -117,6 +129,18 @@ router.patch('/calls/:id', authenticate, requireTenant, async (req: Request, res
 router.delete('/calls/:id', authenticate, requireTenant, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const call = await schedulingService.cancelCall(id, req.auth!.tenantId!);
+
+  // Send cancellation email (non-blocking)
+  if (call.email && req.auth!.tenantId) {
+    import('../../services/email-templates').then(({ sendCancellationEmail }) => {
+      sendCancellationEmail(req.auth!.tenantId!, {
+        name: call.name,
+        email: call.email!,
+        date: call.date,
+      }).catch(err => console.error('[EMAIL] Cancellation email failed:', err.message));
+    });
+  }
+
   return success(res, call);
 });
 
