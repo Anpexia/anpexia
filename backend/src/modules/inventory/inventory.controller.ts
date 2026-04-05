@@ -81,6 +81,7 @@ inventoryRouter.get('/products/:id', async (req: Request, res: Response, next: N
 
 inventoryRouter.post('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log('[ESTOQUE] POST body:', JSON.stringify(req.body, null, 2));
     const data = createProductSchema.parse(req.body);
     const product = await inventoryService.createProduct(req.auth!.tenantId!, data);
 
@@ -99,6 +100,7 @@ inventoryRouter.post('/products', async (req: Request, res: Response, next: Next
 
 inventoryRouter.put('/products/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log('[ESTOQUE] PUT body:', JSON.stringify(req.body, null, 2));
     const data = updateProductSchema.parse(req.body);
     const product = await inventoryService.updateProduct(req.auth!.tenantId!, req.params.id as string, data);
 

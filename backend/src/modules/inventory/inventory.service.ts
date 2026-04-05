@@ -122,7 +122,7 @@ export const inventoryService = {
       where: { id },
       data: {
         ...rest,
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+        expiresAt: expiresAt ? new Date(expiresAt) : expiresAt === null ? null : undefined,
       },
       include: { category: true },
     });
