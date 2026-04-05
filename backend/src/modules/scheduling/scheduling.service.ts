@@ -3,6 +3,32 @@ import { AppError } from '../../shared/middleware/error-handler';
 import { BookCallInput, UpdateConfigInput, UpdateCallStatusInput } from './scheduling.validators';
 import { sendBookingConfirmation, sendCancellationNotice } from './scheduling.notifications';
 
+// ============================================================
+// São Paulo timezone helpers (UTC-3, no DST since 2019)
+// ============================================================
+const SP_OFFSET = '-03:00';
+const SP_OFFSET_MS = 3 * 60 * 60 * 1000; // 3 hours in ms
+
+/** Convert a UTC Date to SP hours, minutes, and date string */
+function toSP(d: Date): { hours: number; minutes: number; dateStr: string } {
+  const sp = new Date(d.getTime() - SP_OFFSET_MS);
+  return { hours: sp.getUTCHours(), minutes: sp.getUTCMinutes(), dateStr: sp.toISOString().slice(0, 10) };
+}
+
+/** Format SP hours:minutes as HH:MM */
+function spTimeStr(d: Date): string {
+  const { hours, minutes } = toSP(d);
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+/** Get start and end of a SP calendar day as UTC Dates */
+function spDayBounds(dateStr: string): { start: Date; end: Date } {
+  return {
+    start: new Date(`${dateStr}T00:00:00${SP_OFFSET}`),
+    end: new Date(`${dateStr}T23:59:59.999${SP_OFFSET}`),
+  };
+}
+
 const DEFAULT_CONFIG = {
   availableDays: [1, 2, 3, 4, 5], // Mon-Fri
   startHour: 9,
@@ -38,7 +64,7 @@ async function updateConfig(data: UpdateConfigInput) {
 // Generate time slots for a given date
 async function getAvailableSlots(date: string) {
   const config = await getConfig();
-  const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+  const dayOfWeek = new Date(`${date}T12:00:00${SP_OFFSET}`).getDay();
 
   if (!config.availableDays.includes(dayOfWeek)) {
     return [];
@@ -61,9 +87,8 @@ async function getAvailableSlots(date: string) {
     slots.push({ time, available: true });
   }
 
-  // Fetch booked calls for this date
-  const startOfDay = new Date(date + 'T00:00:00');
-  const endOfDay = new Date(date + 'T23:59:59');
+  // Fetch booked calls for this date (SP day boundaries)
+  const { start: startOfDay, end: endOfDay } = spDayBounds(date);
 
   const bookedCalls = await prisma.scheduledCall.findMany({
     where: {
@@ -73,11 +98,9 @@ async function getAvailableSlots(date: string) {
     select: { date: true },
   });
 
+  // Convert booked call UTC dates to SP time strings
   const bookedTimes = new Set(
-    bookedCalls.map((call) => {
-      const d = new Date(call.date);
-      return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-    }),
+    bookedCalls.map((call) => spTimeStr(new Date(call.date))),
   );
 
   // Mark booked slots as unavailable
@@ -87,11 +110,11 @@ async function getAvailableSlots(date: string) {
     }
   }
 
-  // Mark past slots as unavailable if date is today
+  // Mark past slots as unavailable if date is today (SP timezone)
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  if (date === today) {
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const nowSP = toSP(now);
+  if (date === nowSP.dateStr) {
+    const currentTime = `${String(nowSP.hours).padStart(2, '0')}:${String(nowSP.minutes).padStart(2, '0')}`;
     for (const slot of slots) {
       if (slot.time <= currentTime) {
         slot.available = false;
@@ -106,13 +129,13 @@ async function getAvailableSlots(date: string) {
 async function getAvailableDates() {
   const config = await getConfig();
   const dates: { date: string; dayOfWeek: number; availableSlots: number }[] = [];
-  const today = new Date();
+  const todaySP = toSP(new Date()).dateStr;
 
-  // Calculate date range
-  const startDate = new Date(today);
-  startDate.setDate(today.getDate() + 1);
-  const endDate = new Date(today);
-  endDate.setDate(today.getDate() + config.maxDaysAhead);
+  // Calculate date range (SP days)
+  const startDate = new Date(`${todaySP}T00:00:00${SP_OFFSET}`);
+  startDate.setDate(startDate.getDate() + 1);
+  const endDate = new Date(`${todaySP}T23:59:59${SP_OFFSET}`);
+  endDate.setDate(endDate.getDate() + config.maxDaysAhead);
 
   // Single query: fetch ALL booked calls in the range
   const bookedCalls = await prisma.scheduledCall.findMany({
@@ -123,15 +146,14 @@ async function getAvailableDates() {
     select: { date: true },
   });
 
-  // Group booked times by date string
+  // Group booked times by SP date string
   const bookedByDate = new Map<string, Set<string>>();
   for (const call of bookedCalls) {
     const d = new Date(call.date);
-    const dateStr = d.toISOString().slice(0, 10);
+    const sp = toSP(d);
+    const dateStr = sp.dateStr;
     if (!bookedByDate.has(dateStr)) bookedByDate.set(dateStr, new Set());
-    bookedByDate.get(dateStr)!.add(
-      `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-    );
+    bookedByDate.get(dateStr)!.add(spTimeStr(d));
   }
 
   // Generate slots for each available day
@@ -146,14 +168,16 @@ async function getAvailableDates() {
     allSlotTimes.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
   }
 
+  // Iterate over next N days from SP "today"
+  const baseDate = new Date(`${todaySP}T12:00:00${SP_OFFSET}`);
   for (let i = 1; i <= config.maxDaysAhead; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
+    const d = new Date(baseDate);
+    d.setDate(baseDate.getDate() + i);
     const dayOfWeek = d.getDay();
 
     if (!config.availableDays.includes(dayOfWeek)) continue;
 
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = toSP(d).dateStr;
     const bookedTimes = bookedByDate.get(dateStr) || new Set();
     const availableSlots = allSlotTimes.filter((t) => !bookedTimes.has(t)).length;
 
@@ -169,8 +193,8 @@ async function getAvailableDates() {
 async function bookCall(data: BookCallInput, tenantId?: string | null) {
   const config = await getConfig();
 
-  // Validate date is available
-  const dayOfWeek = new Date(data.date + 'T12:00:00').getDay();
+  // Validate date is available (use SP noon to avoid date shift)
+  const dayOfWeek = new Date(`${data.date}T12:00:00${SP_OFFSET}`).getDay();
   if (!config.availableDays.includes(dayOfWeek)) {
     throw new AppError(400, 'INVALID_DATE', 'Esta data não está disponível para agendamento');
   }
@@ -196,10 +220,8 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     throw new AppError(400, 'SLOT_TAKEN', 'Este horário já está ocupado');
   }
 
-  // Build datetime
-  const [hour, minute] = time.split(':').map(Number);
-  const callDate = new Date(data.date + 'T00:00:00Z');
-  callDate.setUTCHours(hour, minute, 0, 0);
+  // Build datetime — interpret time as São Paulo (UTC-3)
+  const callDate = new Date(`${data.date}T${time}:00${SP_OFFSET}`);
 
   // Find or link existing lead by phone
   let lead = await prisma.lead.findFirst({
@@ -306,10 +328,9 @@ async function listCalls(tenantId: string, filters: {
 
 // Get today's appointments for dashboard
 async function getTodayAppointments(tenantId: string) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todaySP = toSP(new Date()).dateStr;
+  const { start: today, end: _ } = spDayBounds(todaySP);
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
   return prisma.scheduledCall.findMany({
     where: {
