@@ -150,7 +150,7 @@ async function loadRoutes() {
 
         const { sendEmail } = await import('./services/email.service');
         const result = await sendEmail({
-          to: 'angelolarocca10@gmail.com',
+          to: 'anpexia@hotmail.com',
           subject: `[TESTE] Estoque baixo — ${product.name}`,
           html: `<h2>Teste de email estoque baixo</h2>
             <p>Produto: <strong>${product.name}</strong> (SKU: ${product.sku || 'N/A'})</p>
