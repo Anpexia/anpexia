@@ -690,6 +690,9 @@ model ScheduledCall {
   status     String   @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
   notes      String?
   meetLink   String?  @map("meet_link")
+  confirmationSentAt  DateTime? @map("confirmation_sent_at")
+  reminderSentAt      DateTime? @map("reminder_sent_at")
+  cancelConfirmPending Boolean  @default(false) @map("cancel_confirm_pending")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 

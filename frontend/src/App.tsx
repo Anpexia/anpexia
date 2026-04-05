@@ -14,6 +14,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DemoPage } from './pages/DemoPage';
 import { DemoJFPage } from './pages/DemoJFPage';
 import { EloyDemo } from './pages/demo/EloyDemo';
+import { ConfirmacaoDemo } from './pages/demo/ConfirmacaoDemo';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = sessionStorage.getItem('accessToken');
@@ -33,6 +34,7 @@ export default function App() {
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/demo-jf" element={<DemoJFPage />} />
       <Route path="/demo/eloy" element={<EloyDemo />} />
+      <Route path="/demo/confirmacao" element={<ConfirmacaoDemo />} />
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />

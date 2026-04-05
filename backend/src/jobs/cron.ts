@@ -98,7 +98,7 @@ async function sendAppointmentReminders() {
   try {
     const now = new Date();
 
-    // --- 48h reminder ---
+    // --- 48h reminder (confirmation) ---
     const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
     const in48hEnd = new Date(in48h.getTime() + 60 * 60 * 1000);
 
@@ -106,6 +106,7 @@ async function sendAppointmentReminders() {
       where: {
         date: { gte: in48h, lt: in48hEnd },
         status: { in: ['scheduled', 'confirmed'] },
+        confirmationSentAt: null, // Only send once
       },
     });
 
@@ -117,6 +118,10 @@ async function sendAppointmentReminders() {
         date: call.date,
         leadId: call.leadId,
       });
+      await prisma.scheduledCall.update({
+        where: { id: call.id },
+        data: { confirmationSentAt: now },
+      });
     }
 
     // --- 2h reminder ---
@@ -127,6 +132,7 @@ async function sendAppointmentReminders() {
       where: {
         date: { gte: in2h, lt: in2hEnd },
         status: { in: ['scheduled', 'confirmed'] },
+        reminderSentAt: null, // Only send once
       },
     });
 
@@ -137,6 +143,10 @@ async function sendAppointmentReminders() {
         phone: call.phone,
         date: call.date,
         leadId: call.leadId,
+      });
+      await prisma.scheduledCall.update({
+        where: { id: call.id },
+        data: { reminderSentAt: now },
       });
     }
 

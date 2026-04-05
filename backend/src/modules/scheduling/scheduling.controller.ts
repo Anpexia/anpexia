@@ -5,6 +5,7 @@ import { AppError } from '../../shared/middleware/error-handler';
 import { success, created } from '../../shared/utils/response';
 import { authenticate, requireRole, requireTenant, optionalAuth } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
+import { handleConfirmResponse } from './scheduling.confirm';
 
 const router = Router();
 
@@ -29,6 +30,18 @@ router.get('/available-slots/:date', async (req: Request, res: Response, next) =
     }
     const slots = await schedulingService.getAvailableSlots(date);
     return success(res, slots);
+  } catch (err) { next(err); }
+});
+
+// POST /confirm-response (public — used by demo page and WhatsApp webhook)
+router.post('/confirm-response', async (req: Request, res: Response, next) => {
+  try {
+    const { appointmentId, action } = req.body;
+    if (!appointmentId || !action) {
+      throw new AppError(400, 'MISSING_FIELDS', 'appointmentId e action sao obrigatorios');
+    }
+    const result = await handleConfirmResponse(appointmentId, action);
+    return success(res, result);
   } catch (err) { next(err); }
 });
 

@@ -29,16 +29,20 @@ export async function sendBookingConfirmation(call: {
   date: Date;
   duration: number;
   leadId?: string | null;
+  tenantName?: string;
+  doctorName?: string;
 }) {
   const dateStr = formatDate(call.date);
   const timeStr = formatTime(call.date);
+  const clinicLine = call.tenantName ? `\n📍 ${call.tenantName}` : '';
+  const doctorLine = call.doctorName ? `\n👨‍⚕️ Medico: ${call.doctorName}` : '';
 
   const body =
-    `Oi ${call.name}, seu agendamento foi realizado com sucesso!\n\n` +
-    `Data: ${dateStr}\n` +
-    `Horario: ${timeStr}\n` +
-    `Duracao: ${call.duration} minutos\n\n` +
-    `Voce recebera um lembrete antes da consulta.`;
+    `Ola, ${call.name}! 👋\nSua consulta esta confirmada:\n` +
+    `📅 Data: ${dateStr}\n` +
+    `⏰ Horario: ${timeStr}` +
+    doctorLine + clinicLine + `\n\n` +
+    `Por favor, confirme sua presenca:`;
 
   if (isWhatsAppConfigured()) {
     try {
@@ -161,11 +165,15 @@ export async function sendReminder48h(call: {
   phone: string;
   date: Date;
   leadId: string | null;
+  tenantName?: string;
+  doctorName?: string;
 }) {
   const dateStr = formatDate(call.date);
   const timeStr = formatTime(call.date);
+  const doctorLine = call.doctorName ? ` com ${call.doctorName}` : '';
+  const clinicLine = call.tenantName ? `\n📍 ${call.tenantName}` : '';
 
-  const body = `Sua consulta e amanha, ${dateStr}, as ${timeStr}.\n\nPodemos confirmar sua presenca?`;
+  const body = `Ola, ${call.name}! 👋\nSua consulta esta confirmada:\n📅 Data: ${dateStr}\n⏰ Horario: ${timeStr}${doctorLine}${clinicLine}\n\nPor favor, confirme sua presenca:`;
 
   if (isWhatsAppConfigured()) {
     try {
@@ -204,10 +212,12 @@ export async function sendReminder2h(call: {
   phone: string;
   date: Date;
   leadId: string | null;
+  doctorName?: string;
 }) {
   const timeStr = formatTime(call.date);
+  const doctorLine = call.doctorName ? ` com ${call.doctorName}` : '';
 
-  const body = `${call.name}, sua consulta e em 2 horas, as ${timeStr}!\n\nChegue 10 minutos antes para o check-in.`;
+  const body = `Ola, ${call.name}! Lembrando que sua consulta e hoje as ${timeStr}${doctorLine}. Te esperamos! 🏥`;
 
   if (isWhatsAppConfigured()) {
     try {
