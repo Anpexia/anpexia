@@ -109,6 +109,13 @@ export function EloyDemo() {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open, typing]);
 
+  // Safety: force-clear typing after 30s in case something goes wrong
+  useEffect(() => {
+    if (!typing) return;
+    const safety = setTimeout(() => setTyping(false), 30000);
+    return () => clearTimeout(safety);
+  }, [typing]);
+
   const sendText = useCallback(async (text: string) => {
     if (!text.trim() || typing) return;
     const userMsg: Msg = { role: 'user', content: text.trim(), time: now() };
@@ -119,7 +126,6 @@ export function EloyDemo() {
     setTyping(true);
 
     const l2 = BUTTONS_L2[text.trim()];
-    const delay = 1500 + Math.random() * 1000;
 
     try {
       const controller = new AbortController();
@@ -136,16 +142,25 @@ export function EloyDemo() {
       });
       clearTimeout(timeout);
 
-      const json = await res.json();
-      const reply = json.data?.content?.[0]?.text || 'Desculpa, não consegui responder agora. Pode repetir?';
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
 
-      await new Promise(r => setTimeout(r, delay));
+      const json = await res.json();
+      const reply = json.data?.content?.[0]?.text || 'Desculpa, nao consegui responder agora. Pode repetir?';
+
+      // Small delay to simulate typing
+      await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
       setMessages(prev => [...prev, { role: 'assistant', content: reply, time: now() }]);
       if (l2) setButtons(l2);
-    } catch (err) {
+    } catch (err: any) {
       console.error('[DEMO] fetch error:', err);
-      await new Promise(r => setTimeout(r, Math.min(delay, 1000)));
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Ops, tive um probleminha aqui. Pode mandar de novo?', time: now() }]);
+      const isTimeout = err?.name === 'AbortError';
+      const errorMsg = isTimeout
+        ? 'Desculpe, estou com dificuldades tecnicas. Tente novamente.'
+        : 'Ops, tive um probleminha aqui. Pode mandar de novo?';
+      await new Promise(r => setTimeout(r, 500));
+      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg, time: now() }]);
     } finally {
       setTyping(false);
     }
