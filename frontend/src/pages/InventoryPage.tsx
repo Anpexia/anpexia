@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, AlertTriangle, X, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Eye, Clock, Barcode, Link2Off, Zap, Keyboard, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, Search, AlertTriangle, X, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Eye, Clock, Barcode, Link2Off, Zap, Keyboard, Sparkles, Loader2, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '../services/api';
 import { SuppliersTab } from './SuppliersTab';
@@ -23,6 +23,7 @@ interface Product {
   isActive: boolean;
   movements?: Movement[];
   createdAt: string;
+  supplierProducts?: { id: string; isPrimary: boolean; supplier: { id: string; name: string } }[];
 }
 
 interface Movement {
@@ -559,6 +560,13 @@ export function InventoryPage() {
     } catch {}
   };
 
+  const handleSetPrimary = async (supplierId: string, productId: string) => {
+    try {
+      await api.patch(`/suppliers/${supplierId}/products/${productId}/primary`);
+      setProductSuppliers((prev) => prev.map((ps) => ({ ...ps, isPrimary: ps.supplierId === supplierId })));
+    } catch {}
+  };
+
   const filteredSupplierOptions = allSuppliers.filter(
     (s) =>
       !productSuppliers.some((ps) => ps.supplierId === s.id) &&
@@ -740,7 +748,16 @@ export function InventoryPage() {
                       </span>
                     ) : '-'}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500 hidden xl:table-cell">{p.supplier || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 hidden xl:table-cell">
+                    {p.supplierProducts && p.supplierProducts.length > 0 ? (
+                      <span>
+                        {(p.supplierProducts.find(sp => sp.isPrimary) || p.supplierProducts[0]).supplier.name}
+                        {p.supplierProducts.length > 1 && (
+                          <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">+{p.supplierProducts.length - 1}</span>
+                        )}
+                      </span>
+                    ) : p.supplier || '-'}
+                  </td>
                   <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => openMovement(p)} className="p-1.5 rounded hover:bg-green-50 text-slate-500 hover:text-green-600" title="Movimentacao"><ArrowUpCircle size={16} /></button>
@@ -862,14 +879,26 @@ export function InventoryPage() {
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-[#EFF6FF] text-[#1E3A5F]">Principal</span>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleUnlinkSupplier(ps.supplierId, ps.productId)}
-                            className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
-                            title="Desvincular"
-                          >
-                            <Link2Off size={14} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            {!ps.isPrimary && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetPrimary(ps.supplierId, ps.productId)}
+                                className="p-1 rounded hover:bg-amber-50 text-slate-400 hover:text-amber-500"
+                                title="Definir como principal"
+                              >
+                                <Star size={14} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleUnlinkSupplier(ps.supplierId, ps.productId)}
+                              className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                              title="Desvincular"
+                            >
+                              <Link2Off size={14} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

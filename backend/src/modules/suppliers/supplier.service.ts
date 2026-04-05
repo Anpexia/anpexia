@@ -140,7 +140,7 @@ export const supplierService = {
     });
   },
 
-  async linkProduct(tenantId: string, supplierId: string, productId: string, isPrimary: boolean = false) {
+  async linkProduct(tenantId: string, supplierId: string, productId: string, isPrimary = false) {
     // Validate supplier belongs to tenant
     const supplier = await prisma.supplier.findFirst({ where: { id: supplierId, tenantId } });
     if (!supplier) {
@@ -159,6 +159,12 @@ export const supplierService = {
     });
     if (existing) {
       throw new AppError(409, 'ALREADY_EXISTS', 'Produto ja vinculado a este fornecedor');
+    }
+
+    // Auto-set isPrimary if this is the first supplier for the product
+    const existingCount = await prisma.supplierProduct.count({ where: { productId, tenantId } });
+    if (existingCount === 0) {
+      isPrimary = true;
     }
 
     // If setting as primary, unset other primaries for this product
@@ -192,6 +198,28 @@ export const supplierService = {
 
     return prisma.supplierProduct.delete({
       where: { supplierId_productId: { supplierId, productId } },
+    });
+  },
+
+  async setPrimarySupplier(tenantId: string, supplierId: string, productId: string) {
+    const existing = await prisma.supplierProduct.findUnique({
+      where: { supplierId_productId: { supplierId, productId } },
+    });
+    if (!existing || existing.tenantId !== tenantId) {
+      throw new AppError(404, 'NOT_FOUND', 'Vinculo nao encontrado');
+    }
+
+    // Unset all other primaries for this product
+    await prisma.supplierProduct.updateMany({
+      where: { productId, tenantId, isPrimary: true },
+      data: { isPrimary: false },
+    });
+
+    // Set this one as primary
+    return prisma.supplierProduct.update({
+      where: { supplierId_productId: { supplierId, productId } },
+      data: { isPrimary: true },
+      include: { supplier: { select: { id: true, name: true } } },
     });
   },
 

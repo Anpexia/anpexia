@@ -6,6 +6,7 @@ import { authenticate, requireTenant } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
 import { createAuditLog } from '../../shared/middleware/audit';
 import { getProductByBarcode } from './cosmos.service';
+import { supplierService } from '../suppliers/supplier.service';
 
 export const inventoryRouter = Router();
 
@@ -129,6 +130,16 @@ inventoryRouter.delete('/products/:id', async (req: Request, res: Response, next
     });
 
     return noContent(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Suppliers linked to a product
+inventoryRouter.get('/products/:id/suppliers', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const suppliers = await supplierService.getSuppliersByProduct(req.auth!.tenantId!, req.params.id as string);
+    return success(res, suppliers);
   } catch (err) {
     next(err);
   }

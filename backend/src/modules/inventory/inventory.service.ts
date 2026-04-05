@@ -132,7 +132,13 @@ export const inventoryService = {
         skip: params.skip,
         take: params.take,
         orderBy: { createdAt: 'desc' },
-        include: { category: true },
+        include: {
+          category: true,
+          supplierProducts: {
+            include: { supplier: { select: { id: true, name: true } } },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          },
+        },
       }),
       prisma.product.count({ where }),
     ]);

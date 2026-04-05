@@ -127,6 +127,28 @@ supplierRouter.post('/:id/products', async (req: Request, res: Response, next: N
   }
 });
 
+// Set supplier as primary for a product
+supplierRouter.patch('/:id/products/:productId/primary', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const link = await supplierService.setPrimarySupplier(
+      req.auth!.tenantId!,
+      req.params.id as string,
+      req.params.productId as string,
+    );
+
+    await createAuditLog({
+      req,
+      action: 'supplier.set_primary',
+      entity: 'SupplierProduct',
+      entityId: link.id,
+    });
+
+    return success(res, link);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Unlink product from supplier
 supplierRouter.delete('/:id/products/:productId', async (req: Request, res: Response, next: NextFunction) => {
   try {
