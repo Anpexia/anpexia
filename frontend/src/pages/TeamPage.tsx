@@ -230,6 +230,7 @@ export function TeamPage() {
                   <option value="RECEPTIONIST">Recepcionista</option>
                   <option value="FINANCIAL">Financeiro</option>
                   <option value="STOCK">Estoque</option>
+                  <option value="EMPLOYEE">Funcionario</option>
                 </select>
               </div>
               <button onClick={handleCreate} disabled={submitting}
@@ -270,6 +271,7 @@ export function TeamPage() {
                   <option value="RECEPTIONIST">Recepcionista</option>
                   <option value="FINANCIAL">Financeiro</option>
                   <option value="STOCK">Estoque</option>
+                  <option value="EMPLOYEE">Funcionario</option>
                 </select>
               </div>
               <button onClick={handleUpdate} disabled={submitting}

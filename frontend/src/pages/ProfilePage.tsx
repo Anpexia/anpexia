@@ -144,7 +144,8 @@ export function ProfilePage() {
 
   const handleSaveSignature = async () => {
     const canvas = canvasRef.current;
-    if (!canvas || !user) return;
+    if (!canvas) { showToast('Erro: canvas nao encontrado'); return; }
+    if (!user) { showToast('Erro: sessao expirada, faca login novamente'); return; }
     setSavingSignature(true);
     try {
       // Convert canvas to base64 (without data:image/png;base64, prefix)

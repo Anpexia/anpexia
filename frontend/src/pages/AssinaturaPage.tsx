@@ -91,7 +91,8 @@ export function AssinaturaPage() {
 
   const handleSave = async () => {
     const canvas = canvasRef.current;
-    if (!canvas || !user) return;
+    if (!canvas) { showToast('Erro: canvas nao encontrado'); return; }
+    if (!user) { showToast('Erro: sessao expirada, faca login novamente'); return; }
     setSaving(true);
     try {
       const dataUrl = canvas.toDataURL('image/png');
