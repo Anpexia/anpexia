@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Package, MessageSquare, AlertTriangle, UserPlus, Clock, ArrowRight, Calendar } from 'lucide-react';
+import { Users, Package, MessageSquare, AlertTriangle, UserPlus, Clock, ArrowRight, Calendar, Shield } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { format } from 'date-fns';
 import api from '../services/api';
@@ -88,16 +88,19 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [lowStockProducts, setLowStockProducts] = useState<AlertProduct[]>([]);
   const [expiringProducts, setExpiringProducts] = useState<AlertProduct[]>([]);
+  const [pendingAutorizacoes, setPendingAutorizacoes] = useState<{ total: number; items: any[] }>({ total: 0, items: [] });
 
   useEffect(() => {
     Promise.all([
       api.get('/dashboard').catch(() => ({ data: { data: null } })),
       api.get('/inventory/alerts/low-stock').catch(() => ({ data: { data: [] } })),
       api.get('/inventory/alerts/expiring').catch(() => ({ data: { data: [] } })),
-    ]).then(([dash, low, exp]) => {
+      api.get('/convenios/dashboard/pending').catch(() => ({ data: { data: { total: 0, items: [] } } })),
+    ]).then(([dash, low, exp, pending]) => {
       setData(dash.data.data);
       setLowStockProducts(low.data.data);
       setExpiringProducts(exp.data.data);
+      setPendingAutorizacoes(pending.data.data || { total: 0, items: [] });
     }).finally(() => setLoading(false));
   }, []);
 
@@ -364,6 +367,36 @@ export function DashboardPage() {
                 </div>
               )}
             </div>
+
+            {/* Pending Autorizacoes Card */}
+            {pendingAutorizacoes.total > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Shield size={18} className="text-amber-500" />
+                    <h3 className="font-semibold text-slate-800">Autorizacoes Pendentes</h3>
+                    <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">{pendingAutorizacoes.total}</span>
+                  </div>
+                  <button onClick={() => navigate('/convenios')} className="text-xs text-[#1E3A5F] hover:text-[#1E3A5F] font-medium flex items-center gap-1">
+                    Ver todas <ArrowRight size={12} />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {pendingAutorizacoes.items.map((a: any) => (
+                    <div key={a.id} className="flex items-center justify-between p-2.5 bg-amber-50 rounded-lg">
+                      <div>
+                        <span className="text-sm font-medium text-slate-800">{a.patientName}</span>
+                        <span className="text-xs text-slate-500 ml-2">{a.convenioNome}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-medium text-slate-700">{a.procedimento}</p>
+                        <p className="text-xs text-slate-400">{format(new Date(a.dataSolicitacao), 'dd/MM')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}

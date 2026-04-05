@@ -60,6 +60,8 @@ model Tenant {
   anamneses             Anamnesis[]
   patientEvolutions     PatientEvolution[]
   scheduledCalls        ScheduledCall[]
+  convenios             Convenio[]
+  autorizacoes          Autorizacao[]
 
   @@map("tenants")
 }
@@ -179,6 +181,7 @@ model Customer {
   anamneses             Anamnesis[]
   patientEvolutions     PatientEvolution[]
   financialTransactions FinancialTransaction[]
+  patientConvenios      PatientConvenio[]
 
   @@index([tenantId])
   @@map("customers")
@@ -979,4 +982,66 @@ model PatientEvolution {
   @@index([tenantId])
   @@index([patientId])
   @@map("patient_evolutions")
+}
+
+// ==========================================
+// CONVÊNIOS
+// ==========================================
+
+model Convenio {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  nome      String
+  codigo    String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pacientes PatientConvenio[]
+
+  @@unique([tenantId, nome])
+  @@index([tenantId])
+  @@map("convenios")
+}
+
+model PatientConvenio {
+  id                String    @id @default(cuid())
+  patientId         String    @map("patient_id")
+  convenioId        String    @map("convenio_id")
+  numeroCarteirinha String    @map("numero_carteirinha")
+  validade          DateTime?
+  titular           String    @default("PROPRIO")
+  nomeTitular       String?   @map("nome_titular")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  patient       Customer      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  convenio      Convenio      @relation(fields: [convenioId], references: [id], onDelete: Cascade)
+  autorizacoes  Autorizacao[]
+
+  @@unique([patientId, convenioId])
+  @@index([patientId])
+  @@index([convenioId])
+  @@map("patient_convenios")
+}
+
+model Autorizacao {
+  id                String    @id @default(cuid())
+  patientConvenioId String    @map("patient_convenio_id")
+  tenantId          String    @map("tenant_id")
+  procedimento      String
+  codigoTUSS        String?   @map("codigo_tuss")
+  numeroAutorizacao String?   @map("numero_autorizacao")
+  status            String    @default("PENDENTE")
+  dataSolicitacao   DateTime  @default(now()) @map("data_solicitacao")
+  dataResposta      DateTime? @map("data_resposta")
+  observacoes       String?
+  criadoPor         String?   @map("criado_por")
+
+  patientConvenio PatientConvenio @relation(fields: [patientConvenioId], references: [id], onDelete: Cascade)
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([patientConvenioId])
+  @@index([tenantId])
+  @@map("autorizacoes")
 }

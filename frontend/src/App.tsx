@@ -8,6 +8,7 @@ import { SchedulingPage } from './pages/SchedulingPage';
 import { ScriptsPage } from './pages/ScriptsPage';
 import { FinancialPage } from './pages/FinancialPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { ConveniosPage } from './pages/ConveniosPage';
 import { TeamPage } from './pages/TeamPage';
 import { AssinaturaPage } from './pages/AssinaturaPage';
 import { LoginPage } from './pages/LoginPage';
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="financeiro" element={<FinancialPage />} />
         <Route path="equipe" element={<TeamPage />} />
         <Route path="assinatura" element={<AssinaturaPage />} />
+        <Route path="convenios" element={<ConveniosPage />} />
         <Route path="perfil" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
