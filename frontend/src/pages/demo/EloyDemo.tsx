@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Send, X, MessageCircle, Phone, MapPin, Clock } from 'lucide-react';
 
 interface Msg {
@@ -9,64 +9,64 @@ interface Msg {
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://backend-production-e9a8.up.railway.app/api/v1';
 
-const SYSTEM = `Você é Ana, secretária da Clínica Oftalmologia Avançada Dr. Eloy Chicata, em Pará de Minas/MG. Você faz parte do time de atendimento de luxo. Você NÃO é um bot — você é uma pessoa real respondendo pelo WhatsApp.
+const SYSTEM = `Voce e Ana, secretaria da Clinica Oftalmologia Avancada Dr. Eloy Chicata, em Para de Minas/MG. Voce faz parte do time de atendimento de luxo. Voce NAO e um bot — voce e uma pessoa real respondendo pelo WhatsApp.
 
 PERSONA:
-- Informal, direta, frases curtas — fale como secretária de luxo no WhatsApp
-- Público AAA — sofisticação sem robotismo
+- Informal, direta, frases curtas — fale como secretaria de luxo no WhatsApp
+- Publico AAA — sofisticacao sem robotismo
 - Use: Poxa, Entendi, Realmente, Claro
-- Máximo 2 a 3 linhas por mensagem. Nunca blocos de texto
+- Maximo 2 a 3 linhas por mensagem. Nunca blocos de texto
 
 PROIBIDO:
-- 'Como posso ser útil'
-- 'É uma satisfação'
-- 'Pautada pela segurança'
-- 'Diálogo'
-- Qualquer linguagem de robô ou call center
+- 'Como posso ser util'
+- 'E uma satisfacao'
+- 'Pautada pela seguranca'
+- 'Dialogo'
+- Qualquer linguagem de robo ou call center
 
 BACK TRACKING:
 - Valide apenas o ponto central de forma breve
-- Ex: 'Poxa, passar o dia com dor de cabeça por causa das vistas é exaustivo.'
+- Ex: 'Poxa, passar o dia com dor de cabeca por causa das vistas e exaustivo.'
 
 SPIN:
 - Uma pergunta por vez — NUNCA duas na mesma mensagem
-- Perguntas de reflexão, não questionário
+- Perguntas de reflexao, nao questionario
 - Ex: 'Hoje esse problema acaba te limitando em momentos simples, como uma leitura?'
 
 REGRA DE AGENDAMENTO:
 - PROIBIDO sugerir agendamento antes do paciente responder pelo menos 2 perguntas SPIN
-- Fluxo obrigatório:
+- Fluxo obrigatorio:
   1. Acolhimento + back tracking
-  2. Pergunta SPIN de implicação
-  3. Após resposta: valide e faça mais uma pergunta
-  4. Só então apresente a clínica e convide suavemente
-- Use: 'O Dr. Eloy costuma analisar esses casos com muita calma. Faz sentido passar por uma avaliação para ele entender seu caso de perto?'
+  2. Pergunta SPIN de implicacao
+  3. Apos resposta: valide e faca mais uma pergunta
+  4. So entao apresente a clinica e convide suavemente
+- Use: 'O Dr. Eloy costuma analisar esses casos com muita calma. Faz sentido passar por uma avaliacao para ele entender seu caso de perto?'
 - Nunca use: 'quer agendar?'
-- Quando for perguntar sobre agendamento: primeiro pergunte a data preferida, depois o período (manhã ou tarde), depois o horário específico. Uma pergunta por vez.
+- Quando for perguntar sobre agendamento: primeiro pergunte a data preferida, depois o periodo (manha ou tarde), depois o horario especifico. Uma pergunta por vez.
 
 FOCO:
-- Fale da equipe e estrutura da clínica
-- Só mencione o Dr. Eloy se o paciente perguntar
+- Fale da equipe e estrutura da clinica
+- So mencione o Dr. Eloy se o paciente perguntar
 - Nunca deixe a conversa morrer — sempre termine com pergunta ou resposta
 
-Responda sempre em português brasileiro.`;
+Responda sempre em portugues brasileiro.`;
 
-const INITIAL_MSG = 'Olá! 👋 Aqui é a Ana, da Clínica Dr. Eloy Chicata.\nNo que posso te ajudar hoje?';
+const INITIAL_MSG = 'Ola! Aqui e a Ana, da Clinica Dr. Eloy Chicata.\nNo que posso te ajudar hoje?';
 
 const BUTTONS_L1 = [
   'Quero agendar uma consulta',
-  'Tenho um problema de visão',
+  'Tenho um problema de visao',
   'Quero saber sobre os tratamentos',
-  'Tenho uma dúvida',
+  'Tenho uma duvida',
 ];
 
 const BUTTONS_L2: Record<string, string[]> = {
-  'Quero agendar uma consulta': ['Primeira consulta', 'Retorno', 'Urgência'],
-  'Tenho um problema de visão': ['Visão embaçada', 'Dor nos olhos', 'Dificuldade para ler', 'Outro'],
+  'Quero agendar uma consulta': ['Primeira consulta', 'Retorno', 'Urgencia'],
+  'Tenho um problema de visao': ['Visao embacada', 'Dor nos olhos', 'Dificuldade para ler', 'Outro'],
   'Quero saber sobre os tratamentos': ['Cirurgia de catarata', 'Cirurgia refrativa', 'Glaucoma', 'Retina', 'Outros'],
 };
 
-function now() {
+function timeNow() {
   return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -74,114 +74,107 @@ export function EloyDemo() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
-  const [typing, setTyping] = useState(false);
+  const [sending, setSending] = useState(false);
   const [buttons, setButtons] = useState<string[]>([]);
-  const [initiated, setInitiated] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const initDone = useRef(false);
+  const messagesRef = useRef<Msg[]>([]);
 
-  // Auto-open chat after 2 seconds
+  // Keep messagesRef in sync so sendMessage always has latest
+  messagesRef.current = messages;
+
+  // Auto-open after 2s
   useEffect(() => {
     const t = setTimeout(() => setOpen(true), 2000);
     return () => clearTimeout(t);
   }, []);
 
-  // scroll
+  // Auto-scroll
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages, typing]);
+  }, [messages, sending]);
 
-  // init message on first open
+  // Show initial message when chat first opens (ref-based, no cleanup race)
   useEffect(() => {
-    if (!open || initiated) return;
-    setInitiated(true);
-    setTyping(true);
-    const t = setTimeout(() => {
-      setMessages([{ role: 'assistant', content: INITIAL_MSG, time: now() }]);
+    if (!open || initDone.current) return;
+    initDone.current = true;
+    setSending(true);
+    setTimeout(() => {
+      setMessages([{ role: 'assistant', content: INITIAL_MSG, time: timeNow() }]);
       setButtons(BUTTONS_L1);
-      setTyping(false);
-    }, 1000);
-    return () => clearTimeout(t);
-  }, [open, initiated]);
+      setSending(false);
+    }, 800);
+  }, [open]);
 
-  // focus input
+  // Focus input
   useEffect(() => {
-    if (open && inputRef.current) inputRef.current.focus();
-  }, [open, typing]);
+    if (open && !sending && inputRef.current) inputRef.current.focus();
+  }, [open, sending]);
 
-  // Safety: force-clear typing after 30s in case something goes wrong
-  useEffect(() => {
-    if (!typing) return;
-    const safety = setTimeout(() => setTyping(false), 30000);
-    return () => clearTimeout(safety);
-  }, [typing]);
+  async function sendMessage(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
 
-  const sendText = useCallback(async (text: string) => {
-    if (!text.trim() || typing) return;
-    const userMsg: Msg = { role: 'user', content: text.trim(), time: now() };
-    const updated = [...messages, userMsg];
-    setMessages(updated);
+    const userMsg: Msg = { role: 'user', content: trimmed, time: timeNow() };
+    const allMessages = [...messagesRef.current, userMsg];
+    setMessages(allMessages);
     setInput('');
     setButtons([]);
-    setTyping(true);
+    setSending(true);
 
-    const l2 = BUTTONS_L2[text.trim()];
+    const l2 = BUTTONS_L2[trimmed];
+    let reply = '';
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timer = setTimeout(() => controller.abort(), 25000);
 
       const res = await fetch(`${API_URL}/demo-eloy/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemPrompt: SYSTEM,
-          messages: updated.map(m => ({ role: m.role, content: m.content })),
+          messages: allMessages.map(m => ({ role: m.role, content: m.content })),
         }),
         signal: controller.signal,
       });
-      clearTimeout(timeout);
+      clearTimeout(timer);
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const json = await res.json();
-      const reply = json.data?.content?.[0]?.text || 'Desculpa, nao consegui responder agora. Pode repetir?';
-
-      // Small delay to simulate typing
-      await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
-      setMessages(prev => [...prev, { role: 'assistant', content: reply, time: now() }]);
-      if (l2) setButtons(l2);
+      reply = json.data?.content?.[0]?.text || '';
     } catch (err: any) {
-      console.error('[DEMO] fetch error:', err);
-      const isTimeout = err?.name === 'AbortError';
-      const errorMsg = isTimeout
-        ? 'Desculpe, estou com dificuldades tecnicas. Tente novamente.'
-        : 'Ops, tive um probleminha aqui. Pode mandar de novo?';
-      await new Promise(r => setTimeout(r, 500));
-      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg, time: now() }]);
-    } finally {
-      setTyping(false);
+      console.error('[DEMO-ELOY] Error:', err);
+      if (err?.name === 'AbortError') {
+        reply = 'Desculpe, estou com dificuldades tecnicas no momento. Tente novamente.';
+      } else {
+        reply = 'Ops, tive um probleminha aqui. Pode mandar de novo?';
+      }
     }
-  }, [messages, typing]);
 
-  const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(input); }
-  };
+    if (!reply) reply = 'Desculpa, nao consegui responder agora. Pode repetir?';
 
-  const pill: React.CSSProperties = {
-    padding: '7px 16px', borderRadius: 999, border: '1.5px solid #2D5A1B', backgroundColor: '#fff',
-    color: '#2D5A1B', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
-    transition: 'background 0.15s',
-  };
+    // Small typing delay then show reply
+    await new Promise(r => setTimeout(r, 800 + Math.random() * 700));
+    setMessages(prev => [...prev, { role: 'assistant', content: reply, time: timeNow() }]);
+    if (l2) setButtons(l2);
+    setSending(false);
+  }
+
+  function handleKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(input);
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8faf7' }}>
 
       {/* Landing content */}
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '40px 20px', fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div style={{
             width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', margin: '0 auto 16px',
@@ -199,7 +192,6 @@ export function EloyDemo() {
           </p>
         </div>
 
-        {/* Info cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 40 }}>
           <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -224,7 +216,6 @@ export function EloyDemo() {
           </div>
         </div>
 
-        {/* Specialties */}
         <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '24px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: 40 }}>
           <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1a1a1a', marginTop: 0, marginBottom: 16 }}>Especialidades</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -237,7 +228,6 @@ export function EloyDemo() {
           </div>
         </div>
 
-        {/* CTA */}
         <div style={{ textAlign: 'center' }}>
           <button
             onClick={() => setOpen(true)}
@@ -260,14 +250,13 @@ export function EloyDemo() {
         </div>
       </div>
 
-      {/* ── Widget ── */}
+      {/* Chat Widget */}
       {open && (
         <div style={{
           position: 'fixed', bottom: 96, right: 24, width: 360, height: 580,
           borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column',
           boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 100, fontFamily: "'Segoe UI', Tahoma, sans-serif",
         }}>
-
           {/* Header */}
           <div style={{ backgroundColor: '#2D5A1B', height: 56, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10, flexShrink: 0 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, backgroundColor: '#fff' }}>
@@ -278,14 +267,14 @@ export function EloyDemo() {
               <div style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 Clinica Dr. Eloy Chicata
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>Ana • Online agora</div>
+              <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>Ana - Online agora</div>
             </div>
             <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', padding: 4 }}>
               <X size={20} />
             </button>
           </div>
 
-          {/* Chat */}
+          {/* Messages */}
           <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', backgroundColor: '#ECE5DD', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 2 }}>
@@ -302,10 +291,16 @@ export function EloyDemo() {
             ))}
 
             {/* Quick buttons */}
-            {buttons.length > 0 && !typing && (
+            {buttons.length > 0 && !sending && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 0 2px', justifyContent: 'flex-start' }}>
                 {buttons.map(b => (
-                  <button key={b} style={pill} onClick={() => sendText(b)}
+                  <button key={b}
+                    style={{
+                      padding: '7px 16px', borderRadius: 999, border: '1.5px solid #2D5A1B', backgroundColor: '#fff',
+                      color: '#2D5A1B', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+                      transition: 'background 0.15s',
+                    }}
+                    onClick={() => sendMessage(b)}
                     onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f0f7ee'; }}
                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fff'; }}>
                     {b}
@@ -314,8 +309,8 @@ export function EloyDemo() {
               </div>
             )}
 
-            {/* Typing */}
-            {typing && (
+            {/* Typing indicator */}
+            {sending && (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 2 }}>
                 <div style={{
                   backgroundColor: '#FFFFFF', padding: '10px 14px', borderRadius: '0 12px 12px 12px',
@@ -343,13 +338,20 @@ export function EloyDemo() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
               placeholder="Digite uma mensagem"
-              style={{ flex: 1, padding: '10px 16px', borderRadius: 999, border: 'none', outline: 'none', fontSize: '0.85rem', backgroundColor: '#fff', color: '#111' }}
+              disabled={sending}
+              style={{
+                flex: 1, padding: '10px 16px', borderRadius: 999, border: 'none', outline: 'none',
+                fontSize: '0.85rem', backgroundColor: '#fff', color: '#111',
+                opacity: sending ? 0.6 : 1,
+              }}
             />
-            <button onClick={() => sendText(input)} disabled={!input.trim() || typing}
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim() || sending}
               style={{
                 width: 38, height: 38, borderRadius: '50%', border: 'none', backgroundColor: '#25D366',
                 color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: (!input.trim() || typing) ? 0.5 : 1, flexShrink: 0, transition: 'opacity 0.15s',
+                opacity: (!input.trim() || sending) ? 0.5 : 1, flexShrink: 0, transition: 'opacity 0.15s',
               }}>
               <Send size={16} />
             </button>
@@ -357,7 +359,7 @@ export function EloyDemo() {
         </div>
       )}
 
-      {/* ── Floating button ── */}
+      {/* Floating button */}
       <button
         onClick={() => setOpen(o => !o)}
         style={{
