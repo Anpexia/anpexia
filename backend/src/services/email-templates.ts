@@ -26,6 +26,7 @@ function baseLayout(tenantName: string, content: string): string {
       </div>
       <div style="background:#f8f9fa;padding:16px 24px;border-top:1px solid #eee">
         <p style="color:#888;font-size:12px;margin:0">Enviado por ${tenantName} via Anpexia</p>
+        <p style="color:#aaa;font-size:11px;margin:4px 0 0">&copy; 2026 Anpexia &mdash; anpexia.com.br</p>
       </div>
     </div>
   `;

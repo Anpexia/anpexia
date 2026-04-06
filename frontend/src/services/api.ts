@@ -4,7 +4,7 @@ const PROD_API_URL = 'https://backend-production-e9a8.up.railway.app/api/v1';
 
 const baseURL =
   import.meta.env.VITE_API_URL ||
-  (window.location.hostname.includes('vercel.app') ? PROD_API_URL : '/api/v1');
+  (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('anpexia.com.br') ? PROD_API_URL : '/api/v1');
 
 const api = axios.create({
   baseURL,

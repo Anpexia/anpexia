@@ -43,6 +43,7 @@ const PRODUCTION_ORIGINS = [
   'https://app.anpexia.com.br',
   'https://admin.anpexia.com.br',
   'https://anpexia.com.br',
+  'https://www.anpexia.com.br',
 ];
 const envOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim().replace(/\/$/, '')) ?? [];
 const allowedOrigins = [...new Set([...envOrigins, ...PRODUCTION_ORIGINS])]

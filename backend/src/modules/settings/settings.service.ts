@@ -88,6 +88,7 @@ export const settingsService = {
           <p>Se voce recebeu este email, a configuracao esta funcionando corretamente!</p>
           <hr style="border:none;border-top:1px solid #eee;margin:20px 0"/>
           <p style="color:#888;font-size:12px">Enviado via Anpexia</p>
+          <p style="color:#aaa;font-size:11px">&copy; 2026 Anpexia &mdash; anpexia.com.br</p>
         </div>
       `,
     });
