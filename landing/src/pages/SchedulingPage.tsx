@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Calendar, Clock, ArrowLeft, CheckCircle, Phone, User, Mail, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 
-const PROD_API_URL = 'https://backend-production-e9a8.up.railway.app/api/v1';
+const PROD_API_URL = 'https://api.anpexia.com.br/api/v1';
 const apiUrl =
   import.meta.env.VITE_API_URL ||
   (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('anpexia.com.br') ? PROD_API_URL : '/api/v1');

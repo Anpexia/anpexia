@@ -17,7 +17,7 @@ interface SessionData {
   data: Record<string, string | undefined>;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://backend-production-e9a8.up.railway.app/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.anpexia.com.br/api/v1';
 
 function timeNow() {
   return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });

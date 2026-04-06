@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://backend-production-e9a8.up.railway.app/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.anpexia.com.br/api/v1';
 
 function generateSessionId(): string {
   return 'demo-' + crypto.randomUUID();

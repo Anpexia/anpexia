@@ -48,7 +48,7 @@ export const evolutionApi = {
    */
   async createInstance(instanceName: string) {
     const webhookUrl = env.nodeEnv === 'production'
-      ? 'https://backend-production-e9a8.up.railway.app/api/v1/chatbot/webhook'
+      ? 'https://api.anpexia.com.br/api/v1/chatbot/webhook'
       : `http://localhost:${env.port}/api/v1/chatbot/webhook`;
 
     const { data } = await api.post('/instance/create', {

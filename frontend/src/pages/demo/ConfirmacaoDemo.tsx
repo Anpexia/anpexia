@@ -20,7 +20,7 @@ const DEMO_APPOINTMENT = {
 
 const API_URL = import.meta.env.VITE_API_URL ||
   (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('anpexia.com.br')
-    ? 'https://backend-production-e9a8.up.railway.app/api/v1'
+    ? 'https://api.anpexia.com.br/api/v1'
     : '/api/v1');
 
 function now() {

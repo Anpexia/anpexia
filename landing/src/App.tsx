@@ -12,7 +12,7 @@ import SchedulingPage from './pages/SchedulingPage';
 const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '';
 const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || 'contato@anpexia.com.br';
 const whatsappLink = `https://wa.me/${whatsappNumber}`;
-const PROD_API_URL = 'https://backend-production-e9a8.up.railway.app/api/v1';
+const PROD_API_URL = 'https://api.anpexia.com.br/api/v1';
 const apiUrl =
   import.meta.env.VITE_API_URL ||
   (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('anpexia.com.br') ? PROD_API_URL : '/api/v1');
@@ -111,7 +111,7 @@ function LandingPage() {
               <a key={l} href={`#${l.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`} style={{ color: 'rgba(254,243,199,0.6)', fontSize: '0.875rem', textDecoration: 'none', transition: 'color 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#FEF3C7')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(254,243,199,0.6)')}>{l}</a>
             ))}
-            <a href={import.meta.env.VITE_APP_URL || '/login'} style={{ color: '#F97316', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none' }}>Acessar painel</a>
+            <a href={import.meta.env.VITE_APP_URL || 'https://app.anpexia.com.br'} style={{ color: '#F97316', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none' }}>Acessar painel</a>
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={btnPrimary} className="hidden sm:inline-flex">Falar no WhatsApp</a>

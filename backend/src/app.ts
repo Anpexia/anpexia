@@ -37,13 +37,14 @@ if (process.env.NODE_ENV === 'production') {
 
 // --- 1) CORS — DEVE ser o primeiro middleware ---
 const PRODUCTION_ORIGINS = [
-  'https://admin-nine-pied.vercel.app',
-  'https://anpexia-app.vercel.app',
-  'https://anpexia-landing.vercel.app',
-  'https://app.anpexia.com.br',
-  'https://admin.anpexia.com.br',
   'https://anpexia.com.br',
   'https://www.anpexia.com.br',
+  'https://app.anpexia.com.br',
+  'https://admin.anpexia.com.br',
+  'https://api.anpexia.com.br',
+  'https://anpexia-app.vercel.app',
+  'https://admin-nine-pied.vercel.app',
+  'https://anpexia-landing.vercel.app',
 ];
 const envOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim().replace(/\/$/, '')) ?? [];
 const allowedOrigins = [...new Set([...envOrigins, ...PRODUCTION_ORIGINS])]
