@@ -6,7 +6,7 @@ import api from '../services/api';
 
 interface FinancialSummary {
   totalIncome: number;
-  totalExpense: number;
+  totalExpenses: number;
   netProfit: number;
 }
 
@@ -19,15 +19,15 @@ interface Category {
 interface Transaction {
   id: string;
   type: 'INCOME' | 'EXPENSE';
-  categoryId: string | null;
-  category?: Category | null;
+  category: string;
   description: string;
   amount: number;
   date: string;
   paymentMethod: string;
   status: string;
   notes: string | null;
-  patientId: string | null;
+  customerId: string | null;
+  customer?: { id: string; name: string } | null;
   createdAt: string;
 }
 
@@ -64,14 +64,14 @@ function formatBRL(value: number): string {
 
 const emptyTxForm = {
   type: 'INCOME' as 'INCOME' | 'EXPENSE',
-  categoryId: '',
+  category: '',
   description: '',
   amount: '',
   date: new Date().toISOString().split('T')[0],
   paymentMethod: 'PIX',
   status: 'PENDENTE',
   notes: '',
-  patientId: '',
+  customerId: '',
 };
 
 export function FinancialPage() {
@@ -81,7 +81,7 @@ export function FinancialPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [summary, setSummary] = useState<FinancialSummary>({ totalIncome: 0, totalExpense: 0, netProfit: 0 });
+  const [summary, setSummary] = useState<FinancialSummary>({ totalIncome: 0, totalExpenses: 0, netProfit: 0 });
   const [loadingSummary, setLoadingSummary] = useState(true);
 
   // --- Transactions state ---
@@ -110,9 +110,14 @@ export function FinancialPage() {
     setLoadingSummary(true);
     try {
       const { data } = await api.get('/financial/summary', { params: { month, year } });
-      setSummary(data.data || data);
+      const payload = data?.data || data || {};
+      setSummary({
+        totalIncome: Number(payload.totalIncome) || 0,
+        totalExpenses: Number(payload.totalExpenses ?? payload.totalExpense) || 0,
+        netProfit: Number(payload.netProfit) || 0,
+      });
     } catch {
-      setSummary({ totalIncome: 0, totalExpense: 0, netProfit: 0 });
+      setSummary({ totalIncome: 0, totalExpenses: 0, netProfit: 0 });
     } finally {
       setLoadingSummary(false);
     }
@@ -159,14 +164,14 @@ export function FinancialPage() {
     try {
       const payload = {
         type: txForm.type,
-        categoryId: txForm.categoryId || undefined,
+        category: txForm.category || 'Outros',
         description: txForm.description,
         amount: parseFloat(txForm.amount) || 0,
         date: txForm.date,
         paymentMethod: txForm.paymentMethod,
         status: txForm.status,
         notes: txForm.notes || undefined,
-        patientId: txForm.patientId || undefined,
+        customerId: txForm.customerId || undefined,
       };
       if (txModal === 'edit' && editingTxId) {
         await api.put(`/financial/transactions/${editingTxId}`, payload);
@@ -195,14 +200,14 @@ export function FinancialPage() {
   const openEditTx = (tx: Transaction) => {
     setTxForm({
       type: tx.type,
-      categoryId: tx.categoryId || '',
+      category: tx.category || '',
       description: tx.description,
       amount: String(tx.amount),
       date: tx.date ? tx.date.split('T')[0] : '',
       paymentMethod: tx.paymentMethod,
       status: tx.status,
       notes: tx.notes || '',
-      patientId: tx.patientId || '',
+      customerId: tx.customerId || '',
     });
     setEditingTxId(tx.id);
     setTxModal('edit');
@@ -229,7 +234,7 @@ export function FinancialPage() {
   };
 
   // --- Chart helpers ---
-  const maxChart = Math.max(summary.totalIncome, summary.totalExpense, 1);
+  const maxChart = Math.max(summary.totalIncome, summary.totalExpenses, 1);
 
   // --- Year options ---
   const yearOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i);
@@ -323,7 +328,7 @@ export function FinancialPage() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 font-medium">Total Despesas</p>
-                    <p className="text-xl font-bold text-red-600">{formatBRL(summary.totalExpense)}</p>
+                    <p className="text-xl font-bold text-red-600">{formatBRL(summary.totalExpenses)}</p>
                   </div>
                 </div>
               </div>
@@ -361,10 +366,10 @@ export function FinancialPage() {
                 </div>
                 {/* Expense bar */}
                 <div className="flex flex-col items-center gap-2">
-                  <span className="text-xs font-medium text-slate-600">{formatBRL(summary.totalExpense)}</span>
+                  <span className="text-xs font-medium text-slate-600">{formatBRL(summary.totalExpenses)}</span>
                   <div
                     className="w-20 bg-red-400 rounded-t-lg transition-all duration-500"
-                    style={{ height: `${(summary.totalExpense / maxChart) * 160}px`, minHeight: '4px' }}
+                    style={{ height: `${(summary.totalExpenses / maxChart) * 160}px`, minHeight: '4px' }}
                   />
                   <span className="text-xs text-slate-500">Despesas</span>
                 </div>
@@ -457,7 +462,7 @@ export function FinancialPage() {
                           <td className="px-4 py-3">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tInfo.cls}`}>{tInfo.label}</span>
                           </td>
-                          <td className="px-4 py-3 text-slate-700">{tx.category?.name || '-'}</td>
+                          <td className="px-4 py-3 text-slate-700">{tx.category || '-'}</td>
                           <td className="px-4 py-3 text-slate-700 max-w-[200px] truncate">{tx.description}</td>
                           <td className={`px-4 py-3 text-right font-medium ${tx.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
                             {formatBRL(tx.amount)}
@@ -597,7 +602,7 @@ export function FinancialPage() {
                   <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
                   <select
                     value={txForm.type}
-                    onChange={e => setTxForm({ ...txForm, type: e.target.value as 'INCOME' | 'EXPENSE', categoryId: '' })}
+                    onChange={e => setTxForm({ ...txForm, type: e.target.value as 'INCOME' | 'EXPENSE', category: '' })}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   >
                     <option value="INCOME">Receita</option>
@@ -607,13 +612,13 @@ export function FinancialPage() {
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Categoria</label>
                   <select
-                    value={txForm.categoryId}
-                    onChange={e => setTxForm({ ...txForm, categoryId: e.target.value })}
+                    value={txForm.category}
+                    onChange={e => setTxForm({ ...txForm, category: e.target.value })}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   >
                     <option value="">Sem categoria</option>
                     {formCategories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
                   </select>
                 </div>
@@ -693,12 +698,12 @@ export function FinancialPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">ID do Paciente (opcional)</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">ID do Cliente (opcional)</label>
                 <input
                   type="text"
-                  value={txForm.patientId}
-                  onChange={e => setTxForm({ ...txForm, patientId: e.target.value })}
-                  placeholder="ID do paciente vinculado"
+                  value={txForm.customerId}
+                  onChange={e => setTxForm({ ...txForm, customerId: e.target.value })}
+                  placeholder="ID do cliente vinculado"
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 />
               </div>
