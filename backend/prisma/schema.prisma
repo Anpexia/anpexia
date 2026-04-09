@@ -62,6 +62,8 @@ model Tenant {
   scheduledCalls        ScheduledCall[]
   convenios             Convenio[]
   autorizacoes          Autorizacao[]
+  tussProcedures        TussProcedure[]
+  doctorRepasses        DoctorRepasse[]
   settings              TenantSettings?
 
   @@map("tenants")
@@ -124,8 +126,10 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  auditLogs AuditLog[]
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  auditLogs      AuditLog[]
+  scheduledCalls ScheduledCall[] @relation("DoctorScheduledCalls")
+  repasses       DoctorRepasse[]
 
   @@map("users")
 }
@@ -692,6 +696,7 @@ model ScheduledCall {
   tenantId   String?  @map("tenant_id")
   leadId     String?  @map("lead_id")
   customerId String?  @map("customer_id")
+  doctorId   String?  @map("doctor_id")
   name       String
   email      String?
   phone      String
@@ -700,19 +705,23 @@ model ScheduledCall {
   status     String   @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
   notes      String?
   meetLink   String?  @map("meet_link")
-  confirmationSentAt  DateTime? @map("confirmation_sent_at")
-  reminderSentAt      DateTime? @map("reminder_sent_at")
+  authorizationNumber  String?  @map("authorization_number")
+  confirmationSentAt   DateTime? @map("confirmation_sent_at")
+  reminderSentAt       DateTime? @map("reminder_sent_at")
   cancelConfirmPending Boolean  @default(false) @map("cancel_confirm_pending")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  tenant   Tenant?   @relation(fields: [tenantId], references: [id])
-  lead     Lead?     @relation(fields: [leadId], references: [id])
-  customer Customer? @relation(fields: [customerId], references: [id])
+  tenant     Tenant?                  @relation(fields: [tenantId], references: [id])
+  lead       Lead?                    @relation(fields: [leadId], references: [id])
+  customer   Customer?                @relation(fields: [customerId], references: [id])
+  doctor     User?                    @relation("DoctorScheduledCalls", fields: [doctorId], references: [id])
+  procedures ScheduledCallProcedure[]
 
   @@index([tenantId])
   @@index([date])
   @@index([customerId])
+  @@index([doctorId])
   @@map("scheduled_calls")
 }
 
@@ -998,8 +1007,9 @@ model Convenio {
   ativo     Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
 
-  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  pacientes PatientConvenio[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pacientes      PatientConvenio[]
+  tussProcedures TussProcedure[]
 
   @@unique([tenantId, nome])
   @@index([tenantId])
@@ -1070,4 +1080,60 @@ model TenantSettings {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_settings")
+}
+
+// ==========================================
+// TISS — FATURAMENTO DE CONVENIOS
+// ==========================================
+
+model TussProcedure {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  code        String
+  description String
+  type        String   // CONSULTA, EXAME, CIRURGIA, TERAPIA, OUTROS
+  value       Float
+  convenioId  String?  @map("convenio_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  convenio Convenio? @relation(fields: [convenioId], references: [id], onDelete: SetNull)
+
+  scheduledCallProcedures ScheduledCallProcedure[]
+
+  @@index([tenantId])
+  @@index([convenioId])
+  @@map("tuss_procedures")
+}
+
+model ScheduledCallProcedure {
+  id                  String   @id @default(cuid())
+  scheduledCallId     String   @map("scheduled_call_id")
+  tussProcedureId     String   @map("tuss_procedure_id")
+  authorizationNumber String?  @map("authorization_number")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  scheduledCall ScheduledCall @relation(fields: [scheduledCallId], references: [id], onDelete: Cascade)
+  tussProcedure TussProcedure @relation(fields: [tussProcedureId], references: [id], onDelete: Restrict)
+
+  @@index([scheduledCallId])
+  @@index([tussProcedureId])
+  @@map("scheduled_call_procedures")
+}
+
+model DoctorRepasse {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  doctorId      String   @map("doctor_id")
+  procedureType String   @map("procedure_type") // CONSULTA, EXAME, CIRURGIA, TERAPIA, OUTROS
+  percentage    Float    @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  doctor User   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, doctorId, procedureType])
+  @@index([tenantId])
+  @@index([doctorId])
+  @@map("doctor_repasses")
 }

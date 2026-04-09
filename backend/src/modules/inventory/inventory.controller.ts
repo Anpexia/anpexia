@@ -13,6 +13,28 @@ export const inventoryRouter = Router();
 inventoryRouter.use(authenticate);
 inventoryRouter.use(requireTenant);
 
+// Cosmos-only lookup — never exposes token, always queries external API
+inventoryRouter.get('/cosmos/:codigo', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const code = req.params.codigo as string;
+    const cosmos = await getProductByBarcode(code);
+    if (!cosmos || !cosmos.description) {
+      return success(res, { found: false });
+    }
+    return success(res, {
+      found: true,
+      nome: cosmos.description,
+      marca: cosmos.brand,
+      preco: cosmos.avgPrice,
+      fornecedor: cosmos.brand,
+      thumbnail: cosmos.thumbnail,
+      category: cosmos.category,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Barcode lookup — local DB first, then Cosmos API
 inventoryRouter.get('/barcode/:code', async (req: Request, res: Response, next: NextFunction) => {
   try {

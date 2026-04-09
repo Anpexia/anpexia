@@ -53,6 +53,16 @@ teamRouter.get('/', requireRole('OWNER', 'MANAGER'), async (req: Request, res: R
   }
 });
 
+// List active doctors — any authenticated user of the tenant
+teamRouter.get('/doctors', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const doctors = await teamService.listDoctors(req.auth!.tenantId!);
+    return success(res, doctors);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Create team member — OWNER only
 teamRouter.post('/', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {

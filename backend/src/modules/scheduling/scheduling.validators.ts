@@ -8,6 +8,14 @@ export const bookCallSchema = z.object({
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:MM').optional(),
   notes: z.string().max(500).optional().nullable(),
   customerId: z.string().optional().nullable(),
+  doctorId: z.string().optional().nullable(),
+});
+
+export const linkProceduresSchema = z.object({
+  procedures: z.array(z.object({
+    tussProcedureId: z.string().min(1),
+    authorizationNumber: z.string().optional().nullable(),
+  })).min(1, 'Informe ao menos um procedimento'),
 });
 
 export const updateConfigSchema = z.object({
@@ -29,3 +37,4 @@ export const updateCallStatusSchema = z.object({
 export type BookCallInput = z.infer<typeof bookCallSchema>;
 export type UpdateConfigInput = z.infer<typeof updateConfigSchema>;
 export type UpdateCallStatusInput = z.infer<typeof updateCallStatusSchema>;
+export type LinkProceduresInput = z.infer<typeof linkProceduresSchema>;

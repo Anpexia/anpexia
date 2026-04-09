@@ -1,7 +1,17 @@
 import prisma from '../../config/database';
+import { Prisma } from '@prisma/client';
 import { AppError } from '../../shared/middleware/error-handler';
-import { BookCallInput, UpdateConfigInput, UpdateCallStatusInput } from './scheduling.validators';
+import {
+  BookCallInput,
+  UpdateConfigInput,
+  UpdateCallStatusInput,
+  LinkProceduresInput,
+} from './scheduling.validators';
 import { sendBookingConfirmation, sendCancellationNotice } from './scheduling.notifications';
+
+// Tag embedded in FinancialTransaction.notes so we can find and revert entries
+// tied to a specific scheduled call. Format: [AGENDAMENTO:{scheduledCallId}]
+const AGENDAMENTO_TAG = (id: string) => `[AGENDAMENTO:${id}]`;
 
 // ============================================================
 // São Paulo timezone helpers (UTC-3, no DST since 2019)
@@ -61,8 +71,10 @@ async function updateConfig(data: UpdateConfigInput) {
   });
 }
 
-// Generate time slots for a given date
-async function getAvailableSlots(date: string) {
+// Generate time slots for a given date.
+// doctorId: when provided, only conflicts with calls for that doctor count as "booked".
+// This allows multiple doctors to have consults in the same slot without interfering.
+async function getAvailableSlots(date: string, doctorId?: string | null) {
   const config = await getConfig();
   const dayOfWeek = new Date(`${date}T12:00:00${SP_OFFSET}`).getDay();
 
@@ -90,11 +102,14 @@ async function getAvailableSlots(date: string) {
   // Fetch booked calls for this date (SP day boundaries)
   const { start: startOfDay, end: endOfDay } = spDayBounds(date);
 
+  const where: any = {
+    date: { gte: startOfDay, lte: endOfDay },
+    status: { notIn: ['cancelled'] },
+  };
+  if (doctorId) where.doctorId = doctorId;
+
   const bookedCalls = await prisma.scheduledCall.findMany({
-    where: {
-      date: { gte: startOfDay, lte: endOfDay },
-      status: { notIn: ['cancelled'] },
-    },
+    where,
     select: { date: true },
   });
 
@@ -199,10 +214,10 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     throw new AppError(400, 'INVALID_DATE', 'Esta data não está disponível para agendamento');
   }
 
-  // If no time specified, pick the first available slot
+  // If no time specified, pick the first available slot (per doctor agenda if provided)
   let time = data.time;
   if (!time) {
-    const slots = await getAvailableSlots(data.date);
+    const slots = await getAvailableSlots(data.date, data.doctorId);
     const firstAvailable = slots.find((s) => s.available);
     if (!firstAvailable) {
       throw new AppError(400, 'NO_SLOTS', 'Não há horários disponíveis nesta data');
@@ -210,8 +225,8 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     time = firstAvailable.time;
   }
 
-  // Validate slot is available
-  const slots = await getAvailableSlots(data.date);
+  // Validate slot is available (per doctor agenda if provided)
+  const slots = await getAvailableSlots(data.date, data.doctorId);
   const targetSlot = slots.find((s) => s.time === time);
   if (!targetSlot) {
     throw new AppError(400, 'INVALID_TIME', 'Este horário não existe na agenda');
@@ -253,6 +268,7 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
         notes: data.notes ?? undefined,
         leadId: lead?.id,
         customerId: customer?.id,
+        doctorId: data.doctorId || undefined,
       },
     });
 
@@ -322,6 +338,8 @@ async function listCalls(tenantId: string, filters: {
       include: {
         lead: { select: { id: true, name: true, stage: true, company: true } },
         customer: { select: { id: true, name: true, phone: true, email: true } },
+        doctor: { select: { id: true, name: true } },
+        procedures: { include: { tussProcedure: { select: { id: true, code: true, description: true, type: true, value: true } } } },
       },
       orderBy: { date: 'asc' },
       skip: filters.skip,
@@ -352,6 +370,126 @@ async function getTodayAppointments(tenantId: string) {
   });
 }
 
+// Link TUSS procedures to a scheduled call (appends to any existing ones).
+async function linkProcedures(id: string, tenantId: string, data: LinkProceduresInput) {
+  const call = await prisma.scheduledCall.findUnique({ where: { id } });
+  if (!call || call.tenantId !== tenantId) {
+    throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
+  }
+
+  // Validate all procedure IDs belong to this tenant
+  const procIds = data.procedures.map((p) => p.tussProcedureId);
+  const procs = await prisma.tussProcedure.findMany({
+    where: { id: { in: procIds }, tenantId },
+  });
+  if (procs.length !== procIds.length) {
+    throw new AppError(400, 'INVALID_PROCEDURE', 'Procedimento TUSS inválido');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const p of data.procedures) {
+      await tx.scheduledCallProcedure.create({
+        data: {
+          scheduledCallId: id,
+          tussProcedureId: p.tussProcedureId,
+          authorizationNumber: p.authorizationNumber || null,
+        },
+      });
+    }
+  });
+
+  return prisma.scheduledCall.findUnique({
+    where: { id },
+    include: { procedures: { include: { tussProcedure: true } } },
+  });
+}
+
+// Create financial transactions (revenue + doctor repasse expenses) for a completed call.
+// Idempotent: if entries already exist for this call, does nothing.
+async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, callId: string, tenantId: string) {
+  const existing = await tx.financialTransaction.count({
+    where: {
+      tenantId,
+      notes: { contains: AGENDAMENTO_TAG(callId) },
+    },
+  });
+  if (existing > 0) return; // already processed
+
+  const call = await tx.scheduledCall.findUnique({
+    where: { id: callId },
+    include: {
+      customer: { select: { id: true, name: true } },
+      doctor: { select: { id: true, name: true } },
+      procedures: { include: { tussProcedure: true } },
+    },
+  });
+  if (!call || call.procedures.length === 0) return;
+
+  const dateIso = call.date.toISOString().slice(0, 10);
+  const patientName = call.customer?.name || call.name;
+
+  // Load doctor repasse percentages (if a doctor is assigned)
+  let repasseMap = new Map<string, number>();
+  if (call.doctorId) {
+    const repasses = await tx.doctorRepasse.findMany({
+      where: { tenantId, doctorId: call.doctorId },
+    });
+    repasseMap = new Map(repasses.map((r) => [r.procedureType, r.percentage]));
+  }
+
+  for (const p of call.procedures) {
+    const proc = p.tussProcedure;
+    const valor = Number(proc.value);
+
+    // Revenue entry
+    await tx.financialTransaction.create({
+      data: {
+        tenantId,
+        type: 'INCOME',
+        category: 'Procedimentos',
+        description: `${proc.description} - ${patientName} - ${dateIso}`,
+        amount: new Prisma.Decimal(valor),
+        date: call.date,
+        paymentMethod: 'DINHEIRO',
+        customerId: call.customerId || undefined,
+        status: 'PENDENTE',
+        notes: `${AGENDAMENTO_TAG(callId)} [PROCEDIMENTO:${p.id}]`,
+      },
+    });
+
+    // Doctor repasse expense
+    if (call.doctorId && call.doctor) {
+      const pct = repasseMap.get(proc.type) ?? 0;
+      if (pct > 0) {
+        const repasse = (valor * pct) / 100;
+        await tx.financialTransaction.create({
+          data: {
+            tenantId,
+            type: 'EXPENSE',
+            category: 'Repasse Médico',
+            description: `Repasse Dr. ${call.doctor.name} - ${proc.description} - ${dateIso}`,
+            amount: new Prisma.Decimal(repasse),
+            date: call.date,
+            paymentMethod: 'TRANSFERENCIA',
+            status: 'PENDENTE',
+            notes: `${AGENDAMENTO_TAG(callId)} [REPASSE:${p.id}] [DOCTOR:${call.doctorId}]`,
+          },
+        });
+      }
+    }
+  }
+}
+
+// Remove financial transactions tied to a scheduled call
+async function revertFinancialsForCall(tx: Prisma.TransactionClient, callId: string, tenantId: string) {
+  await tx.financialTransaction.deleteMany({
+    where: {
+      tenantId,
+      notes: { contains: AGENDAMENTO_TAG(callId) },
+    },
+  });
+}
+
 // Update call status
 async function updateCallStatus(id: string, data: UpdateCallStatusInput, tenantId?: string) {
   const call = await prisma.scheduledCall.findUnique({ where: { id } });
@@ -368,6 +506,16 @@ async function updateCallStatus(id: string, data: UpdateCallStatusInput, tenantI
         notes: data.notes ?? call.notes,
       },
     });
+
+    // If completed, create financial entries (revenue + repasse)
+    if (data.status === 'completed' && call.tenantId) {
+      await applyFinancialsForCompletedCall(tx, id, call.tenantId);
+    }
+
+    // If transitioning away from completed (e.g., cancelled/no_show), revert entries
+    if (call.status === 'completed' && data.status !== 'completed' && call.tenantId) {
+      await revertFinancialsForCall(tx, id, call.tenantId);
+    }
 
     // If completed and linked to a lead, update lead stage
     if (data.status === 'completed' && call.leadId) {
@@ -404,9 +552,15 @@ async function cancelCall(id: string, tenantId?: string) {
     throw new AppError(400, 'ALREADY_CANCELLED', 'Este agendamento já foi cancelado');
   }
 
-  const updated = await prisma.scheduledCall.update({
-    where: { id },
-    data: { status: 'cancelled' },
+  const updated = await prisma.$transaction(async (tx) => {
+    // Revert any financial entries previously created for this call
+    if (call.tenantId) {
+      await revertFinancialsForCall(tx, id, call.tenantId);
+    }
+    return tx.scheduledCall.update({
+      where: { id },
+      data: { status: 'cancelled' },
+    });
   });
 
   // Send cancellation notice via WhatsApp (non-blocking)
@@ -431,4 +585,5 @@ export const schedulingService = {
   getTodayAppointments,
   updateCallStatus,
   cancelCall,
+  linkProcedures,
 };

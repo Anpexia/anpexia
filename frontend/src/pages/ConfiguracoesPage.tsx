@@ -1,16 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Building2, Clock, Mail, Shield, Wifi } from 'lucide-react';
+import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
-type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email';
+type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss';
 
-const TABS: { key: Tab; label: string; icon: any }[] = [
-  { key: 'clinica', label: 'Clinica', icon: Building2 },
-  { key: 'convenios', label: 'Convenios', icon: Shield },
-  { key: 'horarios', label: 'Horarios', icon: Clock },
-  { key: 'whatsapp', label: 'WhatsApp', icon: Wifi },
-  { key: 'email', label: 'Email', icon: Mail },
-];
+const PROCEDURE_TYPES = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'OUTROS'] as const;
+type ProcedureType = typeof PROCEDURE_TYPES[number];
+
+interface TussProcedureItem {
+  id: string;
+  code: string;
+  description: string;
+  type: ProcedureType;
+  value: number;
+  convenioId: string | null;
+  convenio?: { id: string; nome: string } | null;
+}
 
 const DIAS = [
   { key: 'seg', label: 'Segunda' },
@@ -33,10 +39,37 @@ const DEFAULT_HORARIOS: Record<string, { ativo: boolean; inicio: string; fim: st
 };
 
 export function ConfiguracoesPage() {
+  const { user } = useAuth();
+  const canManageTuss = user?.role === 'OWNER' || user?.role === 'MANAGER' || user?.role === 'SUPER_ADMIN';
+
+  const TABS: { key: Tab; label: string; icon: any }[] = [
+    { key: 'clinica', label: 'Clinica', icon: Building2 },
+    { key: 'convenios', label: 'Convenios', icon: Shield },
+    ...(canManageTuss ? [{ key: 'tuss' as Tab, label: 'Procedimentos TUSS', icon: FileCode }] : []),
+    { key: 'horarios', label: 'Horarios', icon: Clock },
+    { key: 'whatsapp', label: 'WhatsApp', icon: Wifi },
+    { key: 'email', label: 'Email', icon: Mail },
+  ];
+
   const [tab, setTab] = useState<Tab>('clinica');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+
+  // TUSS state
+  const [tussList, setTussList] = useState<TussProcedureItem[]>([]);
+  const [tussFilterType, setTussFilterType] = useState<string>('');
+  const [tussFilterConvenio, setTussFilterConvenio] = useState<string>('');
+  const [tussModalOpen, setTussModalOpen] = useState(false);
+  const [tussEditing, setTussEditing] = useState<TussProcedureItem | null>(null);
+  const [tussForm, setTussForm] = useState<{ code: string; description: string; type: ProcedureType; value: string; convenioId: string }>({
+    code: '', description: '', type: 'CONSULTA', value: '', convenioId: '',
+  });
+  // Gerar lote TISS
+  const [loteConvenio, setLoteConvenio] = useState('');
+  const [loteInicio, setLoteInicio] = useState('');
+  const [loteFim, setLoteFim] = useState('');
+  const [generatingXml, setGeneratingXml] = useState(false);
 
   // Clinica
   const [clinica, setClinica] = useState({ name: '', phone: '', email: '', address: '', cnpj: '', logo: '' });
@@ -101,7 +134,104 @@ export function ConfiguracoesPage() {
     } catch {}
   }, []);
 
+  const loadTuss = useCallback(async () => {
+    if (!canManageTuss) return;
+    try {
+      const params: any = {};
+      if (tussFilterType) params.type = tussFilterType;
+      if (tussFilterConvenio) params.convenioId = tussFilterConvenio;
+      const { data } = await api.get('/tuss/procedures', { params });
+      setTussList(data.data || []);
+    } catch {}
+  }, [canManageTuss, tussFilterType, tussFilterConvenio]);
+
   useEffect(() => { loadSettings(); loadConvenios(); }, [loadSettings, loadConvenios]);
+  useEffect(() => { if (tab === 'tuss') loadTuss(); }, [tab, loadTuss]);
+
+  const openTussCreate = () => {
+    setTussEditing(null);
+    setTussForm({ code: '', description: '', type: 'CONSULTA', value: '', convenioId: '' });
+    setTussModalOpen(true);
+  };
+
+  const openTussEdit = (p: TussProcedureItem) => {
+    setTussEditing(p);
+    setTussForm({
+      code: p.code,
+      description: p.description,
+      type: p.type,
+      value: String(p.value),
+      convenioId: p.convenioId || '',
+    });
+    setTussModalOpen(true);
+  };
+
+  const saveTuss = async () => {
+    const payload = {
+      code: tussForm.code.trim(),
+      description: tussForm.description.trim(),
+      type: tussForm.type,
+      value: Number(tussForm.value),
+      convenioId: tussForm.convenioId || null,
+    };
+    if (!payload.code || !payload.description || isNaN(payload.value)) {
+      flash('Preencha todos os campos obrigatorios');
+      return;
+    }
+    try {
+      if (tussEditing) {
+        await api.put(`/tuss/procedures/${tussEditing.id}`, payload);
+        flash('Procedimento atualizado!');
+      } else {
+        await api.post('/tuss/procedures', payload);
+        flash('Procedimento criado!');
+      }
+      setTussModalOpen(false);
+      loadTuss();
+    } catch (err: any) {
+      flash(err.response?.data?.error?.message || 'Erro ao salvar');
+    }
+  };
+
+  const deleteTuss = async (id: string) => {
+    if (!confirm('Excluir este procedimento?')) return;
+    try {
+      await api.delete(`/tuss/procedures/${id}`);
+      flash('Procedimento excluido!');
+      loadTuss();
+    } catch (err: any) {
+      flash(err.response?.data?.error?.message || 'Erro ao excluir');
+    }
+  };
+
+  const generateTissXml = async () => {
+    if (!loteConvenio || !loteInicio || !loteFim) {
+      flash('Selecione convenio e periodo');
+      return;
+    }
+    setGeneratingXml(true);
+    try {
+      const res = await api.post(
+        '/tuss/generate-xml',
+        { convenioId: loteConvenio, dataInicio: loteInicio, dataFim: loteFim },
+        { responseType: 'blob' },
+      );
+      const blob = new Blob([res.data], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tiss_${loteInicio}_${loteFim}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      flash('Lote TISS gerado!');
+    } catch (err: any) {
+      flash(err.response?.data?.error?.message || 'Erro ao gerar XML');
+    } finally {
+      setGeneratingXml(false);
+    }
+  };
 
   const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
@@ -331,6 +461,164 @@ export function ConfiguracoesPage() {
             <p className="text-sm text-yellow-800">
               A configuracao do WhatsApp e gerenciada pela equipe Anpexia. Entre em contato caso precise vincular ou alterar sua instancia.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* TUSS TAB */}
+      {tab === 'tuss' && canManageTuss && (
+        <div className="space-y-6">
+          {/* Procedures list */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <h2 className="text-lg font-semibold text-gray-800">Procedimentos TUSS</h2>
+              <button
+                onClick={openTussCreate}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+              >
+                <Plus size={16} /> Adicionar Procedimento
+              </button>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3 mb-4">
+              <select
+                value={tussFilterType}
+                onChange={(e) => setTussFilterType(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Todos os tipos</option>
+                {PROCEDURE_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <select
+                value={tussFilterConvenio}
+                onChange={(e) => setTussFilterConvenio(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Todos os convenios</option>
+                {convenios.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-left text-gray-600">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Codigo</th>
+                    <th className="px-3 py-2 font-medium">Descricao</th>
+                    <th className="px-3 py-2 font-medium">Tipo</th>
+                    <th className="px-3 py-2 font-medium">Valor</th>
+                    <th className="px-3 py-2 font-medium">Convenio</th>
+                    <th className="px-3 py-2 font-medium text-right">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {tussList.length === 0 && (
+                    <tr><td colSpan={6} className="text-center py-8 text-gray-400">Nenhum procedimento cadastrado</td></tr>
+                  )}
+                  {tussList.map((p) => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-mono text-xs">{p.code}</td>
+                      <td className="px-3 py-2 text-gray-800">{p.description}</td>
+                      <td className="px-3 py-2"><span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">{p.type}</span></td>
+                      <td className="px-3 py-2 text-gray-700">R$ {Number(p.value).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-gray-600">{p.convenio?.nome || '-'}</td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openTussEdit(p)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Edit2 size={14} /></button>
+                          <button onClick={() => deleteTuss(p.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500" title="Excluir"><Trash2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Gerar Lote TISS */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Gerar Lote TISS</h2>
+            <p className="text-sm text-gray-500 mb-4">Gera o XML no padrao TISS 4.01.00 da ANS com as consultas realizadas no periodo.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Convenio *</label>
+                <select
+                  value={loteConvenio}
+                  onChange={(e) => setLoteConvenio(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Selecione...</option>
+                  {convenios.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data inicio *</label>
+                <input type="date" value={loteInicio} onChange={(e) => setLoteInicio(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data fim *</label>
+                <input type="date" value={loteFim} onChange={(e) => setLoteFim(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={generateTissXml}
+                disabled={generatingXml}
+                className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <Download size={16} /> {generatingXml ? 'Gerando...' : 'Gerar XML'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TUSS MODAL */}
+      {tussModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">{tussEditing ? 'Editar' : 'Novo'} Procedimento TUSS</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Codigo TUSS *</label>
+                <input value={tussForm.code} onChange={(e) => setTussForm({ ...tussForm, code: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descricao *</label>
+                <input value={tussForm.description} onChange={(e) => setTussForm({ ...tussForm, description: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                  <select value={tussForm.type} onChange={(e) => setTussForm({ ...tussForm, type: e.target.value as ProcedureType })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    {PROCEDURE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$) *</label>
+                  <input type="number" step="0.01" value={tussForm.value} onChange={(e) => setTussForm({ ...tussForm, value: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Convenio (opcional)</label>
+                <select value={tussForm.convenioId} onChange={(e) => setTussForm({ ...tussForm, convenioId: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  <option value="">Nenhum (particular)</option>
+                  {convenios.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setTussModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
+              <button onClick={saveTuss} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Salvar</button>
+            </div>
           </div>
         </div>
       )}

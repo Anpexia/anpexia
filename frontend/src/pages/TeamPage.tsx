@@ -34,6 +34,12 @@ export function TeamPage() {
   const [formRole, setFormRole] = useState<'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'>('RECEPTIONIST');
   const [submitting, setSubmitting] = useState(false);
 
+  // Repasse (only visible when editing a DOCTOR)
+  const [repasse, setRepasse] = useState<{ CONSULTA: number; EXAME: number; CIRURGIA: number; TERAPIA: number; OUTROS: number }>({
+    CONSULTA: 0, EXAME: 0, CIRURGIA: 0, TERAPIA: 0, OUTROS: 0,
+  });
+  const [loadingRepasse, setLoadingRepasse] = useState(false);
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   const fetchMembers = async () => {
@@ -67,7 +73,21 @@ export function TeamPage() {
     if (!editMember) return;
     setSubmitting(true);
     try {
-      await api.put(`/team/${editMember.id}`, { name: formName, phone: formPhone || undefined, role: formRole });
+      // OWNER can edit basic fields. MANAGER cannot (backend enforces).
+      if (isOwner) {
+        await api.put(`/team/${editMember.id}`, { name: formName, phone: formPhone || undefined, role: formRole });
+      }
+      // Save repasse for doctors (OWNER or MANAGER)
+      if ((editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && canManage) {
+        const repasses = [
+          { procedureType: 'CONSULTA', percentage: Number(repasse.CONSULTA) || 0 },
+          { procedureType: 'EXAME', percentage: Number(repasse.EXAME) || 0 },
+          { procedureType: 'CIRURGIA', percentage: Number(repasse.CIRURGIA) || 0 },
+          { procedureType: 'TERAPIA', percentage: Number(repasse.TERAPIA) || 0 },
+          { procedureType: 'OUTROS', percentage: Number(repasse.OUTROS) || 0 },
+        ];
+        await api.put(`/doctors/${editMember.id}/repasse`, { repasses });
+      }
       showToast('Membro atualizado!');
       setEditMember(null);
       resetForm();
@@ -76,6 +96,22 @@ export function TeamPage() {
       showToast(err.response?.data?.error?.message || 'Erro ao atualizar');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const loadRepasse = async (doctorId: string) => {
+    setLoadingRepasse(true);
+    try {
+      const { data } = await api.get(`/doctors/${doctorId}/repasse`);
+      const map: any = { CONSULTA: 0, EXAME: 0, CIRURGIA: 0, TERAPIA: 0, OUTROS: 0 };
+      for (const r of data.data || []) {
+        map[r.procedureType] = r.percentage;
+      }
+      setRepasse(map);
+    } catch {
+      setRepasse({ CONSULTA: 0, EXAME: 0, CIRURGIA: 0, TERAPIA: 0, OUTROS: 0 });
+    } finally {
+      setLoadingRepasse(false);
     }
   };
 
@@ -107,6 +143,11 @@ export function TeamPage() {
     setFormName(m.name);
     setFormPhone(m.phone || '');
     setFormRole(m.role === 'OWNER' ? 'MANAGER' : (m.role as any));
+    if (m.role === 'DOCTOR') {
+      loadRepasse(m.id);
+    } else {
+      setRepasse({ CONSULTA: 0, EXAME: 0, CIRURGIA: 0, TERAPIA: 0, OUTROS: 0 });
+    }
   };
 
   const roleLabel: Record<string, string> = { SUPER_ADMIN: 'Super Admin', OWNER: 'Proprietario', MANAGER: 'Gerente', DOCTOR: 'Medico', RECEPTIONIST: 'Recepcionista', FINANCIAL: 'Financeiro', STOCK: 'Estoque', EMPLOYEE: 'Funcionario' };
@@ -191,7 +232,7 @@ export function TeamPage() {
                         <div className="flex items-center justify-end gap-2">
                           {m.role !== 'OWNER' && (
                             <>
-                              {isOwner && (
+                              {canManage && (
                                 <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-slate-100 text-slate-500" title="Editar">
                                   <Edit2 size={15} />
                                 </button>
@@ -201,9 +242,11 @@ export function TeamPage() {
                                   {m.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
                                 </button>
                               )}
-                              <button onClick={() => setRemoveConfirm(m)} className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600" title="Remover">
-                                <Trash2 size={15} />
-                              </button>
+                              {isOwner && (
+                                <button onClick={() => setRemoveConfirm(m)} className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600" title="Remover">
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
                             </>
                           )}
                           {m.role === 'OWNER' && <Shield size={15} className="text-[#1E3A5F]" />}
@@ -291,10 +334,15 @@ export function TeamPage() {
               <h2 className="text-lg font-semibold text-slate-800">Editar Membro</h2>
               <button onClick={() => setEditMember(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {!isOwner && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2">
+                  Apenas o Proprietario pode editar dados basicos. Voce pode ajustar o repasse do medico.
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
-                <input value={formName} onChange={e => setFormName(e.target.value)} className={inputCls} />
+                <input value={formName} onChange={e => setFormName(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
@@ -302,11 +350,11 @@ export function TeamPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                <input value={formPhone} onChange={e => setFormPhone(e.target.value)} className={inputCls} />
+                <input value={formPhone} onChange={e => setFormPhone(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
-                <select value={formRole} onChange={e => setFormRole(e.target.value as any)} className={inputCls}>
+                <select value={formRole} onChange={e => setFormRole(e.target.value as any)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')}>
                   <option value="MANAGER">Gerente</option>
                   <option value="DOCTOR">Medico</option>
                   <option value="RECEPTIONIST">Recepcionista</option>
@@ -315,6 +363,36 @@ export function TeamPage() {
                   <option value="EMPLOYEE">Funcionario</option>
                 </select>
               </div>
+
+              {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
+                <div className="border-t border-slate-200 pt-4">
+                  <h3 className="text-sm font-semibold text-slate-800 mb-1">Repasse por tipo de procedimento</h3>
+                  <p className="text-xs text-slate-500 mb-3">Percentual do valor do procedimento repassado ao medico.</p>
+                  {loadingRepasse ? (
+                    <div className="text-xs text-slate-400">Carregando repasses...</div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {(['CONSULTA','EXAME','CIRURGIA','TERAPIA','OUTROS'] as const).map(type => (
+                        <div key={type}>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
+                            {type.charAt(0) + type.slice(1).toLowerCase()} %
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={repasse[type]}
+                            onChange={e => setRepasse(r => ({ ...r, [type]: Number(e.target.value) }))}
+                            className={inputCls}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button onClick={handleUpdate} disabled={submitting}
                 className="w-full btn-pill btn-primary justify-center">
                 {submitting ? 'Salvando...' : 'Salvar'}

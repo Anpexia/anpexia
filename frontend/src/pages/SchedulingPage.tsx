@@ -1,8 +1,35 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, isBefore, isToday } from 'date-fns';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
+
+interface Doctor {
+  id: string;
+  name: string;
+  especialidade?: string | null;
+}
+
+interface CallProcedure {
+  id: string;
+  authorizationNumber: string | null;
+  tussProcedure: {
+    id: string;
+    code: string;
+    description: string;
+    type: string;
+    value: number;
+  };
+}
+
+interface TussProc {
+  id: string;
+  code: string;
+  description: string;
+  type: string;
+  value: number;
+  convenioId: string | null;
+}
 
 interface AvailableDate {
   date: string;
@@ -25,7 +52,10 @@ interface Appointment {
   status: string;
   notes: string | null;
   customerId: string | null;
+  doctorId: string | null;
   customer: { id: string; name: string; phone: string; email: string | null } | null;
+  doctor: { id: string; name: string } | null;
+  procedures?: CallProcedure[];
   createdAt: string;
 }
 
@@ -90,7 +120,7 @@ function StatusTimeline({ status }: { status: string }) {
 export function SchedulingPage() {
   const [view, setView] = useState<View>('list');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [availableDates, setAvailableDates] = useState<AvailableDate[]>([]);
+  const [, setAvailableDates] = useState<AvailableDate[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -98,8 +128,18 @@ export function SchedulingPage() {
 
   // New appointment
   const [showBookModal, setShowBookModal] = useState(false);
-  const [bookForm, setBookForm] = useState({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '' });
+  const [bookForm, setBookForm] = useState({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
   const [saving, setSaving] = useState(false);
+
+  // Doctors
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+
+  // Registrar TUSS (ao clicar em "Realizado")
+  const [tussModalCall, setTussModalCall] = useState<Appointment | null>(null);
+  const [tussModalProcedures, setTussModalProcedures] = useState<TussProc[]>([]);
+  const [tussLoadingList, setTussLoadingList] = useState(false);
+  const [tussSelected, setTussSelected] = useState<Record<string, { checked: boolean; authorizationNumber: string }>>({});
+  const [tussSaving, setTussSaving] = useState(false);
 
   // Customer search in booking modal
   const [customerSearch, setCustomerSearch] = useState('');
@@ -143,7 +183,14 @@ export function SchedulingPage() {
     } catch {} finally { setLoadingMonth(false); }
   }, []);
 
-  useEffect(() => { fetchAppointments(); fetchDates(); }, [fetchAppointments, fetchDates]);
+  const fetchDoctors = useCallback(async () => {
+    try {
+      const { data } = await api.get('/team/doctors');
+      setDoctors(data.data || []);
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); }, [fetchAppointments, fetchDates, fetchDoctors]);
 
   useEffect(() => {
     if (view === 'calendar') fetchMonthAppointments(calMonth);
@@ -192,20 +239,22 @@ export function SchedulingPage() {
     setSelectedDate(date);
     setLoadingSlots(true);
     try {
-      const { data } = await api.get(`/scheduling/available-slots/${date}`);
+      const params: any = {};
+      if (bookForm.doctorId) params.doctorId = bookForm.doctorId;
+      const { data } = await api.get(`/scheduling/available-slots/${date}`, { params });
       setSlots(data.data);
     } catch {} finally { setLoadingSlots(false); }
   };
 
   const openBookWithSlot = (date: string, time: string) => {
-    setBookForm({ name: '', phone: '', email: '', date, time, notes: '', customerId: '' });
+    setBookForm({ name: '', phone: '', email: '', date, time, notes: '', customerId: '', doctorId: '' });
     setSelectedBookCustomer(null);
     setCustomerSearch('');
     setShowBookModal(true);
   };
 
   const openBook = () => {
-    setBookForm({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '' });
+    setBookForm({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
     setSelectedBookCustomer(null);
     setCustomerSearch('');
     setShowBookModal(true);
@@ -231,6 +280,10 @@ export function SchedulingPage() {
 
   const handleBook = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!bookForm.doctorId) {
+      showToast('Selecione o medico responsavel pela consulta');
+      return;
+    }
     setSaving(true);
     try {
       await api.post('/scheduling/book', {
@@ -241,6 +294,7 @@ export function SchedulingPage() {
         time: bookForm.time || undefined,
         notes: bookForm.notes || undefined,
         customerId: bookForm.customerId || undefined,
+        doctorId: bookForm.doctorId,
       });
       setShowBookModal(false);
       fetchAppointments();
@@ -258,6 +312,80 @@ export function SchedulingPage() {
       await api.patch(`/scheduling/calls/${id}`, { status });
       fetchAppointments();
     } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao atualizar status.'); } finally { setUpdatingId(null); }
+  };
+
+  // When clicking "Realizado":
+  // - If patient has convenio: open TUSS modal to select procedures before marking completed.
+  // - Otherwise: mark as completed directly.
+  const handleRealized = async (a: Appointment) => {
+    const hasConvenio = await patientHasConvenio(a);
+    if (hasConvenio) {
+      await openTussModalForCall(a);
+    } else {
+      await handleStatusChange(a.id, 'completed');
+    }
+  };
+
+  const patientHasConvenio = async (a: Appointment): Promise<boolean> => {
+    if (!a.customerId) return false;
+    try {
+      const { data } = await api.get(`/convenios/patients/${a.customerId}`);
+      return !!data.data;
+    } catch {
+      return false;
+    }
+  };
+
+  const openTussModalForCall = async (a: Appointment) => {
+    setTussModalCall(a);
+    setTussSelected({});
+    setTussLoadingList(true);
+    try {
+      // Load procedures for the patient's convenio (if known), otherwise all
+      let convenioId: string | null = null;
+      if (a.customerId) {
+        try {
+          const { data } = await api.get(`/convenios/patients/${a.customerId}`);
+          convenioId = data.data?.convenioId || null;
+        } catch {}
+      }
+      const params: any = {};
+      if (convenioId) params.convenioId = convenioId;
+      const { data } = await api.get('/tuss/procedures', { params });
+      setTussModalProcedures(data.data || []);
+    } catch {
+      setTussModalProcedures([]);
+    } finally {
+      setTussLoadingList(false);
+    }
+  };
+
+  const submitTussModal = async () => {
+    if (!tussModalCall) return;
+    const selected = Object.entries(tussSelected)
+      .filter(([, v]) => v.checked)
+      .map(([id, v]) => ({ tussProcedureId: id, authorizationNumber: v.authorizationNumber || null }));
+
+    if (selected.length === 0) {
+      showToast('Selecione ao menos um procedimento');
+      return;
+    }
+    setTussSaving(true);
+    try {
+      await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
+      await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
+      showToast('Procedimentos registrados!');
+      setTussModalCall(null);
+      fetchAppointments();
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao registrar procedimentos');
+    } finally {
+      setTussSaving(false);
+    }
+  };
+
+  const openRegistrarTussForExisting = async (a: Appointment) => {
+    await openTussModalForCall(a);
   };
 
   const handleCancel = async (id: string) => {
@@ -339,7 +467,7 @@ export function SchedulingPage() {
                                 <Check size={14} />Confirmar
                               </button>
                             )}
-                            <button onClick={() => handleStatusChange(a.id, 'completed')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">
+                            <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">
                               Realizado
                             </button>
                             <button onClick={() => handleStatusChange(a.id, 'no_show')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
@@ -367,14 +495,32 @@ export function SchedulingPage() {
                   <div className="space-y-2">
                     {pastAppointments.map((a) => {
                       const st = statusMap[a.status] || { label: a.status, cls: 'bg-gray-100 text-gray-600', icon: '⬜', step: 0 };
+                      const isRealized = a.status === 'completed';
+                      const hasProcs = (a.procedures?.length || 0) > 0;
                       return (
-                        <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex items-center justify-between opacity-75">
+                        <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex items-center justify-between opacity-90">
                           <div className="flex items-center gap-3">
+                            {isRealized && hasProcs && (
+                              <span title="TUSS vinculado" className="flex items-center text-emerald-600"><FileCheck2 size={16} /></span>
+                            )}
+                            {isRealized && !hasProcs && (
+                              <span title="Sem TUSS vinculado" className="flex items-center text-amber-500"><AlertCircle size={16} /></span>
+                            )}
                             <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
                             <span className="text-sm font-medium text-slate-800">{a.customer?.name || a.name}</span>
                             <span className="text-sm text-slate-500">{a.phone}</span>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded ${st.cls}`}>{st.icon} {st.label}</span>
+                          <div className="flex items-center gap-2">
+                            {isRealized && !hasProcs && (
+                              <button
+                                onClick={() => openRegistrarTussForExisting(a)}
+                                className="px-2 py-1 text-xs font-medium rounded bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                              >
+                                Registrar TUSS
+                              </button>
+                            )}
+                            <span className={`text-xs px-2 py-0.5 rounded ${st.cls}`}>{st.icon} {st.label}</span>
+                          </div>
                         </div>
                       );
                     })}
@@ -575,6 +721,25 @@ export function SchedulingPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Medico *</label>
+                <select
+                  value={bookForm.doctorId}
+                  onChange={(e) => setBookForm({ ...bookForm, doctorId: e.target.value })}
+                  className={inputCls}
+                  required
+                >
+                  <option value="">Selecione o medico</option>
+                  {doctors.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}{d.especialidade ? ` — ${d.especialidade}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {doctors.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">Nenhum medico cadastrado. Adicione medicos na pagina Equipe.</p>
+                )}
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
                 <input type="text" value={bookForm.name} onChange={(e) => setBookForm({ ...bookForm, name: e.target.value })} className={inputCls} required />
               </div>
@@ -605,6 +770,90 @@ export function SchedulingPage() {
                 <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Agendando...' : 'Agendar'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* TUSS Procedures Modal — triggered by "Realizado" when patient has convenio */}
+      {tussModalCall && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-800">Registrar procedimentos realizados</h3>
+              <button onClick={() => setTussModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Paciente: <strong>{tussModalCall.customer?.name || tussModalCall.name}</strong> — {format(new Date(tussModalCall.date), 'dd/MM/yyyy HH:mm')}
+            </p>
+
+            {tussLoadingList ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1E3A5F]" />
+              </div>
+            ) : tussModalProcedures.length === 0 ? (
+              <div className="text-center py-8 text-sm text-slate-500">
+                Nenhum procedimento TUSS cadastrado para este convenio.
+                <br />
+                Cadastre em Configuracoes &gt; Procedimentos TUSS.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {tussModalProcedures.map((p) => {
+                  const sel = tussSelected[p.id] || { checked: false, authorizationNumber: '' };
+                  return (
+                    <div key={p.id} className={`border rounded-lg p-3 ${sel.checked ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200'}`}>
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sel.checked}
+                          onChange={(e) => setTussSelected((s) => ({
+                            ...s,
+                            [p.id]: { checked: e.target.checked, authorizationNumber: s[p.id]?.authorizationNumber || '' },
+                          }))}
+                          className="mt-1 rounded border-slate-300"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-slate-500">{p.code}</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{p.type}</span>
+                          </div>
+                          <p className="text-sm font-medium text-slate-800">{p.description}</p>
+                          <p className="text-xs text-slate-500">R$ {Number(p.value).toFixed(2)}</p>
+                          {sel.checked && (
+                            <input
+                              type="text"
+                              placeholder="Numero de autorizacao (opcional)"
+                              value={sel.authorizationNumber}
+                              onChange={(e) => setTussSelected((s) => ({
+                                ...s,
+                                [p.id]: { checked: true, authorizationNumber: e.target.value },
+                              }))}
+                              className="mt-2 w-full px-2 py-1.5 border border-slate-300 rounded text-xs"
+                            />
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-4 mt-4 border-t border-slate-100">
+              <button
+                onClick={() => setTussModalCall(null)}
+                className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitTussModal}
+                disabled={tussSaving || tussLoadingList}
+                className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
+              >
+                {tussSaving ? 'Registrando...' : 'Confirmar e registrar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

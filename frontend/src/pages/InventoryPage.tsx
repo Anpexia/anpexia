@@ -797,13 +797,13 @@ export function InventoryPage() {
             {modalMode === 'create' && scannedCode && scanSource === 'cosmos' && (
               <div className="mb-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2">
                 <Sparkles size={14} className="text-emerald-500" />
-                <span className="text-xs text-emerald-700">Dados preenchidos automaticamente via codigo <span className="font-mono font-semibold">{scannedCode}</span> — edite se necessario</span>
+                <span className="text-xs text-emerald-700">Produto encontrado na base Cosmos Bluesoft — codigo <span className="font-mono font-semibold">{scannedCode}</span>. Dados preenchidos automaticamente, edite se necessario.</span>
               </div>
             )}
             {modalMode === 'create' && scannedCode && !scanSource && (
               <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
                 <Barcode size={14} className="text-amber-500" />
-                <span className="text-xs text-amber-700">Codigo <span className="font-mono font-semibold">{scannedCode}</span> nao encontrado na base. Preencha os dados manualmente.</span>
+                <span className="text-xs text-amber-700">Codigo <span className="font-mono font-semibold">{scannedCode}</span> nao encontrado. Preencha manualmente.</span>
               </div>
             )}
             <form onSubmit={handleSave} className="space-y-4">

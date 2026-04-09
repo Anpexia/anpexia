@@ -132,6 +132,8 @@ async function loadRoutes() {
     const { teamRouter } = await import('./modules/team/team.controller');
     const { conveniosRouter } = await import('./modules/convenios/convenios.controller');
     const { settingsRouter } = await import('./modules/settings/settings.controller');
+    const { tussRouter } = await import('./modules/tuss/tuss.controller');
+    const { doctorsRouter } = await import('./modules/tuss/doctors.controller');
 
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/tenants', tenantRouter);
@@ -196,6 +198,8 @@ async function loadRoutes() {
     app.use('/api/v1/team', teamRouter);
     app.use('/api/v1/convenios', conveniosRouter);
     app.use('/api/v1/settings', settingsRouter);
+    app.use('/api/v1/tuss', tussRouter);
+    app.use('/api/v1/doctors', doctorsRouter);
 
     const { errorHandler } = await import('./shared/middleware/error-handler');
     app.use(errorHandler);

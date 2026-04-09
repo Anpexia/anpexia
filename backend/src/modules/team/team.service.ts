@@ -29,6 +29,23 @@ export const teamService = {
     return users;
   },
 
+  async listDoctors(tenantId: string) {
+    return prisma.user.findMany({
+      where: { tenantId, role: 'DOCTOR', isActive: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        especialidade: true,
+        tipoRegistro: true,
+        numeroRegistro: true,
+        duracaoConsulta: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+  },
+
   async create(tenantId: string, data: CreateMemberData) {
     // Block creating OWNER or SUPER_ADMIN via team API (req.body can send anything at runtime)
     const role = data.role as string;

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { schedulingService } from './scheduling.service';
-import { bookCallSchema, updateConfigSchema, updateCallStatusSchema } from './scheduling.validators';
+import { bookCallSchema, updateConfigSchema, updateCallStatusSchema, linkProceduresSchema } from './scheduling.validators';
 import { AppError } from '../../shared/middleware/error-handler';
 import { success, created } from '../../shared/utils/response';
 import { authenticate, requireRole, requireTenant, optionalAuth } from '../../shared/middleware/auth';
@@ -21,14 +21,15 @@ router.get('/available-dates', async (_req: Request, res: Response, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /available-slots/:date
+// GET /available-slots/:date?doctorId=...
 router.get('/available-slots/:date', async (req: Request, res: Response, next) => {
   try {
     const date = req.params.date as string;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new AppError(400, 'INVALID_DATE', 'Data deve estar no formato YYYY-MM-DD');
     }
-    const slots = await schedulingService.getAvailableSlots(date);
+    const doctorId = (req.query.doctorId as string) || null;
+    const slots = await schedulingService.getAvailableSlots(date, doctorId);
     return success(res, slots);
   } catch (err) { next(err); }
 });
@@ -123,6 +124,16 @@ router.patch('/calls/:id', authenticate, requireTenant, async (req: Request, res
   const data = updateCallStatusSchema.parse(req.body);
   const call = await schedulingService.updateCallStatus(id, data, req.auth!.tenantId!);
   return success(res, call);
+});
+
+// POST /calls/:id/procedures — link TUSS procedures to a realized call
+router.post('/calls/:id/procedures', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const data = linkProceduresSchema.parse(req.body);
+    const call = await schedulingService.linkProcedures(id, req.auth!.tenantId!, data);
+    return success(res, call);
+  } catch (err) { next(err); }
 });
 
 // DELETE /calls/:id
