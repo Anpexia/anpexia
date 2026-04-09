@@ -34,7 +34,25 @@ export const updateCallStatusSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
 });
 
+export const updateCallDoctorSchema = z.object({
+  doctorId: z.string().nullable().optional(),
+});
+
+export const updateCallAuthorizationSchema = z.object({
+  authorizationNumber: z.string().max(100).nullable().optional(),
+});
+
+export const replaceProceduresSchema = z.object({
+  procedures: z.array(z.object({
+    tussProcedureId: z.string().min(1),
+    authorizationNumber: z.string().optional().nullable(),
+  })),
+});
+
 export type BookCallInput = z.infer<typeof bookCallSchema>;
 export type UpdateConfigInput = z.infer<typeof updateConfigSchema>;
 export type UpdateCallStatusInput = z.infer<typeof updateCallStatusSchema>;
 export type LinkProceduresInput = z.infer<typeof linkProceduresSchema>;
+export type UpdateCallDoctorInput = z.infer<typeof updateCallDoctorSchema>;
+export type UpdateCallAuthorizationInput = z.infer<typeof updateCallAuthorizationSchema>;
+export type ReplaceProceduresInput = z.infer<typeof replaceProceduresSchema>;

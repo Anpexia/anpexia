@@ -6,6 +6,7 @@ import {
   UpdateConfigInput,
   UpdateCallStatusInput,
   LinkProceduresInput,
+  ReplaceProceduresInput,
 } from './scheduling.validators';
 import { sendBookingConfirmation, sendCancellationNotice } from './scheduling.notifications';
 
@@ -49,6 +50,107 @@ const DEFAULT_CONFIG = {
   timezone: 'America/Sao_Paulo',
   maxDaysAhead: 14,
 };
+
+// Day-of-week (0=Sun..6=Sat) → horarios key used in TenantSettings.horarios JSON
+const DAY_KEYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'] as const;
+
+interface TenantHours {
+  durationMin: number;
+  days: Record<string, { ativo: boolean; inicio: string; fim: string } | undefined>;
+}
+
+// Load tenant working hours from TenantSettings.horarios, falling back to defaults
+async function loadTenantHours(tenantId: string | null | undefined): Promise<TenantHours> {
+  const defaultDays: TenantHours['days'] = {
+    dom: { ativo: false, inicio: '08:00', fim: '18:00' },
+    seg: { ativo: true, inicio: '08:00', fim: '18:00' },
+    ter: { ativo: true, inicio: '08:00', fim: '18:00' },
+    qua: { ativo: true, inicio: '08:00', fim: '18:00' },
+    qui: { ativo: true, inicio: '08:00', fim: '18:00' },
+    sex: { ativo: true, inicio: '08:00', fim: '18:00' },
+    sab: { ativo: false, inicio: '08:00', fim: '12:00' },
+  };
+
+  if (!tenantId) {
+    return { durationMin: 30, days: defaultDays };
+  }
+
+  const settings = await prisma.tenantSettings.findUnique({ where: { tenantId } });
+  const horarios = (settings?.horarios as any) || null;
+
+  const days: TenantHours['days'] = { ...defaultDays };
+  if (horarios && typeof horarios === 'object') {
+    for (const key of DAY_KEYS) {
+      if (horarios[key] && typeof horarios[key] === 'object') {
+        days[key] = {
+          ativo: Boolean(horarios[key].ativo),
+          inicio: String(horarios[key].inicio || defaultDays[key]!.inicio),
+          fim: String(horarios[key].fim || defaultDays[key]!.fim),
+        };
+      }
+    }
+  }
+
+  return {
+    durationMin: settings?.duracaoConsultaPadrao ?? 30,
+    days,
+  };
+}
+
+// Convert "HH:MM" to minutes since midnight
+function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+// Validate that a booking request fits within tenant working hours and has no
+// conflict with an existing call for the same doctor at the same datetime.
+async function validateBookingWithinHours(params: {
+  tenantId: string | null | undefined;
+  date: string; // YYYY-MM-DD (SP)
+  time: string; // HH:MM
+  doctorId?: string | null;
+  excludeCallId?: string;
+}) {
+  const hours = await loadTenantHours(params.tenantId);
+
+  // Day of week in SP
+  const dayOfWeek = new Date(`${params.date}T12:00:00${SP_OFFSET}`).getDay();
+  const key = DAY_KEYS[dayOfWeek];
+  const daySettings = hours.days[key];
+
+  if (!daySettings || !daySettings.ativo) {
+    throw new AppError(400, 'INVALID_DATE', 'Esta data não está disponível para agendamento');
+  }
+
+  const reqMin = timeToMinutes(params.time);
+  const startMin = timeToMinutes(daySettings.inicio);
+  const endMin = timeToMinutes(daySettings.fim);
+
+  if (reqMin < startMin || reqMin + hours.durationMin > endMin) {
+    throw new AppError(400, 'INVALID_TIME', 'Horário fora do expediente configurado');
+  }
+
+  // Per-doctor conflict check: another call at the exact same datetime for same doctor
+  if (params.doctorId && params.tenantId) {
+    const callDate = new Date(`${params.date}T${params.time}:00${SP_OFFSET}`);
+    const conflict = await prisma.scheduledCall.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        doctorId: params.doctorId,
+        date: callDate,
+        status: { notIn: ['cancelled'] },
+        ...(params.excludeCallId ? { NOT: { id: params.excludeCallId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (conflict) {
+      throw new AppError(400, 'SLOT_TAKEN', 'Este médico já tem uma consulta neste horário');
+    }
+  }
+
+  return { durationMin: hours.durationMin };
+}
 
 // Get or create default ScheduleConfig
 async function getConfig() {
@@ -206,15 +308,7 @@ async function getAvailableDates() {
 
 // Book a call — auto-link to Customer by phone
 async function bookCall(data: BookCallInput, tenantId?: string | null) {
-  const config = await getConfig();
-
-  // Validate date is available (use SP noon to avoid date shift)
-  const dayOfWeek = new Date(`${data.date}T12:00:00${SP_OFFSET}`).getDay();
-  if (!config.availableDays.includes(dayOfWeek)) {
-    throw new AppError(400, 'INVALID_DATE', 'Esta data não está disponível para agendamento');
-  }
-
-  // If no time specified, pick the first available slot (per doctor agenda if provided)
+  // If no time specified, pick the first available pre-generated slot for UI compat
   let time = data.time;
   if (!time) {
     const slots = await getAvailableSlots(data.date, data.doctorId);
@@ -225,15 +319,13 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     time = firstAvailable.time;
   }
 
-  // Validate slot is available (per doctor agenda if provided)
-  const slots = await getAvailableSlots(data.date, data.doctorId);
-  const targetSlot = slots.find((s) => s.time === time);
-  if (!targetSlot) {
-    throw new AppError(400, 'INVALID_TIME', 'Este horário não existe na agenda');
-  }
-  if (!targetSlot.available) {
-    throw new AppError(400, 'SLOT_TAKEN', 'Este horário já está ocupado');
-  }
+  // Validate against tenant working hours + per-doctor conflict (no pre-generated slot grid)
+  const { durationMin } = await validateBookingWithinHours({
+    tenantId,
+    date: data.date,
+    time,
+    doctorId: data.doctorId,
+  });
 
   // Build datetime — interpret time as São Paulo (UTC-3)
   const callDate = new Date(`${data.date}T${time}:00${SP_OFFSET}`);
@@ -263,7 +355,7 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
         email: data.email ?? undefined,
         phone: data.phone,
         date: callDate,
-        duration: config.slotDuration,
+        duration: durationMin,
         status: 'scheduled',
         notes: data.notes ?? undefined,
         leadId: lead?.id,
@@ -298,7 +390,7 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     name: data.name,
     phone: data.phone,
     date: callDate,
-    duration: config.slotDuration,
+    duration: durationMin,
     leadId: lead?.id,
   }).catch((err) => console.error('[SCHEDULING] Confirmation send failed:', err));
 
@@ -401,6 +493,102 @@ async function linkProcedures(id: string, tenantId: string, data: LinkProcedures
   return prisma.scheduledCall.findUnique({
     where: { id },
     include: { procedures: { include: { tussProcedure: true } } },
+  });
+}
+
+// Replace all TUSS procedures linked to a call. If the call is already completed,
+// re-sync financial transactions to reflect the new procedures and doctor repasse.
+async function replaceProcedures(id: string, tenantId: string, data: ReplaceProceduresInput) {
+  const call = await prisma.scheduledCall.findUnique({ where: { id } });
+  if (!call || call.tenantId !== tenantId) {
+    throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
+  }
+
+  // Validate all procedure IDs belong to this tenant
+  if (data.procedures.length > 0) {
+    const procIds = data.procedures.map((p) => p.tussProcedureId);
+    const procs = await prisma.tussProcedure.findMany({
+      where: { id: { in: procIds }, tenantId },
+    });
+    if (procs.length !== procIds.length) {
+      throw new AppError(400, 'INVALID_PROCEDURE', 'Procedimento TUSS inválido');
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Remove existing procedure links
+    await tx.scheduledCallProcedure.deleteMany({ where: { scheduledCallId: id } });
+
+    // Create new ones
+    for (const p of data.procedures) {
+      await tx.scheduledCallProcedure.create({
+        data: {
+          scheduledCallId: id,
+          tussProcedureId: p.tussProcedureId,
+          authorizationNumber: p.authorizationNumber || null,
+        },
+      });
+    }
+
+    // If call is completed, re-sync financials (revert old + apply new)
+    if (call.status === 'completed') {
+      await revertFinancialsForCall(tx, id, tenantId);
+      await applyFinancialsForCompletedCall(tx, id, tenantId);
+    }
+  });
+
+  return prisma.scheduledCall.findUnique({
+    where: { id },
+    include: { procedures: { include: { tussProcedure: true } } },
+  });
+}
+
+// Update the doctor assigned to a call. If already completed, re-sync financials
+// so the doctor repasse expense reflects the new doctor.
+async function updateCallDoctor(id: string, tenantId: string, doctorId: string | null | undefined) {
+  const call = await prisma.scheduledCall.findUnique({ where: { id } });
+  if (!call || call.tenantId !== tenantId) {
+    throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
+  }
+
+  // If assigning a doctor, validate it belongs to this tenant and has DOCTOR role
+  if (doctorId) {
+    const doctor = await prisma.user.findFirst({
+      where: { id: doctorId, tenantId, role: 'DOCTOR', isActive: true },
+    });
+    if (!doctor) {
+      throw new AppError(400, 'INVALID_DOCTOR', 'Médico não encontrado ou inativo');
+    }
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.scheduledCall.update({
+      where: { id },
+      data: { doctorId: doctorId || null },
+    });
+
+    // If completed, revert and re-apply financials with new doctor
+    if (call.status === 'completed') {
+      await revertFinancialsForCall(tx, id, tenantId);
+      await applyFinancialsForCompletedCall(tx, id, tenantId);
+    }
+
+    return u;
+  });
+
+  return updated;
+}
+
+// Update authorization number for a call
+async function updateCallAuthorization(id: string, tenantId: string, authorizationNumber: string | null | undefined) {
+  const call = await prisma.scheduledCall.findUnique({ where: { id } });
+  if (!call || call.tenantId !== tenantId) {
+    throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
+  }
+
+  return prisma.scheduledCall.update({
+    where: { id },
+    data: { authorizationNumber: authorizationNumber || null },
   });
 }
 
@@ -586,4 +774,7 @@ export const schedulingService = {
   updateCallStatus,
   cancelCall,
   linkProcedures,
+  replaceProcedures,
+  updateCallDoctor,
+  updateCallAuthorization,
 };

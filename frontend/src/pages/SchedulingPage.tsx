@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -53,6 +53,7 @@ interface Appointment {
   notes: string | null;
   customerId: string | null;
   doctorId: string | null;
+  authorizationNumber: string | null;
   customer: { id: string; name: string; phone: string; email: string | null } | null;
   doctor: { id: string; name: string } | null;
   procedures?: CallProcedure[];
@@ -140,6 +141,22 @@ export function SchedulingPage() {
   const [tussLoadingList, setTussLoadingList] = useState(false);
   const [tussSelected, setTussSelected] = useState<Record<string, { checked: boolean; authorizationNumber: string }>>({});
   const [tussSaving, setTussSaving] = useState(false);
+  // When true, saving the TUSS modal REPLACES procedures (edit mode) instead of
+  // appending and marking completed (registration mode from "Realizado" button).
+  const [tussEditMode, setTussEditMode] = useState(false);
+
+  // Assign/change doctor
+  const [doctorEditCall, setDoctorEditCall] = useState<Appointment | null>(null);
+  const [doctorEditValue, setDoctorEditValue] = useState('');
+  const [savingDoctor, setSavingDoctor] = useState(false);
+
+  // Inline authorization editor — keyed by call id
+  const [authEditingId, setAuthEditingId] = useState<string | null>(null);
+  const [authEditValue, setAuthEditValue] = useState('');
+  const [savingAuthId, setSavingAuthId] = useState<string | null>(null);
+
+  // Convenio presence cache — map customerId → boolean
+  const [convenioMap, setConvenioMap] = useState<Record<string, boolean>>({});
 
   // Customer search in booking modal
   const [customerSearch, setCustomerSearch] = useState('');
@@ -320,7 +337,7 @@ export function SchedulingPage() {
   const handleRealized = async (a: Appointment) => {
     const hasConvenio = await patientHasConvenio(a);
     if (hasConvenio) {
-      await openTussModalForCall(a);
+      await openTussModalForCall(a, false);
     } else {
       await handleStatusChange(a.id, 'completed');
     }
@@ -328,16 +345,52 @@ export function SchedulingPage() {
 
   const patientHasConvenio = async (a: Appointment): Promise<boolean> => {
     if (!a.customerId) return false;
+    if (convenioMap[a.customerId] !== undefined) return convenioMap[a.customerId];
     try {
       const { data } = await api.get(`/convenios/patients/${a.customerId}`);
-      return !!data.data;
+      const has = !!data.data;
+      setConvenioMap((m) => ({ ...m, [a.customerId!]: has }));
+      return has;
     } catch {
+      setConvenioMap((m) => ({ ...m, [a.customerId!]: false }));
       return false;
     }
   };
 
-  const openTussModalForCall = async (a: Appointment) => {
+  // Prefetch convenio flags for all appointments with customers so we can show
+  // the "Autorizado"/"Sem autorizacao" badges without waiting for click.
+  useEffect(() => {
+    const ids = Array.from(new Set(
+      appointments
+        .map((a) => a.customerId)
+        .filter((id): id is string => !!id && convenioMap[id] === undefined),
+    ));
+    if (ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const { data } = await api.get(`/convenios/patients/${id}`);
+            return [id, !!data.data] as const;
+          } catch {
+            return [id, false] as const;
+          }
+        }),
+      );
+      if (cancelled) return;
+      setConvenioMap((m) => {
+        const next = { ...m };
+        for (const [id, has] of results) next[id] = has;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [appointments, convenioMap]);
+
+  const openTussModalForCall = async (a: Appointment, editMode: boolean) => {
     setTussModalCall(a);
+    setTussEditMode(editMode);
     setTussSelected({});
     setTussLoadingList(true);
     try {
@@ -352,7 +405,37 @@ export function SchedulingPage() {
       const params: any = {};
       if (convenioId) params.convenioId = convenioId;
       const { data } = await api.get('/tuss/procedures', { params });
-      setTussModalProcedures(data.data || []);
+      const list: TussProc[] = data.data || [];
+      setTussModalProcedures(list);
+
+      // In edit mode, pre-select procedures already linked to the call
+      if (editMode && a.procedures && a.procedures.length > 0) {
+        const preset: Record<string, { checked: boolean; authorizationNumber: string }> = {};
+        for (const p of a.procedures) {
+          preset[p.tussProcedure.id] = {
+            checked: true,
+            authorizationNumber: p.authorizationNumber || '',
+          };
+        }
+        // Ensure any pre-selected procedure is present in the list (in case it's
+        // filtered out by convenio — add it so the user still sees it)
+        const listIds = new Set(list.map((l) => l.id));
+        const extras: TussProc[] = [];
+        for (const p of a.procedures) {
+          if (!listIds.has(p.tussProcedure.id)) {
+            extras.push({
+              id: p.tussProcedure.id,
+              code: p.tussProcedure.code,
+              description: p.tussProcedure.description,
+              type: p.tussProcedure.type,
+              value: p.tussProcedure.value,
+              convenioId: null,
+            });
+          }
+        }
+        if (extras.length > 0) setTussModalProcedures([...extras, ...list]);
+        setTussSelected(preset);
+      }
     } catch {
       setTussModalProcedures([]);
     } finally {
@@ -366,26 +449,83 @@ export function SchedulingPage() {
       .filter(([, v]) => v.checked)
       .map(([id, v]) => ({ tussProcedureId: id, authorizationNumber: v.authorizationNumber || null }));
 
-    if (selected.length === 0) {
+    if (selected.length === 0 && !tussEditMode) {
       showToast('Selecione ao menos um procedimento');
       return;
     }
     setTussSaving(true);
     try {
-      await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
-      await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
-      showToast('Procedimentos registrados!');
+      if (tussEditMode) {
+        // Replace-all endpoint re-syncs financials automatically for completed calls
+        await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
+        showToast('Procedimentos atualizados!');
+      } else {
+        await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
+        await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
+        showToast('Procedimentos registrados!');
+      }
       setTussModalCall(null);
       fetchAppointments();
     } catch (err: any) {
-      showToast(err?.response?.data?.error?.message || 'Erro ao registrar procedimentos');
+      showToast(err?.response?.data?.error?.message || 'Erro ao salvar procedimentos');
     } finally {
       setTussSaving(false);
     }
   };
 
   const openRegistrarTussForExisting = async (a: Appointment) => {
-    await openTussModalForCall(a);
+    await openTussModalForCall(a, false);
+  };
+
+  // Open edit modal for doctor assignment
+  const openDoctorEdit = (a: Appointment) => {
+    setDoctorEditCall(a);
+    setDoctorEditValue(a.doctorId || '');
+  };
+
+  const saveDoctorEdit = async () => {
+    if (!doctorEditCall) return;
+    setSavingDoctor(true);
+    try {
+      await api.patch(`/scheduling/calls/${doctorEditCall.id}/doctor`, {
+        doctorId: doctorEditValue || null,
+      });
+      showToast('Medico atualizado!');
+      setDoctorEditCall(null);
+      fetchAppointments();
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao atualizar medico');
+    } finally {
+      setSavingDoctor(false);
+    }
+  };
+
+  // Inline authorization editor
+  const startEditAuth = (a: Appointment) => {
+    setAuthEditingId(a.id);
+    setAuthEditValue(a.authorizationNumber || '');
+  };
+
+  const cancelEditAuth = () => {
+    setAuthEditingId(null);
+    setAuthEditValue('');
+  };
+
+  const saveAuth = async (id: string) => {
+    setSavingAuthId(id);
+    try {
+      await api.patch(`/scheduling/calls/${id}/authorization`, {
+        authorizationNumber: authEditValue.trim() || null,
+      });
+      showToast('Autorizacao salva!');
+      setAuthEditingId(null);
+      setAuthEditValue('');
+      fetchAppointments();
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao salvar autorizacao');
+    } finally {
+      setSavingAuthId(null);
+    }
   };
 
   const handleCancel = async (id: string) => {
@@ -450,14 +590,76 @@ export function SchedulingPage() {
                               <p className="text-xl font-bold text-[#1E3A5F]">{format(new Date(a.date), 'dd')}</p>
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium text-slate-800">{a.customer?.name || a.name}</span>
                                 {a.customer && <span className="text-xs bg-[#EFF6FF] text-[#1E3A5F] px-1.5 py-0.5 rounded">Paciente vinculado</span>}
+                                {a.doctor ? (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
+                                    <Stethoscope size={11} /> {a.doctor.name}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">
+                                    <AlertTriangle size={11} /> Sem medico
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() => openDoctorEdit(a)}
+                                  title="Editar medico"
+                                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                                >
+                                  <UserCog size={13} />
+                                </button>
                               </div>
                               <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
                                 <span className="flex items-center gap-1"><Clock size={14} />{format(new Date(a.date), 'HH:mm')}</span>
                                 <span className="flex items-center gap-1"><Phone size={14} />{a.phone}</span>
                               </div>
+                              {/* Authorization badge — only when patient has convenio */}
+                              {a.customerId && convenioMap[a.customerId] && (
+                                <div className="mt-2">
+                                  {authEditingId === a.id ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="text"
+                                        value={authEditValue}
+                                        onChange={(e) => setAuthEditValue(e.target.value)}
+                                        placeholder="Numero de autorizacao"
+                                        className="px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={() => saveAuth(a.id)}
+                                        disabled={savingAuthId === a.id}
+                                        className="p-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                      >
+                                        <Check size={12} />
+                                      </button>
+                                      <button
+                                        onClick={cancelEditAuth}
+                                        className="p-1 rounded bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    </div>
+                                  ) : a.authorizationNumber ? (
+                                    <button
+                                      onClick={() => startEditAuth(a)}
+                                      className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
+                                      title="Clique para editar"
+                                    >
+                                      <ShieldCheck size={11} /> Autorizado: {a.authorizationNumber}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => startEditAuth(a)}
+                                      className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-100"
+                                      title="Clique para adicionar numero de autorizacao"
+                                    >
+                                      <ShieldAlert size={11} /> Sem autorizacao
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                               {a.notes && <p className="text-xs text-slate-400 mt-1">{a.notes}</p>}
                             </div>
                           </div>
@@ -498,19 +700,88 @@ export function SchedulingPage() {
                       const isRealized = a.status === 'completed';
                       const hasProcs = (a.procedures?.length || 0) > 0;
                       return (
-                        <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex items-center justify-between opacity-90">
-                          <div className="flex items-center gap-3">
-                            {isRealized && hasProcs && (
-                              <span title="TUSS vinculado" className="flex items-center text-emerald-600"><FileCheck2 size={16} /></span>
-                            )}
-                            {isRealized && !hasProcs && (
-                              <span title="Sem TUSS vinculado" className="flex items-center text-amber-500"><AlertCircle size={16} /></span>
-                            )}
-                            <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
-                            <span className="text-sm font-medium text-slate-800">{a.customer?.name || a.name}</span>
-                            <span className="text-sm text-slate-500">{a.phone}</span>
+                        <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-col md:flex-row md:items-center justify-between gap-2 opacity-90">
+                          <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {isRealized && hasProcs && (
+                                <button
+                                  onClick={() => openTussModalForCall(a, true)}
+                                  title="Clique para editar TUSS"
+                                  className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
+                                >
+                                  <FileCheck2 size={12} /> TUSS
+                                </button>
+                              )}
+                              {isRealized && !hasProcs && (
+                                <span title="Sem TUSS vinculado" className="flex items-center text-amber-500"><AlertCircle size={14} /></span>
+                              )}
+                              <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
+                              <span className="text-sm font-medium text-slate-800 truncate">{a.customer?.name || a.name}</span>
+                              <span className="text-sm text-slate-500 hidden sm:inline">{a.phone}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {a.doctor ? (
+                                <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
+                                  <Stethoscope size={11} /> {a.doctor.name}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">
+                                  <AlertTriangle size={11} /> Sem medico
+                                </span>
+                              )}
+                              <button
+                                onClick={() => openDoctorEdit(a)}
+                                title="Editar medico"
+                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                              >
+                                <UserCog size={12} />
+                              </button>
+                              {a.customerId && convenioMap[a.customerId] && (
+                                authEditingId === a.id ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={authEditValue}
+                                      onChange={(e) => setAuthEditValue(e.target.value)}
+                                      placeholder="Numero de autorizacao"
+                                      className="px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => saveAuth(a.id)}
+                                      disabled={savingAuthId === a.id}
+                                      className="p-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                    >
+                                      <Check size={12} />
+                                    </button>
+                                    <button
+                                      onClick={cancelEditAuth}
+                                      className="p-1 rounded bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ) : a.authorizationNumber ? (
+                                  <button
+                                    onClick={() => startEditAuth(a)}
+                                    className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
+                                    title="Clique para editar"
+                                  >
+                                    <ShieldCheck size={11} /> Autorizado: {a.authorizationNumber}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => startEditAuth(a)}
+                                    className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-100"
+                                    title="Clique para adicionar numero"
+                                  >
+                                    <ShieldAlert size={11} /> Sem autorizacao
+                                  </button>
+                                )
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             {isRealized && !hasProcs && (
                               <button
                                 onClick={() => openRegistrarTussForExisting(a)}
@@ -852,6 +1123,56 @@ export function SchedulingPage() {
                 className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
               >
                 {tussSaving ? 'Registrando...' : 'Confirmar e registrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Doctor edit modal */}
+      {doctorEditCall && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-800">Alterar medico responsavel</h3>
+              <button onClick={() => setDoctorEditCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Paciente: <strong>{doctorEditCall.customer?.name || doctorEditCall.name}</strong> — {format(new Date(doctorEditCall.date), 'dd/MM/yyyy HH:mm')}
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Medico</label>
+              <select
+                value={doctorEditValue}
+                onChange={(e) => setDoctorEditValue(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">— Sem medico —</option>
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}{d.especialidade ? ` — ${d.especialidade}` : ''}
+                  </option>
+                ))}
+              </select>
+              {doctorEditCall.status === 'completed' && (
+                <p className="text-xs text-amber-600 mt-2">
+                  Esta consulta ja foi realizada. Ao salvar, os lancamentos financeiros serao recalculados com o repasse do novo medico.
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setDoctorEditCall(null)}
+                className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveDoctorEdit}
+                disabled={savingDoctor}
+                className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
+              >
+                {savingDoctor ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>

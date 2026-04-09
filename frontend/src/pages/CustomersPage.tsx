@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, ChevronDown, ChevronUp, Download, FileText, Shield, ClipboardList } from 'lucide-react';
+import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, ChevronDown, ChevronUp, Download, FileText, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -188,16 +188,9 @@ export function CustomersPage() {
 
   // Convenio state
   const [conveniosList, setConveniosList] = useState<any[]>([]);
-  const [patientConvenio, setPatientConvenio] = useState<any>(null);
+  const [, setPatientConvenio] = useState<any>(null);
   const [convenioForm, setConvenioForm] = useState({ convenioId: '', numeroCarteirinha: '', validade: '', titular: 'PROPRIO', nomeTitular: '' });
   const [savingConvenio, setSavingConvenio] = useState(false);
-  const [showAutorizacoes, setShowAutorizacoes] = useState(false);
-  const [autorizacoes, setAutorizacoes] = useState<any[]>([]);
-  const [loadingAutorizacoes, setLoadingAutorizacoes] = useState(false);
-  const [showNewAutorizacao, setShowNewAutorizacao] = useState(false);
-  const [autorizacaoForm, setAutorizacaoForm] = useState({ procedimento: '', codigoTUSS: '', observacoes: '' });
-  const [savingAutorizacao, setSavingAutorizacao] = useState(false);
-  const [editAutorizacao, setEditAutorizacao] = useState<any>(null);
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -470,47 +463,6 @@ export function CustomersPage() {
     } catch (err: any) {
       showToast(err.response?.data?.error?.message || 'Erro ao salvar convenio');
     } finally { setSavingConvenio(false); }
-  };
-
-  const fetchAutorizacoes = async (patientId: string) => {
-    setLoadingAutorizacoes(true);
-    try {
-      const { data } = await api.get(`/convenios/patients/${patientId}/autorizacoes`);
-      setAutorizacoes(data.data || []);
-    } catch { setAutorizacoes([]); }
-    finally { setLoadingAutorizacoes(false); }
-  };
-
-  const handleCreateAutorizacao = async () => {
-    if (!selectedCustomer || !autorizacaoForm.procedimento) {
-      showToast('Informe o procedimento');
-      return;
-    }
-    setSavingAutorizacao(true);
-    try {
-      await api.post(`/convenios/patients/${selectedCustomer.id}/autorizacoes`, autorizacaoForm);
-      setShowNewAutorizacao(false);
-      setAutorizacaoForm({ procedimento: '', codigoTUSS: '', observacoes: '' });
-      await fetchAutorizacoes(selectedCustomer.id);
-      showToast('Autorizacao solicitada! Acesse o portal do convenio para finalizar.');
-    } catch (err: any) {
-      showToast(err.response?.data?.error?.message || 'Erro ao solicitar autorizacao');
-    } finally { setSavingAutorizacao(false); }
-  };
-
-  const handleUpdateAutorizacao = async () => {
-    if (!editAutorizacao) return;
-    try {
-      await api.put(`/convenios/autorizacoes/${editAutorizacao.id}`, {
-        status: editAutorizacao.status,
-        numeroAutorizacao: editAutorizacao.numeroAutorizacao,
-        observacoes: editAutorizacao.observacoes,
-        dataResposta: editAutorizacao.status !== 'PENDENTE' ? new Date().toISOString() : undefined,
-      });
-      setEditAutorizacao(null);
-      if (selectedCustomer) await fetchAutorizacoes(selectedCustomer.id);
-      showToast('Autorizacao atualizada!');
-    } catch { showToast('Erro ao atualizar autorizacao'); }
   };
 
   // Load prontuario sub-section data when switching
@@ -862,15 +814,6 @@ export function CustomersPage() {
                       <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                         <Shield size={16} className="text-blue-500" /> Convenio / Plano de Saude
                       </h4>
-                      {patientConvenio?.autorizacoes?.[0] && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          patientConvenio.autorizacoes[0].status === 'APROVADA' ? 'bg-emerald-100 text-emerald-700'
-                          : patientConvenio.autorizacoes[0].status === 'NEGADA' ? 'bg-red-100 text-red-700'
-                          : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          Ult. autoriz.: {patientConvenio.autorizacoes[0].status}
-                        </span>
-                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -912,16 +855,6 @@ export function CustomersPage() {
                       <button type="button" onClick={handleSaveConvenio} disabled={savingConvenio} className="px-3 py-1.5 bg-[#1E3A5F] text-white text-xs rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
                         {savingConvenio ? 'Salvando...' : 'Salvar Convenio'}
                       </button>
-                      {patientConvenio && (
-                        <>
-                          <button type="button" onClick={() => { setShowAutorizacoes(true); fetchAutorizacoes(selectedCustomer.id); }} className="px-3 py-1.5 border border-slate-300 text-xs rounded-lg text-slate-600 hover:bg-slate-50 flex items-center gap-1">
-                            <ClipboardList size={12} /> Ver Autorizacoes
-                          </button>
-                          <button type="button" onClick={() => { setShowAutorizacoes(true); setShowNewAutorizacao(true); fetchAutorizacoes(selectedCustomer.id); }} className="px-3 py-1.5 border border-blue-300 text-xs rounded-lg text-blue-600 hover:bg-blue-50 flex items-center gap-1">
-                            <Plus size={12} /> Nova Autorizacao
-                          </button>
-                        </>
-                      )}
                     </div>
                   </div>
 
@@ -1721,116 +1654,6 @@ export function CustomersPage() {
         </div>
         );
       })()}
-
-      {/* Autorizacoes Modal */}
-      {showAutorizacoes && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-2xl shadow-xl max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                <ClipboardList size={20} /> Autorizacoes
-                {patientConvenio?.convenio?.nome && <span className="text-sm font-normal text-slate-500">- {patientConvenio.convenio.nome}</span>}
-              </h2>
-              <button onClick={() => { setShowAutorizacoes(false); setShowNewAutorizacao(false); setEditAutorizacao(null); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-            </div>
-            <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              {/* New Authorization Form */}
-              {showNewAutorizacao && (
-                <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
-                  <h4 className="text-sm font-medium text-slate-800">Nova Autorizacao</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Procedimento *</label>
-                      <input type="text" value={autorizacaoForm.procedimento} onChange={e => setAutorizacaoForm({ ...autorizacaoForm, procedimento: e.target.value })} className={inputCls} placeholder="Ex: Consulta oftalmologica" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Codigo TUSS</label>
-                      <input type="text" value={autorizacaoForm.codigoTUSS} onChange={e => setAutorizacaoForm({ ...autorizacaoForm, codigoTUSS: e.target.value })} className={inputCls} placeholder="Opcional" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                    <textarea value={autorizacaoForm.observacoes} onChange={e => setAutorizacaoForm({ ...autorizacaoForm, observacoes: e.target.value })} className={inputCls + ' h-16 resize-none'} />
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setShowNewAutorizacao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                    <button onClick={handleCreateAutorizacao} disabled={savingAutorizacao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
-                      {savingAutorizacao ? 'Solicitando...' : 'Solicitar'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {!showNewAutorizacao && (
-                <button onClick={() => setShowNewAutorizacao(true)} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#2A4D7A]">
-                  <Plus size={16} /> Nova Autorizacao
-                </button>
-              )}
-
-              {/* Edit Authorization Inline */}
-              {editAutorizacao && (
-                <div className="p-4 border border-amber-200 bg-amber-50/50 rounded-lg space-y-3">
-                  <h4 className="text-sm font-medium text-slate-800">Atualizar Autorizacao</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-                      <select value={editAutorizacao.status} onChange={e => setEditAutorizacao({ ...editAutorizacao, status: e.target.value })} className={inputCls}>
-                        <option value="PENDENTE">Pendente</option>
-                        <option value="APROVADA">Aprovada</option>
-                        <option value="NEGADA">Negada</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Numero da autorizacao</label>
-                      <input type="text" value={editAutorizacao.numeroAutorizacao || ''} onChange={e => setEditAutorizacao({ ...editAutorizacao, numeroAutorizacao: e.target.value })} className={inputCls} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                    <textarea value={editAutorizacao.observacoes || ''} onChange={e => setEditAutorizacao({ ...editAutorizacao, observacoes: e.target.value })} className={inputCls + ' h-16 resize-none'} />
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setEditAutorizacao(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                    <button onClick={handleUpdateAutorizacao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A]">Salvar</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Autorizacoes List */}
-              {loadingAutorizacoes ? (
-                <p className="text-sm text-slate-500 text-center py-8">Carregando...</p>
-              ) : autorizacoes.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">Nenhuma autorizacao registrada.</p>
-              ) : (
-                <div className="space-y-2">
-                  {autorizacoes.map((a: any) => {
-                    const statusCls = a.status === 'APROVADA' ? 'bg-emerald-100 text-emerald-700'
-                      : a.status === 'NEGADA' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
-                    return (
-                      <div key={a.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50/50 transition-colors">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${statusCls}`}>{a.status}</span>
-                            <span className="text-sm font-medium text-slate-800">{a.procedimento}</span>
-                            {a.codigoTUSS && <span className="text-xs text-slate-400">TUSS: {a.codigoTUSS}</span>}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-400">{format(new Date(a.dataSolicitacao), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                            <button onClick={() => setEditAutorizacao({ ...a })} className="text-xs text-[#1E3A5F] hover:text-[#2A4D7A] font-medium">Editar</button>
-                          </div>
-                        </div>
-                        {a.numeroAutorizacao && <p className="text-xs text-slate-500">Autoriz: {a.numeroAutorizacao}</p>}
-                        {a.dataResposta && <p className="text-xs text-slate-500">Resposta: {format(new Date(a.dataResposta), 'dd/MM/yyyy', { locale: ptBR })}</p>}
-                        {a.observacoes && <p className="text-xs text-slate-400 mt-1">{a.observacoes}</p>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Toast notification */}
       {toastMsg && (

@@ -1,6 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { schedulingService } from './scheduling.service';
-import { bookCallSchema, updateConfigSchema, updateCallStatusSchema, linkProceduresSchema } from './scheduling.validators';
+import {
+  bookCallSchema,
+  updateConfigSchema,
+  updateCallStatusSchema,
+  linkProceduresSchema,
+  updateCallDoctorSchema,
+  updateCallAuthorizationSchema,
+  replaceProceduresSchema,
+} from './scheduling.validators';
 import { AppError } from '../../shared/middleware/error-handler';
 import { success, created } from '../../shared/utils/response';
 import { authenticate, requireRole, requireTenant, optionalAuth } from '../../shared/middleware/auth';
@@ -126,12 +134,42 @@ router.patch('/calls/:id', authenticate, requireTenant, async (req: Request, res
   return success(res, call);
 });
 
-// POST /calls/:id/procedures — link TUSS procedures to a realized call
+// POST /calls/:id/procedures — link TUSS procedures to a realized call (append)
 router.post('/calls/:id/procedures', authenticate, requireTenant, async (req: Request, res: Response, next) => {
   try {
     const id = req.params.id as string;
     const data = linkProceduresSchema.parse(req.body);
     const call = await schedulingService.linkProcedures(id, req.auth!.tenantId!, data);
+    return success(res, call);
+  } catch (err) { next(err); }
+});
+
+// PUT /calls/:id/procedures — replace all linked procedures and re-sync financials
+router.put('/calls/:id/procedures', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const data = replaceProceduresSchema.parse(req.body);
+    const call = await schedulingService.replaceProcedures(id, req.auth!.tenantId!, data);
+    return success(res, call);
+  } catch (err) { next(err); }
+});
+
+// PATCH /calls/:id/doctor — assign or change the doctor, re-sync financials if completed
+router.patch('/calls/:id/doctor', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const data = updateCallDoctorSchema.parse(req.body);
+    const call = await schedulingService.updateCallDoctor(id, req.auth!.tenantId!, data.doctorId);
+    return success(res, call);
+  } catch (err) { next(err); }
+});
+
+// PATCH /calls/:id/authorization — update convenio authorization number
+router.patch('/calls/:id/authorization', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const data = updateCallAuthorizationSchema.parse(req.body);
+    const call = await schedulingService.updateCallAuthorization(id, req.auth!.tenantId!, data.authorizationNumber);
     return success(res, call);
   } catch (err) { next(err); }
 });
