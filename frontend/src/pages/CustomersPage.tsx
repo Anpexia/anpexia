@@ -72,7 +72,7 @@ interface Customer {
 }
 
 type ModalMode = 'closed' | 'create' | 'detail';
-type DetailTab = 'info' | 'prontuario' | 'prescricoes' | 'atestados' | 'appointments' | 'whatsapp';
+type DetailTab = 'info' | 'prontuario' | 'prescricoes' | 'atestados' | 'appointments';
 
 const emptyForm = { name: '', phone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } };
 
@@ -91,14 +91,6 @@ const entryTypeLabels: Record<string, { label: string; cls: string }> = {
   procedure: { label: 'Procedimento', cls: 'bg-emerald-100 text-emerald-700' },
   prescription: { label: 'Prescricao', cls: 'bg-violet-100 text-violet-700' },
   exam: { label: 'Exame', cls: 'bg-amber-100 text-amber-700' },
-};
-
-const msgStatusMap: Record<string, { label: string; cls: string }> = {
-  SENT: { label: 'Enviada', cls: 'bg-green-100 text-green-700' },
-  DELIVERED: { label: 'Entregue', cls: 'bg-emerald-100 text-emerald-700' },
-  READ: { label: 'Lida', cls: 'bg-blue-100 text-blue-700' },
-  FAILED: { label: 'Falhou', cls: 'bg-red-100 text-red-700' },
-  PENDING: { label: 'Pendente', cls: 'bg-yellow-100 text-yellow-700' },
 };
 
 function populateForm(c: Customer) {
@@ -727,7 +719,6 @@ export function CustomersPage() {
                 { key: 'prescricoes', label: 'Prescricoes', icon: FileText },
                 { key: 'atestados', label: 'Atestados', icon: FileText },
                 { key: 'appointments', label: 'Consultas', icon: Calendar },
-                { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
               ] as const).map((tab) => (
                 <button key={tab.key} onClick={() => setDetailTab(tab.key)}
                   className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === tab.key ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
@@ -740,9 +731,6 @@ export function CustomersPage() {
                   )}
                   {tab.key === 'appointments' && selectedCustomer.scheduledCalls && selectedCustomer.scheduledCalls.length > 0 && (
                     <span className="bg-[#EFF6FF] text-[#1E3A5F] text-xs px-1.5 py-0.5 rounded">{selectedCustomer.scheduledCalls.length}</span>
-                  )}
-                  {tab.key === 'whatsapp' && selectedCustomer.chatMessages && selectedCustomer.chatMessages.length > 0 && (
-                    <span className="bg-green-50 text-green-600 text-xs px-1.5 py-0.5 rounded">{selectedCustomer.chatMessages.length}</span>
                   )}
                 </button>
               ))}
@@ -1589,66 +1577,6 @@ export function CustomersPage() {
                 </div>
               )}
 
-              {/* WHATSAPP TAB */}
-              {detailTab === 'whatsapp' && (
-                <div>
-                  {(!selectedCustomer.chatMessages || selectedCustomer.chatMessages.length === 0) && (!selectedCustomer.messagesSent || selectedCustomer.messagesSent.length === 0) ? (
-                    <p className="text-sm text-slate-500 text-center py-8">Nenhuma mensagem registrada para este paciente.</p>
-                  ) : (
-                    <div className="space-y-6">
-                      {selectedCustomer.chatMessages && selectedCustomer.chatMessages.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-slate-800 mb-3 flex items-center gap-2">
-                            <MessageSquare size={16} className="text-green-600" /> Conversas WhatsApp
-                          </h4>
-                          <div className="space-y-2 max-h-80 overflow-y-auto bg-slate-50 rounded-lg p-4">
-                            {[...selectedCustomer.chatMessages].reverse().map((msg) => (
-                              <div key={msg.id} className={`flex ${msg.direction === 'OUTGOING' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[75%] rounded-lg p-3 ${msg.direction === 'OUTGOING' ? 'bg-[#1E3A5F] text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>
-                                  <p className={`text-xs mb-1 font-medium ${msg.direction === 'OUTGOING' ? 'text-blue-200' : 'text-slate-500'}`}>
-                                    {msg.direction === 'OUTGOING' ? 'Bot' : msg.senderName}
-                                  </p>
-                                  <p className="text-sm whitespace-pre-wrap">{msg.body}</p>
-                                  {msg.metadata?.buttonResponseId && (
-                                    <p className={`text-xs mt-1 italic ${msg.direction === 'OUTGOING' ? 'text-blue-200' : 'text-slate-400'}`}>
-                                      Botao: {msg.metadata.buttonResponseText || msg.metadata.buttonResponseId}
-                                    </p>
-                                  )}
-                                  <p className={`text-xs mt-1 ${msg.direction === 'OUTGOING' ? 'text-blue-300' : 'text-slate-400'}`}>
-                                    {format(new Date(msg.createdAt), 'dd/MM HH:mm')}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedCustomer.messagesSent && selectedCustomer.messagesSent.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-slate-800 mb-3 flex items-center gap-2">
-                            <Send size={16} className="text-[#1E3A5F]" /> Mensagens enviadas
-                          </h4>
-                          <div className="space-y-2">
-                            {selectedCustomer.messagesSent.map((m) => {
-                              const st = msgStatusMap[m.status] || { label: m.status, cls: 'bg-gray-100 text-gray-600' };
-                              return (
-                                <div key={m.id} className="p-3 border border-slate-200 rounded-lg">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
-                                    <span className="text-xs text-slate-400">{m.sentAt ? format(new Date(m.sentAt), 'dd/MM HH:mm') : format(new Date(m.createdAt), 'dd/MM HH:mm')}</span>
-                                  </div>
-                                  <p className="text-sm text-slate-700">{m.body}</p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>
