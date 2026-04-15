@@ -135,15 +135,21 @@ export function SchedulingPage() {
   // Doctors
   const [doctors, setDoctors] = useState<Doctor[]>([]);
 
-  // Registrar TUSS (ao clicar em "Realizado")
+  // Confirmar Realizacao (ao clicar em "Realizado")
   const [tussModalCall, setTussModalCall] = useState<Appointment | null>(null);
   const [tussModalProcedures, setTussModalProcedures] = useState<TussProc[]>([]);
   const [tussLoadingList, setTussLoadingList] = useState(false);
-  const [tussSelected, setTussSelected] = useState<Record<string, { checked: boolean; authorizationNumber: string }>>({});
+  // Single-select: id of chosen TUSS procedure
+  const [tussChosenId, setTussChosenId] = useState<string>('');
+  const [tussAuthNumber, setTussAuthNumber] = useState<string>('');
   const [tussSaving, setTussSaving] = useState(false);
+  // Doctor repasse percentages keyed by procedureType
+  const [tussDoctorRepasse, setTussDoctorRepasse] = useState<Record<string, number> | null>(null);
   // When true, saving the TUSS modal REPLACES procedures (edit mode) instead of
-  // appending and marking completed (registration mode from "Realizado" button).
+  // registering + marking completed.
   const [tussEditMode, setTussEditMode] = useState(false);
+  // When true, the call is already completed (legacy "Registrar TUSS") — skip status change.
+  const [tussAlreadyCompleted, setTussAlreadyCompleted] = useState(false);
 
   // Assign/change doctor
   const [doctorEditCall, setDoctorEditCall] = useState<Appointment | null>(null);
@@ -331,30 +337,10 @@ export function SchedulingPage() {
     } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao atualizar status.'); } finally { setUpdatingId(null); }
   };
 
-  // When clicking "Realizado":
-  // - If patient has convenio: open TUSS modal to select procedures before marking completed.
-  // - Otherwise: mark as completed directly.
+  // When clicking "Realizado": always open the "Confirmar Realizacao" modal
+  // so the user picks the TUSS procedure that triggers the financial posting.
   const handleRealized = async (a: Appointment) => {
-    const hasConvenio = await patientHasConvenio(a);
-    if (hasConvenio) {
-      await openTussModalForCall(a, false);
-    } else {
-      await handleStatusChange(a.id, 'completed');
-    }
-  };
-
-  const patientHasConvenio = async (a: Appointment): Promise<boolean> => {
-    if (!a.customerId) return false;
-    if (convenioMap[a.customerId] !== undefined) return convenioMap[a.customerId];
-    try {
-      const { data } = await api.get(`/convenios/patients/${a.customerId}`);
-      const has = !!data.data;
-      setConvenioMap((m) => ({ ...m, [a.customerId!]: has }));
-      return has;
-    } catch {
-      setConvenioMap((m) => ({ ...m, [a.customerId!]: false }));
-      return false;
-    }
+    await openTussModalForCall(a, false);
   };
 
   // Prefetch convenio flags for all appointments with customers so we can show
@@ -391,7 +377,10 @@ export function SchedulingPage() {
   const openTussModalForCall = async (a: Appointment, editMode: boolean) => {
     setTussModalCall(a);
     setTussEditMode(editMode);
-    setTussSelected({});
+    setTussAlreadyCompleted(a.status === 'completed');
+    setTussChosenId('');
+    setTussAuthNumber('');
+    setTussDoctorRepasse(null);
     setTussLoadingList(true);
     try {
       // Load procedures for the patient's convenio (if known), otherwise all
@@ -406,19 +395,9 @@ export function SchedulingPage() {
       if (convenioId) params.convenioId = convenioId;
       const { data } = await api.get('/tuss/procedures', { params });
       const list: TussProc[] = data.data || [];
-      setTussModalProcedures(list);
 
-      // In edit mode, pre-select procedures already linked to the call
+      // In edit mode, ensure pre-existing procedures are visible in the list
       if (editMode && a.procedures && a.procedures.length > 0) {
-        const preset: Record<string, { checked: boolean; authorizationNumber: string }> = {};
-        for (const p of a.procedures) {
-          preset[p.tussProcedure.id] = {
-            checked: true,
-            authorizationNumber: p.authorizationNumber || '',
-          };
-        }
-        // Ensure any pre-selected procedure is present in the list (in case it's
-        // filtered out by convenio — add it so the user still sees it)
         const listIds = new Set(list.map((l) => l.id));
         const extras: TussProc[] = [];
         for (const p of a.procedures) {
@@ -433,8 +412,26 @@ export function SchedulingPage() {
             });
           }
         }
-        if (extras.length > 0) setTussModalProcedures([...extras, ...list]);
-        setTussSelected(preset);
+        setTussModalProcedures([...extras, ...list]);
+        // Pre-select first existing procedure
+        const first = a.procedures[0];
+        setTussChosenId(first.tussProcedure.id);
+        setTussAuthNumber(first.authorizationNumber || '');
+      } else {
+        setTussModalProcedures(list);
+      }
+
+      // Fetch doctor repasse percentages (one row per type)
+      if (a.doctorId) {
+        try {
+          const { data: repasseData } = await api.get(`/doctors/${a.doctorId}/repasse`);
+          const rows: Array<{ procedureType: string; percentage: number }> = repasseData.data || [];
+          const map: Record<string, number> = {};
+          for (const r of rows) map[r.procedureType] = Number(r.percentage) || 0;
+          setTussDoctorRepasse(map);
+        } catch {
+          setTussDoctorRepasse({});
+        }
       }
     } catch {
       setTussModalProcedures([]);
@@ -445,29 +442,32 @@ export function SchedulingPage() {
 
   const submitTussModal = async () => {
     if (!tussModalCall) return;
-    const selected = Object.entries(tussSelected)
-      .filter(([, v]) => v.checked)
-      .map(([id, v]) => ({ tussProcedureId: id, authorizationNumber: v.authorizationNumber || null }));
-
-    if (selected.length === 0 && !tussEditMode) {
-      showToast('Selecione ao menos um procedimento');
+    if (!tussChosenId) {
+      showToast('Selecione um procedimento TUSS');
       return;
     }
+    const selected = [{ tussProcedureId: tussChosenId, authorizationNumber: tussAuthNumber.trim() || null }];
+
     setTussSaving(true);
     try {
       if (tussEditMode) {
         // Replace-all endpoint re-syncs financials automatically for completed calls
         await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
-        showToast('Procedimentos atualizados!');
+        showToast('Procedimento atualizado!');
+      } else if (tussAlreadyCompleted) {
+        // Legacy "Registrar TUSS" flow: call is already completed, just attach procedure.
+        // PUT replaces and re-syncs financials (idempotent — dedup by call tag in notes).
+        await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
+        showToast('Procedimento registrado!');
       } else {
         await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
         await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
-        showToast('Procedimentos registrados!');
+        showToast('Realizacao confirmada!');
       }
       setTussModalCall(null);
       fetchAppointments();
     } catch (err: any) {
-      showToast(err?.response?.data?.error?.message || 'Erro ao salvar procedimentos');
+      showToast(err?.response?.data?.error?.message || 'Erro ao salvar procedimento');
     } finally {
       setTussSaving(false);
     }
@@ -706,10 +706,10 @@ export function SchedulingPage() {
                               {isRealized && hasProcs && (
                                 <button
                                   onClick={() => openTussModalForCall(a, true)}
-                                  title="Clique para editar TUSS"
+                                  title={`Clique para editar TUSS — ${a.procedures?.map((p) => `${p.tussProcedure.code} ${p.tussProcedure.description}`).join('; ')}`}
                                   className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
                                 >
-                                  <FileCheck2 size={12} /> TUSS
+                                  <FileCheck2 size={12} /> TUSS {a.procedures?.[0]?.tussProcedure.code}
                                 </button>
                               )}
                               {isRealized && !hasProcs && (
@@ -1045,16 +1045,35 @@ export function SchedulingPage() {
         </div>
       )}
 
-      {/* TUSS Procedures Modal — triggered by "Realizado" when patient has convenio */}
-      {tussModalCall && (
+      {/* Confirmar Realizacao Modal — triggered by "Realizado" button */}
+      {tussModalCall && (() => {
+        const chosen = tussModalProcedures.find((p) => p.id === tussChosenId) || null;
+        const valorTotal = chosen ? Number(chosen.value) : 0;
+        // Pick repasse pct by TUSS type (fallback OUTROS)
+        let pct = 0;
+        if (chosen && tussDoctorRepasse) {
+          pct = tussDoctorRepasse[chosen.type] ?? tussDoctorRepasse['OUTROS'] ?? 0;
+        }
+        const repasse = (valorTotal * pct) / 100;
+        const receitaClinica = valorTotal - repasse;
+        const hasDoctor = !!tussModalCall.doctorId;
+        return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-800">Registrar procedimentos realizados</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-slate-800">
+                {tussEditMode ? 'Editar procedimento TUSS' : 'Confirmar Realização'}
+              </h3>
               <button onClick={() => setTussModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
             <p className="text-xs text-slate-500 mb-4">
+              {tussEditMode
+                ? 'Altere o procedimento TUSS vinculado a esta consulta.'
+                : 'Selecione o procedimento TUSS realizado para registrar o financeiro automaticamente.'}
+            </p>
+            <p className="text-xs text-slate-500 mb-4">
               Paciente: <strong>{tussModalCall.customer?.name || tussModalCall.name}</strong> — {format(new Date(tussModalCall.date), 'dd/MM/yyyy HH:mm')}
+              {tussModalCall.doctor && <> · Medico: <strong>{tussModalCall.doctor.name}</strong></>}
             </p>
 
             {tussLoadingList ? (
@@ -1063,54 +1082,72 @@ export function SchedulingPage() {
               </div>
             ) : tussModalProcedures.length === 0 ? (
               <div className="text-center py-8 text-sm text-slate-500">
-                Nenhum procedimento TUSS cadastrado para este convenio.
+                Nenhum procedimento TUSS cadastrado.
                 <br />
                 Cadastre em Configuracoes &gt; Procedimentos TUSS.
               </div>
             ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {tussModalProcedures.map((p) => {
-                  const sel = tussSelected[p.id] || { checked: false, authorizationNumber: '' };
-                  return (
-                    <div key={p.id} className={`border rounded-lg p-3 ${sel.checked ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200'}`}>
-                      <label className="flex items-start gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={sel.checked}
-                          onChange={(e) => setTussSelected((s) => ({
-                            ...s,
-                            [p.id]: { checked: e.target.checked, authorizationNumber: s[p.id]?.authorizationNumber || '' },
-                          }))}
-                          className="mt-1 rounded border-slate-300"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono text-slate-500">{p.code}</span>
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{p.type}</span>
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Procedimento TUSS <span className="text-red-500">*</span></label>
+                  <select
+                    value={tussChosenId}
+                    onChange={(e) => setTussChosenId(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">Selecione um procedimento...</option>
+                    {tussModalProcedures.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.code} — {p.description} — R$ {Number(p.value).toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {chosen && (
+                  <>
+                    <div className="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Valor total:</span>
+                        <span className="font-semibold text-slate-800">R$ {valorTotal.toFixed(2)}</span>
+                      </div>
+                      {hasDoctor && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Repasse médico:</span>
+                            <span className="font-semibold text-indigo-700">
+                              R$ {repasse.toFixed(2)} <span className="text-xs text-slate-500">({pct}%)</span>
+                            </span>
                           </div>
-                          <p className="text-sm font-medium text-slate-800">{p.description}</p>
-                          <p className="text-xs text-slate-500">R$ {Number(p.value).toFixed(2)}</p>
-                          {sel.checked && (
-                            <input
-                              type="text"
-                              placeholder="Numero de autorizacao (opcional)"
-                              value={sel.authorizationNumber}
-                              onChange={(e) => setTussSelected((s) => ({
-                                ...s,
-                                [p.id]: { checked: true, authorizationNumber: e.target.value },
-                              }))}
-                              className="mt-2 w-full px-2 py-1.5 border border-slate-300 rounded text-xs"
-                            />
-                          )}
-                        </div>
-                      </label>
+                          <div className="flex justify-between pt-1.5 border-t border-slate-200">
+                            <span className="text-slate-600">Receita clínica:</span>
+                            <span className="font-semibold text-emerald-700">R$ {receitaClinica.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
+                      {!hasDoctor && (
+                        <p className="text-xs text-amber-600 pt-1">
+                          Sem medico vinculado — nenhum repasse sera lancado.
+                        </p>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+
+                    <div className="mb-4">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Numero de autorizacao (opcional)</label>
+                      <input
+                        type="text"
+                        value={tussAuthNumber}
+                        onChange={(e) => setTussAuthNumber(e.target.value)}
+                        placeholder="Ex.: 123456"
+                        className={inputCls}
+                      />
+                    </div>
+                  </>
+                )}
+              </>
             )}
 
-            <div className="flex gap-2 pt-4 mt-4 border-t border-slate-100">
+            <div className="flex gap-2 pt-4 mt-2 border-t border-slate-100">
               <button
                 onClick={() => setTussModalCall(null)}
                 className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
@@ -1119,15 +1156,16 @@ export function SchedulingPage() {
               </button>
               <button
                 onClick={submitTussModal}
-                disabled={tussSaving || tussLoadingList}
+                disabled={tussSaving || tussLoadingList || !tussChosenId}
                 className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
               >
-                {tussSaving ? 'Registrando...' : 'Confirmar e registrar'}
+                {tussSaving ? 'Salvando...' : (tussEditMode ? 'Salvar' : 'Confirmar Realização')}
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Doctor edit modal */}
       {doctorEditCall && (
