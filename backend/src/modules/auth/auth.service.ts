@@ -60,10 +60,10 @@ export const authService = {
     if (!user || !user.isActive) {
       await logAction({
         userEmail: email,
-        action: 'LOGIN_FAIL',
-        entity: 'User',
+        action: 'LOGIN',
+        entity: 'USER',
         ipAddress,
-        metadata: { reason: 'user_not_found_or_inactive' },
+        metadata: { reason: 'credenciais inválidas', detail: 'user_not_found_or_inactive' },
       });
       throw new AppError(401, 'INVALID_CREDENTIALS', 'E-mail ou senha incorretos');
     }
@@ -79,11 +79,11 @@ export const authService = {
         userEmail: user.email,
         userRole: user.role,
         tenantId: user.tenantId,
-        action: 'LOGIN_FAIL',
-        entity: 'User',
+        action: 'LOGIN',
+        entity: 'USER',
         entityId: user.id,
         ipAddress,
-        metadata: { reason: 'wrong_password' },
+        metadata: { reason: 'credenciais inválidas', detail: 'wrong_password' },
       });
       throw new AppError(401, 'INVALID_CREDENTIALS', 'E-mail ou senha incorretos');
     }
@@ -145,10 +145,11 @@ export const authService = {
       userEmail: user.email,
       userRole: user.role,
       tenantId: user.tenantId,
-      action: 'LOGIN_SUCCESS',
-      entity: 'User',
+      action: 'LOGIN',
+      entity: 'USER',
       entityId: user.id,
       ipAddress,
+      metadata: { result: 'success' },
     });
 
     return {
@@ -323,7 +324,7 @@ export const authService = {
         userRole: auth.role,
         tenantId: auth.tenantId,
         action: 'LOGOUT',
-        entity: 'User',
+        entity: 'USER',
         entityId: auth.userId,
         ipAddress,
       });

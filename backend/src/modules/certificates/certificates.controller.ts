@@ -3,6 +3,17 @@ import { certificatesService } from './certificates.service';
 import { generateCertificatePdf } from '../../services/pdf.service';
 import { success, created } from '../../shared/utils/response';
 import { authenticate, requireTenant } from '../../shared/middleware/auth';
+import { logAction, getClientIp } from '../../services/auditLog.service';
+
+function auditCtx(req: Request) {
+  return {
+    userId: req.auth?.userId,
+    userEmail: req.auth?.email,
+    userRole: req.auth?.role,
+    tenantId: req.auth?.tenantId,
+    ipAddress: getClientIp(req),
+  };
+}
 
 export const certificatesRouter = Router();
 
@@ -42,6 +53,7 @@ certificatesRouter.post('/medical-certificates', async (req: Request, res: Respo
       req.auth!.tenantId!,
       body,
     );
+    await logAction({ ...auditCtx(req), action: 'CREATE', entity: 'CERTIFICATE', entityId: (certificate as any)?.id, metadata: { patientId: (certificate as any)?.patientId } });
     return created(res, certificate);
   } catch (err: any) {
     console.error('[ATESTADO] erro:', err.message, err.stack);
@@ -54,6 +66,8 @@ certificatesRouter.get('/medical-certificates/:id/pdf', async (req: Request, res
     const tenantId = req.auth!.tenantId!;
     const certificateId = req.params.id as string;
     const pdfBuffer = await generateCertificatePdf(tenantId, certificateId);
+
+    await logAction({ ...auditCtx(req), action: 'PRINT', entity: 'CERTIFICATE', entityId: certificateId });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="atestado-${certificateId}.pdf"`);

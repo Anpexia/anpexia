@@ -14,8 +14,19 @@ import { success, created } from '../../shared/utils/response';
 import { authenticate, requireRole, requireTenant, optionalAuth } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
 import { handleConfirmResponse } from './scheduling.confirm';
+import { logAction, getClientIp } from '../../services/auditLog.service';
 
 const router = Router();
+
+function auditCtx(req: Request) {
+  return {
+    userId: req.auth?.userId,
+    userEmail: req.auth?.email,
+    userRole: req.auth?.role,
+    tenantId: req.auth?.tenantId,
+    ipAddress: getClientIp(req),
+  };
+}
 
 // ==========================================
 // PUBLIC ROUTES (no auth)
@@ -61,6 +72,8 @@ router.post('/book', optionalAuth, async (req: Request, res: Response, next) => 
     // tenantId comes from auth if available, otherwise from body
     const tenantId = (req as any).auth?.tenantId || req.body.tenantId || null;
     const call = await schedulingService.bookCall(data, tenantId);
+
+    await logAction({ ...auditCtx(req), tenantId: tenantId || null, action: 'CREATE', entity: 'APPOINTMENT', entityId: (call as any)?.id, metadata: { name: data.name, date: (call as any)?.date } });
 
     // Send confirmation email (non-blocking)
     if (data.email && tenantId) {
@@ -131,6 +144,7 @@ router.patch('/calls/:id', authenticate, requireTenant, async (req: Request, res
   const id = req.params.id as string;
   const data = updateCallStatusSchema.parse(req.body);
   const call = await schedulingService.updateCallStatus(id, data, req.auth!.tenantId!);
+  await logAction({ ...auditCtx(req), action: 'UPDATE', entity: 'APPOINTMENT', entityId: id, metadata: { status: data.status } });
   return success(res, call);
 });
 
@@ -178,6 +192,8 @@ router.patch('/calls/:id/authorization', authenticate, requireTenant, async (req
 router.delete('/calls/:id', authenticate, requireTenant, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const call = await schedulingService.cancelCall(id, req.auth!.tenantId!);
+
+  await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'APPOINTMENT', entityId: id });
 
   // Send cancellation email (non-blocking)
   if (call.email && req.auth!.tenantId) {

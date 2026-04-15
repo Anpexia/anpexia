@@ -3,6 +3,17 @@ import { prescriptionsService } from './prescriptions.service';
 import { generatePrescriptionPdf } from '../../services/pdf.service';
 import { success, created } from '../../shared/utils/response';
 import { authenticate, requireTenant } from '../../shared/middleware/auth';
+import { logAction, getClientIp } from '../../services/auditLog.service';
+
+function auditCtx(req: Request) {
+  return {
+    userId: req.auth?.userId,
+    userEmail: req.auth?.email,
+    userRole: req.auth?.role,
+    tenantId: req.auth?.tenantId,
+    ipAddress: getClientIp(req),
+  };
+}
 
 export const prescriptionsRouter = Router();
 
@@ -60,6 +71,7 @@ prescriptionsRouter.post('/prescriptions', async (req: Request, res: Response, n
       req.auth!.tenantId!,
       body,
     );
+    await logAction({ ...auditCtx(req), action: 'CREATE', entity: 'PRESCRIPTION', entityId: (prescription as any)?.id, metadata: { patientId: (prescription as any)?.patientId, type: (prescription as any)?.type } });
     return created(res, prescription);
   } catch (err: any) {
     console.error('[PRESCRICAO] erro:', err.message, err.stack);
@@ -72,6 +84,8 @@ prescriptionsRouter.get('/prescriptions/:id/pdf', async (req: Request, res: Resp
     const tenantId = req.auth!.tenantId!;
     const prescriptionId = req.params.id as string;
     const pdfBuffer = await generatePrescriptionPdf(tenantId, prescriptionId);
+
+    await logAction({ ...auditCtx(req), action: 'PRINT', entity: 'PRESCRIPTION', entityId: prescriptionId });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="prescricao-${prescriptionId}.pdf"`);

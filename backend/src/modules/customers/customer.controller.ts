@@ -5,12 +5,23 @@ import { success, created, noContent } from '../../shared/utils/response';
 import { authenticate, requireTenant } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
 import { createAuditLog } from '../../shared/middleware/audit';
+import { logAction, getClientIp } from '../../services/auditLog.service';
 import prisma from '../../config/database';
 
 export const customerRouter = Router();
 
 customerRouter.use(authenticate);
 customerRouter.use(requireTenant);
+
+function auditCtx(req: Request) {
+  return {
+    userId: req.auth?.userId,
+    userEmail: req.auth?.email,
+    userRole: req.auth?.role,
+    tenantId: req.auth?.tenantId,
+    ipAddress: getClientIp(req),
+  };
+}
 
 customerRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -43,13 +54,7 @@ customerRouter.post('/', async (req: Request, res: Response, next: NextFunction)
     const data = createCustomerSchema.parse(req.body);
     const customer = await customerService.create(req.auth!.tenantId!, data);
 
-    await createAuditLog({
-      req,
-      action: 'customer.create',
-      entity: 'Customer',
-      entityId: customer.id,
-      changes: { after: customer },
-    });
+    await logAction({ ...auditCtx(req), action: 'CREATE', entity: 'PATIENT', entityId: customer.id, metadata: { name: customer.name } });
 
     // Send welcome email (non-blocking)
     if (customer.email) {
@@ -70,12 +75,7 @@ customerRouter.put('/:id', async (req: Request, res: Response, next: NextFunctio
     const data = updateCustomerSchema.parse(req.body);
     const customer = await customerService.update(req.auth!.tenantId!, req.params.id as string, data);
 
-    await createAuditLog({
-      req,
-      action: 'customer.update',
-      entity: 'Customer',
-      entityId: customer.id,
-    });
+    await logAction({ ...auditCtx(req), action: 'UPDATE', entity: 'PATIENT', entityId: customer.id });
 
     return success(res, customer);
   } catch (err) {
@@ -87,12 +87,7 @@ customerRouter.delete('/:id', async (req: Request, res: Response, next: NextFunc
   try {
     await customerService.delete(req.auth!.tenantId!, req.params.id as string);
 
-    await createAuditLog({
-      req,
-      action: 'customer.delete',
-      entity: 'Customer',
-      entityId: req.params.id as string,
-    });
+    await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'PATIENT', entityId: req.params.id as string });
 
     return noContent(res);
   } catch (err) {
@@ -123,6 +118,7 @@ customerRouter.delete('/:id/tags/:tagId', async (req: Request, res: Response, ne
 customerRouter.get('/:id/medical-record', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const record = await customerService.getMedicalRecord(req.auth!.tenantId!, req.params.id as string);
+    await logAction({ ...auditCtx(req), action: 'VIEW', entity: 'PATIENT', entityId: req.params.id as string, metadata: { resource: 'medical-record' } });
     return success(res, record);
   } catch (err) {
     next(err);

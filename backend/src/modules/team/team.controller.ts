@@ -2,6 +2,17 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { teamService } from './team.service';
 import { success, created } from '../../shared/utils/response';
 import { authenticate, requireTenant, requireRole } from '../../shared/middleware/auth';
+import { logAction, getClientIp } from '../../services/auditLog.service';
+
+function auditCtx(req: Request) {
+  return {
+    userId: req.auth?.userId,
+    userEmail: req.auth?.email,
+    userRole: req.auth?.role,
+    tenantId: req.auth?.tenantId,
+    ipAddress: getClientIp(req),
+  };
+}
 
 export const teamRouter = Router();
 
@@ -68,6 +79,7 @@ teamRouter.post('/', requireRole('OWNER'), async (req: Request, res: Response, n
   try {
     console.log('[EQUIPE] body:', { ...req.body, password: '***' }, 'tenantId:', req.auth!.tenantId);
     const user = await teamService.create(req.auth!.tenantId!, req.body);
+    await logAction({ ...auditCtx(req), action: 'CREATE', entity: 'USER', entityId: (user as any)?.id, metadata: { email: (user as any)?.email, role: (user as any)?.role } });
     return created(res, user);
   } catch (err) {
     next(err);
@@ -78,6 +90,7 @@ teamRouter.post('/', requireRole('OWNER'), async (req: Request, res: Response, n
 teamRouter.put('/:id', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await teamService.update(req.auth!.tenantId!, req.params.id as string, req.body);
+    await logAction({ ...auditCtx(req), action: 'UPDATE', entity: 'USER', entityId: req.params.id as string });
     return success(res, user);
   } catch (err) {
     next(err);
@@ -98,6 +111,7 @@ teamRouter.patch('/:id/toggle', requireRole('OWNER'), async (req: Request, res: 
 teamRouter.delete('/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await teamService.remove(req.auth!.tenantId!, req.params.id as string, req.auth!.userId);
+    await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'USER', entityId: req.params.id as string });
     return success(res, result);
   } catch (err) {
     next(err);

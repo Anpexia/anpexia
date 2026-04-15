@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings, ShieldCheck } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
@@ -35,6 +36,36 @@ export function Layout() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { showWarning, dismissWarning } = useInactivityLogout();
+
+  // 2FA banner state
+  const [twoFAEnabled, setTwoFAEnabled] = useState<boolean | null>(
+    typeof user?.twoFactorEnabled === 'boolean' ? user.twoFactorEnabled : null,
+  );
+  const [bannerDismissed, setBannerDismissed] = useState<boolean>(
+    typeof window !== 'undefined' && localStorage.getItem('anpexia_2fa_banner_dismissed') === 'true',
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    if (typeof user.twoFactorEnabled === 'boolean') {
+      setTwoFAEnabled(user.twoFactorEnabled);
+      return;
+    }
+    api.get('/auth/me')
+      .then(({ data }) => setTwoFAEnabled(!!data?.data?.twoFactorEnabled))
+      .catch(() => setTwoFAEnabled(null));
+  }, [user]);
+
+  const showTwoFABanner = !!user && twoFAEnabled === false && !bannerDismissed;
+
+  const dismissTwoFABanner = () => {
+    localStorage.setItem('anpexia_2fa_banner_dismissed', 'true');
+    setBannerDismissed(true);
+  };
+
+  const goActivate2FA = () => {
+    navigate('/perfil?tab=seguranca');
+  };
 
   const navItems = allNavItems.filter(item => {
     const allowed = roleAllowedPaths[user?.role || 'EMPLOYEE'] || roleAllowedPaths.EMPLOYEE;
@@ -135,6 +166,31 @@ export function Layout() {
 
       {/* Main content */}
       <main className="md:ml-64 flex-1 h-screen overflow-y-auto pt-14 md:pt-0" style={{ backgroundColor: '#F8FAFC' }}>
+        {showTwoFABanner && (
+          <div
+            className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 md:px-8 py-3"
+            style={{ backgroundColor: '#1E3A5F', color: '#FFFFFF' }}
+          >
+            <span className="text-sm">
+              Aumente a segurança da sua conta ativando a autenticação em dois fatores.
+            </span>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={goActivate2FA}
+                className="text-sm font-medium px-3 py-1.5 rounded-md"
+                style={{ backgroundColor: '#FFFFFF', color: '#1E3A5F' }}
+              >
+                Ativar agora
+              </button>
+              <button
+                onClick={dismissTwoFABanner}
+                className="text-sm px-3 py-1.5 rounded-md border border-white/30 text-white hover:bg-white/10"
+              >
+                Agora não
+              </button>
+            </div>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto p-4 md:p-8">
           <Outlet />
         </div>
