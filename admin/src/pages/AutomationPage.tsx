@@ -1,297 +1,138 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Zap, Save, X, RefreshCw, Info } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Zap, Trash2, X } from 'lucide-react';
 import api from '../services/api';
 
-interface Template {
-  id: string;
-  key: string;
-  name: string;
-  trigger: string;
-  body: string;
-  delayMinutes: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+const TRIGGERS = [
+  { key: 'LEAD_CREATED', label: 'Lead criado' },
+  { key: 'STAGE_CHANGED', label: 'Estágio alterado' },
+  { key: 'LEAD_IDLE', label: 'Lead inativo' },
+  { key: 'DEAL_WON', label: 'Negócio fechado' },
+];
 
-const TRIGGER_LABELS: Record<string, string> = {
-  on_new_lead: 'Novo lead criado',
-  on_no_response_48h: 'Sem resposta (48h)',
-  on_no_response_96h: 'Sem resposta (96h)',
-  on_call_scheduled: 'Call agendada',
-  on_call_reminder: 'Lembrete de call',
-  on_contracted: 'Lead contratou',
-  on_onboarding: 'Inicio onboarding',
-};
+const ACTIONS = [
+  { key: 'CREATE_TASK', label: 'Criar tarefa' },
+  { key: 'SEND_NOTIFICATION', label: 'Enviar notificação' },
+];
+
+const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL_SENT', 'NEGOTIATION', 'WON', 'LOST'];
 
 export default function AutomationPage() {
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Template>>({});
-  const [saving, setSaving] = useState(false);
-  const [seeding, setSeeding] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
 
-  const fetchTemplates = useCallback(async () => {
+  const load = async () => {
+    setLoading(true);
     try {
-      const { data } = await api.get('/sales/templates');
-      setTemplates(data.data || []);
-    } catch (err) {
-      console.error('Erro ao carregar templates:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
-
-  const handleEdit = (template: Template) => {
-    setEditingId(template.id);
-    setEditForm({
-      name: template.name,
-      body: template.body,
-      delayMinutes: template.delayMinutes,
-      isActive: template.isActive,
-    });
+      const r = await api.get('/admin/automations');
+      setItems(r.data.data || []);
+    } finally { setLoading(false); }
   };
 
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditForm({});
-  };
+  useEffect(() => { load(); }, []);
 
-  const handleSave = async (id: string) => {
-    setSaving(true);
-    try {
-      await api.put(`/sales/templates/${id}`, editForm);
-      setEditingId(null);
-      setEditForm({});
-      fetchTemplates();
-    } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Erro ao salvar template');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const toggle = async (id: string) => { await api.patch(`/admin/automations/${id}/toggle`); load(); };
+  const del = async (id: string) => { if (!confirm('Excluir automação?')) return; await api.delete(`/admin/automations/${id}`); load(); };
 
-  const handleToggle = async (template: Template) => {
-    try {
-      await api.put(`/sales/templates/${template.id}`, {
-        isActive: !template.isActive,
-      });
-      fetchTemplates();
-    } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Erro ao alterar status');
+  const save = async () => {
+    const body: any = { ...editing };
+    if (body.id) {
+      const id = body.id; delete body.id; delete body.createdAt; delete body.updatedAt;
+      await api.patch(`/admin/automations/${id}`, body);
+    } else {
+      await api.post('/admin/automations', body);
     }
-  };
-
-  const handleSeedTemplates = async () => {
-    if (!confirm('Isso vai criar/atualizar os templates padrao. Continuar?')) return;
-    setSeeding(true);
-    try {
-      await api.post('/sales/templates/seed');
-      fetchTemplates();
-    } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Erro ao popular templates');
-    } finally {
-      setSeeding(false);
-    }
+    setEditing(null);
+    load();
   };
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Automacao de mensagens</h2>
-          <p className="text-gray-600 mt-1">
-            Templates de mensagens automaticas para o pipeline de vendas
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900">Automações</h2>
+          <p className="text-gray-600 mt-1">Regras que disparam ações automáticas no CRM</p>
         </div>
-        <button
-          onClick={handleSeedTemplates}
-          disabled={seeding}
-          className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={16} className={seeding ? 'animate-spin' : ''} />
-          {seeding ? 'Populando...' : 'Popular templates padrao'}
+        <button onClick={() => setEditing({ name: '', trigger: 'LEAD_CREATED', triggerConfig: {}, action: 'CREATE_TASK', actionConfig: { type: 'FOLLOWUP', daysOffset: 1 }, active: true })} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2 rounded-lg text-sm font-medium">
+          <Plus size={18} /> Nova automação
         </button>
       </div>
 
-      {/* Info box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex gap-3">
-        <Info size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-800">
-          <p className="font-medium mb-1">Como funciona a automacao</p>
-          <p>
-            As mensagens sao enviadas automaticamente via WhatsApp quando leads mudam de estagio no
-            pipeline. Cada template tem um gatilho (trigger) que define quando a mensagem e
-            disparada. Voce pode usar variaveis como{' '}
-            <code className="bg-blue-100 px-1 rounded">{'{nome}'}</code>,{' '}
-            <code className="bg-blue-100 px-1 rounded">{'{empresa}'}</code> e{' '}
-            <code className="bg-blue-100 px-1 rounded">{'{segmento}'}</code> no corpo da mensagem.
-          </p>
+      {loading ? <div className="text-gray-500">Carregando...</div> : (
+        <div className="space-y-3">
+          {items.map((a) => (
+            <div key={a.id} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-yellow-50 flex items-center justify-center">
+                <Zap size={20} className="text-yellow-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-gray-900">{a.name}</h3>
+                <p className="text-xs text-gray-500">
+                  {TRIGGERS.find((t) => t.key === a.trigger)?.label || a.trigger}
+                  {a.triggerConfig?.toStage ? ` → ${a.triggerConfig.toStage}` : ''}
+                  {a.triggerConfig?.idleDays ? ` (${a.triggerConfig.idleDays} dias)` : ''}
+                  {' • '}
+                  {ACTIONS.find((x) => x.key === a.action)?.label || a.action}
+                  {a.actionConfig?.type ? ` [${a.actionConfig.type}]` : ''}
+                  {a.actionConfig?.daysOffset != null ? ` +${a.actionConfig.daysOffset}d` : ''}
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={a.active} onChange={() => toggle(a.id)} />
+                <span>{a.active ? 'Ativa' : 'Inativa'}</span>
+              </label>
+              <button onClick={() => setEditing(a)} className="text-sm text-[#1E3A5F]">Editar</button>
+              <button onClick={() => del(a.id)} className="text-red-500"><Trash2 size={16} /></button>
+            </div>
+          ))}
+          {items.length === 0 && <p className="text-gray-400 text-center py-8">Nenhuma automação</p>}
         </div>
-      </div>
+      )}
 
-      {/* Templates Table */}
-      {loading ? (
-        <div className="text-center py-12 text-gray-500">Carregando templates...</div>
-      ) : templates.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <Zap size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 text-sm mb-4">
-            Nenhum template cadastrado ainda. Clique no botao acima para popular com os templates
-            padrao.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Chave
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Nome
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Gatilho
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Mensagem
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Delay
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Ativo
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Acoes
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {templates.map((tpl) => (
-                <tr key={tpl.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  {editingId === tpl.id ? (
-                    <>
-                      <td className="px-6 py-4 text-xs font-mono text-gray-500">{tpl.key}</td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="text"
-                          value={editForm.name || ''}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {TRIGGER_LABELS[tpl.trigger] || tpl.trigger}
-                      </td>
-                      <td className="px-6 py-4">
-                        <textarea
-                          value={editForm.body || ''}
-                          onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          rows={3}
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          value={editForm.delayMinutes ?? 0}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              delayMinutes: parseInt(e.target.value) || 0,
-                            })
-                          }
-                          className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                          min={0}
-                        />
-                        <span className="text-xs text-gray-400 ml-1">min</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() =>
-                            setEditForm({ ...editForm, isActive: !editForm.isActive })
-                          }
-                          className={`text-xs font-medium px-2 py-1 rounded ${
-                            editForm.isActive
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {editForm.isActive ? 'Sim' : 'Nao'}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleSave(tpl.id)}
-                            disabled={saving}
-                            className="text-green-600 hover:text-green-800"
-                            title="Salvar"
-                          >
-                            <Save size={16} />
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="text-gray-400 hover:text-gray-600"
-                            title="Cancelar"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-6 py-4 text-xs font-mono text-gray-500">{tpl.key}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{tpl.name}</td>
-                      <td className="px-6 py-4">
-                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                          {TRIGGER_LABELS[tpl.trigger] || tpl.trigger}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                        <p className="truncate" title={tpl.body}>
-                          {tpl.body}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {tpl.delayMinutes > 0 ? `${tpl.delayMinutes} min` : 'Imediato'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleToggle(tpl)}
-                          className={`text-xs font-medium px-2 py-1 rounded cursor-pointer ${
-                            tpl.isActive
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {tpl.isActive ? 'Ativo' : 'Inativo'}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleEdit(tpl)}
-                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Editar
-                        </button>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {editing && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg p-6">
+            <div className="flex justify-between mb-4"><h3 className="font-semibold">{editing.id ? 'Editar' : 'Nova'} automação</h3><button onClick={() => setEditing(null)}><X size={20} /></button></div>
+            <div className="space-y-3">
+              <input placeholder="Nome" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+              <div>
+                <label className="text-xs text-gray-600">Trigger</label>
+                <select value={editing.trigger} onChange={(e) => setEditing({ ...editing, trigger: e.target.value, triggerConfig: {} })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                  {TRIGGERS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                </select>
+              </div>
+              {editing.trigger === 'STAGE_CHANGED' && (
+                <select value={editing.triggerConfig?.toStage || ''} onChange={(e) => setEditing({ ...editing, triggerConfig: { toStage: e.target.value } })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                  <option value="">Para qualquer estágio</option>
+                  {STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              )}
+              {editing.trigger === 'LEAD_IDLE' && (
+                <input type="number" placeholder="Dias inativo" value={editing.triggerConfig?.idleDays || ''} onChange={(e) => setEditing({ ...editing, triggerConfig: { idleDays: Number(e.target.value) } })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+              )}
+              <div>
+                <label className="text-xs text-gray-600">Ação</label>
+                <select value={editing.action} onChange={(e) => setEditing({ ...editing, action: e.target.value, actionConfig: {} })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                  {ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+                </select>
+              </div>
+              {editing.action === 'CREATE_TASK' && (
+                <>
+                  <select value={editing.actionConfig?.type || 'FOLLOWUP'} onChange={(e) => setEditing({ ...editing, actionConfig: { ...editing.actionConfig, type: e.target.value } })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                    {['CALL', 'FOLLOWUP', 'PROPOSAL', 'MEETING', 'OTHER'].map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <input type="number" placeholder="Dias de offset" value={editing.actionConfig?.daysOffset ?? 1} onChange={(e) => setEditing({ ...editing, actionConfig: { ...editing.actionConfig, daysOffset: Number(e.target.value) } })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+                </>
+              )}
+              {editing.action === 'SEND_NOTIFICATION' && (
+                <input placeholder="Mensagem" value={editing.actionConfig?.message || ''} onChange={(e) => setEditing({ ...editing, actionConfig: { message: e.target.value } })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+              )}
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setEditing(null)} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancelar</button>
+                <button onClick={save} className="flex-1 bg-[#1E3A5F] text-white py-2 rounded text-sm">Salvar</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -117,6 +117,8 @@ async function loadRoutes() {
     const { chatbotService } = await import('./modules/chatbot/chatbot.service');
     const schedulingRouter = (await import('./modules/scheduling/scheduling.controller')).default;
     const salesRouter = (await import('./modules/sales/sales.controller')).default;
+    const { adminCrmRouter, publicLeadsRouter } = await import('./modules/sales/crm.controller');
+    const { seedDefaultAutomations } = await import('./modules/sales/crm.service');
     const onboardingRouter = (await import('./modules/onboarding/onboarding.controller')).default;
     const { scriptsRouter } = await import('./modules/scripts/scripts.controller');
     const { supplierRouter } = await import('./modules/suppliers/supplier.controller');
@@ -184,6 +186,13 @@ async function loadRoutes() {
 
     app.use('/api/v1/scheduling', schedulingRouter);
     app.use('/api/v1/sales', salesRouter);
+    app.use('/api/v1/admin', adminCrmRouter);
+    app.use('/api/admin', adminCrmRouter); // alias per spec
+    app.use('/api/public/leads', publicLeadsRouter);
+
+    // Seed default CRM automations (idempotent by name)
+    seedDefaultAutomations().catch((err) => console.error('[CRM] seed automations error', err));
+
     app.use('/api/v1/onboarding', onboardingRouter);
     app.use('/api/v1/scripts', scriptsRouter);
     app.use('/api/v1/suppliers', supplierRouter);

@@ -618,12 +618,21 @@ model Lead {
   plan              Plan?
   lostReason        String?   @map("lost_reason")
   convertedTenantId String?   @unique @map("converted_tenant_id")
+  companyName       String?   @map("company_name")
+  estimatedValue    Decimal?  @map("estimated_value") @db.Decimal(12, 2)
+  responsible       String?
+  tags              String[]  @default([])
+  zoomLink          String?   @map("zoom_link")
+  proposalSentAt    DateTime? @map("proposal_sent_at")
+  lastInteractionAt DateTime? @map("last_interaction_at")
+  scheduledAt       DateTime? @map("scheduled_at")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   convertedTenant Tenant?         @relation(fields: [convertedTenantId], references: [id])
   messages        LeadMessage[]
   activities      LeadActivity[]
+  tasks           LeadTask[]
   scheduledCalls  ScheduledCall[]
   proposals       Proposal[]
 
@@ -633,17 +642,18 @@ model Lead {
 }
 
 enum LeadStage {
-  NEW // Acabou de entrar
-  CONTACTED // Primeira mensagem enviada
-  QUALIFIED // Confirmou interesse
-  CALL_SCHEDULED // Call agendada
-  CALL_DONE // Call realizada
-  PROPOSAL_SENT // Proposta enviada
-  NEGOTIATION // Em negociacao
-  CONTRACTED // Fechou contrato
-  ONBOARDING // Em implantacao
-  ACTIVE // Cliente ativo
-  LOST // Perdido
+  NEW
+  CONTACTED
+  QUALIFIED
+  CALL_SCHEDULED
+  CALL_DONE
+  PROPOSAL_SENT
+  NEGOTIATION
+  CONTRACTED
+  ONBOARDING
+  ACTIVE
+  WON
+  LOST
 }
 
 model LeadMessage {
@@ -666,8 +676,10 @@ model LeadMessage {
 model LeadActivity {
   id          String   @id @default(cuid())
   leadId      String   @map("lead_id")
-  type        String // stage_change, note, call, message_sent, proposal_sent, follow_up
-  description String
+  type        String // stage_change, note, call, message_sent, proposal_sent, follow_up, NOTE, CALL, EMAIL, WHATSAPP, MEETING
+  description String   @default("")
+  content     String?
+  responsible String?
   metadata    Json?
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -675,6 +687,37 @@ model LeadActivity {
 
   @@index([leadId])
   @@map("lead_activities")
+}
+
+model LeadTask {
+  id          String   @id @default(cuid())
+  leadId      String   @map("lead_id")
+  type        String // CALL, FOLLOWUP, PROPOSAL, MEETING, OTHER
+  dueAt       DateTime @map("due_at")
+  responsible String?
+  status      String   @default("PENDING") // PENDING, DONE
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([status])
+  @@map("lead_tasks")
+}
+
+model CrmAutomation {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  trigger       String // LEAD_CREATED, STAGE_CHANGED, LEAD_IDLE, DEAL_WON
+  triggerConfig Json?    @map("trigger_config")
+  action        String // CREATE_TASK, SEND_NOTIFICATION
+  actionConfig  Json?    @map("action_config")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("crm_automations")
 }
 
 model SalesMessageTemplate {

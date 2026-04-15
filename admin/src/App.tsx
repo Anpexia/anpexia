@@ -6,6 +6,7 @@ import api from './services/api';
 import CrmPage from './pages/CrmPage';
 import LeadDetailPage from './pages/LeadDetailPage';
 import AutomationPage from './pages/AutomationPage';
+import CrmReportsPage from './pages/CrmReportsPage';
 
 // ============ AUTH ============
 
@@ -510,6 +511,7 @@ export default function App() {
         <Route path="empresas" element={<TenantsPage />} />
         <Route path="leads" element={<CrmPage />} />
         <Route path="leads/:id" element={<LeadDetailPage />} />
+        <Route path="crm/relatorios" element={<CrmReportsPage />} />
         <Route path="automacao" element={<AutomationPage />} />
         <Route path="financeiro" element={<BillingPage />} />
       </Route>
