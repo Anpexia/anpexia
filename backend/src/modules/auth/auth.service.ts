@@ -407,11 +407,12 @@ export const authService = {
   // ===== Convite / Definir senha =====
 
   async createInvite(params: {
-    tenantId: string;
+    tenantId: string | null;
     name: string;
     email: string;
     role: string;
     phone?: string;
+    inviteLinkBase?: string;
   }) {
     const existing = await prisma.user.findUnique({ where: { email: params.email } });
     if (existing) throw new AppError(409, 'EMAIL_EXISTS', 'Este e-mail já está cadastrado');
@@ -434,7 +435,8 @@ export const authService = {
       select: { id: true, name: true, email: true, role: true },
     });
 
-    const link = `${env.frontendUrl.replace(/\/$/, '')}/criar-senha?token=${inviteToken}`;
+    const base = (params.inviteLinkBase || env.frontendUrl).replace(/\/$/, '');
+    const link = `${base}/criar-senha?token=${inviteToken}`;
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">
         <h2 style="color:#111">Você foi convidado para acessar o sistema</h2>

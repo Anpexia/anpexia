@@ -173,6 +173,9 @@ enum Role {
   FINANCIAL // Financeiro
   STOCK // Estoque
   EMPLOYEE // Funcionário (legado)
+  ADMIN // Admin painel Anpexia
+  GERENTE // Gerente painel Anpexia
+  VENDEDOR // Vendedor painel Anpexia
 }
 
 model RefreshToken {

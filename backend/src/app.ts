@@ -137,6 +137,7 @@ async function loadRoutes() {
     const { tussRouter } = await import('./modules/tuss/tuss.controller');
     const { doctorsRouter } = await import('./modules/tuss/doctors.controller');
     const { auditLogRouter } = await import('./modules/admin/auditLog.controller');
+    const { adminUsersRouter } = await import('./modules/admin/adminUsers.controller');
     const { autoAudit } = await import('./shared/middleware/autoAudit');
 
     app.use('/api/v1/auth', authRouter);
@@ -213,6 +214,8 @@ async function loadRoutes() {
     app.use('/api/v1/doctors', doctorsRouter);
     app.use('/api/admin', auditLogRouter);
     app.use('/api/v1/admin', auditLogRouter);
+    app.use('/api/admin', adminUsersRouter);
+    app.use('/api/v1/admin', adminUsersRouter);
 
     const { errorHandler } = await import('./shared/middleware/error-handler');
     app.use(errorHandler);
