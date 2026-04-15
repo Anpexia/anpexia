@@ -18,7 +18,11 @@ function buildWhere(req: Request) {
   if (startDate || endDate) {
     where.createdAt = {};
     if (startDate) where.createdAt.gte = new Date(startDate);
-    if (endDate) where.createdAt.lte = new Date(endDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      where.createdAt.lte = end;
+    }
   }
 
   // OWNERs may only read their own tenant's logs
@@ -27,6 +31,25 @@ function buildWhere(req: Request) {
   }
   return where;
 }
+
+auditLogRouter.get('/audit-log/tenants', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (req.auth?.role === 'OWNER' && req.auth.tenantId) {
+      const t = await prisma.tenant.findUnique({
+        where: { id: req.auth.tenantId },
+        select: { id: true, name: true },
+      });
+      return success(res, { items: t ? [t] : [] });
+    }
+    const items = await prisma.tenant.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    return success(res, { items });
+  } catch (err) {
+    next(err);
+  }
+});
 
 auditLogRouter.get('/audit-log', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -40,11 +63,20 @@ auditLogRouter.get('/audit-log', async (req: Request, res: Response, next: NextF
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
+        include: { tenant: { select: { id: true, name: true } } },
       }),
       prisma.auditLog.count({ where }),
     ]);
 
-    return success(res, { items, total, page, limit, pages: Math.ceil(total / limit) });
+    return success(res, {
+      items,
+      data: items,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
     next(err);
   }
@@ -57,22 +89,24 @@ auditLogRouter.get('/audit-log/export', async (req: Request, res: Response, next
       where,
       orderBy: { createdAt: 'desc' },
       take: 10000,
+      include: { tenant: { select: { id: true, name: true } } },
     });
 
-    const header = 'data,usuario_id,usuario_email,usuario_role,tenant_id,acao,entidade,entidade_id,ip\n';
+    const header = 'data,usuario_id,usuario_email,usuario_role,tenant_id,tenant_nome,acao,entidade,entidade_id,ip\n';
     const esc = (v: unknown) => {
       if (v == null) return '';
       const s = String(v).replace(/"/g, '""');
       return `"${s}"`;
     };
     const rows = items
-      .map((l) =>
+      .map((l: any) =>
         [
           l.createdAt.toISOString(),
           l.userId,
           l.userEmail,
           l.userRole,
           l.tenantId,
+          l.tenant?.name,
           l.action,
           l.entity,
           l.entityId,
