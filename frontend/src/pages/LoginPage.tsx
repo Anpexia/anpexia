@@ -11,8 +11,12 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const result = await login(email, password);
+      if (result.needs2FA) {
+        navigate('/verificar-2fa');
+      } else {
+        navigate('/dashboard');
+      }
     } catch {
       // error state is handled by useAuth
     }

@@ -13,6 +13,9 @@ import { ConfiguracoesPage } from './pages/ConfiguracoesPage';
 import { TeamPage } from './pages/TeamPage';
 import { AssinaturaPage } from './pages/AssinaturaPage';
 import { LoginPage } from './pages/LoginPage';
+import { Verify2FAPage } from './pages/Verify2FAPage';
+import { CriarSenhaPage } from './pages/CriarSenhaPage';
+import { SegurancaPage } from './pages/SegurancaPage';
 import { DemoPage } from './pages/DemoPage';
 import { DemoJFPage } from './pages/DemoJFPage';
 import { EloyDemo } from './pages/demo/EloyDemo';
@@ -38,6 +41,8 @@ export default function App() {
       <Route path="/demo/eloy" element={<EloyDemo />} />
       <Route path="/demo/confirmacao" element={<ConfirmacaoDemo />} />
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+      <Route path="/verificar-2fa" element={<Verify2FAPage />} />
+      <Route path="/criar-senha" element={<CriarSenhaPage />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
@@ -52,6 +57,7 @@ export default function App() {
         <Route path="convenios" element={<ConveniosPage />} />
         <Route path="configuracoes" element={<ConfiguracoesPage />} />
         <Route path="perfil" element={<ProfilePage />} />
+        <Route path="seguranca" element={<SegurancaPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

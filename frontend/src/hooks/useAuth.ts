@@ -1,11 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import api from '../services/api';
+import { getDeviceId } from '../utils/device';
 
 interface User {
   id: string;
   name: string;
   email: string;
   role: string;
+  twoFactorEnabled?: boolean;
   tenant: { id: string; name: string; slug: string; plan: string; segment?: string } | null;
 }
 
@@ -23,12 +25,24 @@ export function useAuth() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const deviceId = getDeviceId();
+      const { data } = await api.post('/auth/login', { email, password, deviceId });
       sessionStorage.setItem('accessToken', data.data.accessToken);
       sessionStorage.setItem('user', JSON.stringify(data.data.user));
       setUser(data.data.user);
-      return data.data.user;
+      return { needs2FA: false, user: data.data.user };
     } catch (err: any) {
+      const code = err.response?.data?.error?.code;
+      const details = err.response?.data?.error?.details;
+      if (code === 'DEVICE_NOT_TRUSTED') {
+        // Not a login error — just needs 2FA
+        sessionStorage.setItem('pending2FA', JSON.stringify({
+          userId: details?.userId,
+          email: details?.email,
+          twoFactorEnabled: !!details?.twoFactorEnabled,
+        }));
+        return { needs2FA: true, user: null };
+      }
       const msg = err.response?.data?.error?.message || 'Erro ao fazer login';
       setError(msg);
       throw err;
@@ -45,6 +59,7 @@ export function useAuth() {
     }
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('user');
+    sessionStorage.removeItem('pending2FA');
     setUser(null);
   }, []);
 

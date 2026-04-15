@@ -38,7 +38,8 @@ export const env = {
   // JWT — obrigatórias, sem fallback inseguro
   jwtSecret: required('JWT_SECRET'),
   jwtRefreshSecret: required('JWT_REFRESH_SECRET'),
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+  frontendUrl: process.env.FRONTEND_URL || 'https://app.anpexia.com.br',
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
 
   // Banco de dados

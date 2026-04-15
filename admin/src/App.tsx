@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap } from 'lucide-react';
+import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap, FileSearch } from 'lucide-react';
 import clsx from 'clsx';
 import api from './services/api';
 import CrmPage from './pages/CrmPage';
 import LeadDetailPage from './pages/LeadDetailPage';
 import AutomationPage from './pages/AutomationPage';
 import CrmReportsPage from './pages/CrmReportsPage';
+import AuditLogPage from './pages/AuditLogPage';
 
 // ============ AUTH ============
 
@@ -456,6 +457,7 @@ const navItems: Array<{
     ],
   },
   { to: '/financeiro', label: 'Financeiro', icon: CreditCard },
+  { to: '/audit-log', label: 'Audit Log', icon: FileSearch },
 ];
 
 function AdminLayout() {
@@ -559,6 +561,7 @@ export default function App() {
         <Route path="leads/:id" element={<LeadDetailPage />} />
         <Route path="automacao" element={<Navigate to="/crm/automacoes" replace />} />
         <Route path="financeiro" element={<BillingPage />} />
+        <Route path="audit-log" element={<AuditLogPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

@@ -123,6 +123,11 @@ model User {
   bio              String?
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime? @map("last_login_at")
+  passwordDefined      Boolean   @default(true) @map("password_defined")
+  inviteToken          String?   @unique @map("invite_token")
+  inviteTokenExpiresAt DateTime? @map("invite_token_expires_at")
+  twoFactorSecret      String?   @map("two_factor_secret")
+  twoFactorEnabled     Boolean   @default(false) @map("two_factor_enabled")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
@@ -130,8 +135,33 @@ model User {
   auditLogs      AuditLog[]
   scheduledCalls ScheduledCall[] @relation("DoctorScheduledCalls")
   repasses       DoctorRepasse[]
+  trustedDevices TrustedDevice[]
 
   @@map("users")
+}
+
+model TrustedDevice {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  userType   String   @default("USER") @map("user_type")
+  deviceId   String   @map("device_id")
+  deviceName String?  @map("device_name")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@map("trusted_devices")
+}
+
+model TokenBlacklist {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("token_blacklist")
 }
 
 enum Role {
@@ -485,11 +515,15 @@ model AuditLog {
   id        String   @id @default(cuid())
   tenantId  String?  @map("tenant_id")
   userId    String?  @map("user_id")
-  action    String // Ex: "customer.create", "product.update"
+  userEmail String?  @map("user_email")
+  userRole  String?  @map("user_role")
+  action    String // Ex: "customer.create", "product.update", "LOGIN_SUCCESS"
   entity    String // Ex: "Customer", "Product"
   entityId  String?  @map("entity_id")
   changes   Json? // { before: {...}, after: {...} }
+  metadata  Json?
   ip        String?
+  ipAddress String?  @map("ip_address")
   createdAt DateTime @default(now()) @map("created_at")
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -497,6 +531,7 @@ model AuditLog {
 
   @@index([tenantId])
   @@index([action])
+  @@index([entity])
   @@index([createdAt])
   @@map("audit_logs")
 }

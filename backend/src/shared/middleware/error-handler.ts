@@ -3,13 +3,16 @@ import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 
 export class AppError extends Error {
+  public details?: Record<string, unknown>;
   constructor(
     public statusCode: number,
     public code: string,
     message: string,
+    details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'AppError';
+    this.details = details;
   }
 }
 
@@ -25,6 +28,7 @@ export function errorHandler(
       error: {
         code: err.code,
         message: err.message,
+        ...(err.details ? { details: err.details } : {}),
       },
     });
   }

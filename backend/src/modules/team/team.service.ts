@@ -1,13 +1,16 @@
 import prisma from '../../config/database';
 import bcrypt from 'bcryptjs';
 import { AppError } from '../../shared/middleware/error-handler';
+import { authService } from '../auth/auth.service';
+import { isPasswordValid } from '../../shared/utils/password';
 
 interface CreateMemberData {
   name: string;
   email: string;
-  password: string;
+  password?: string;
   phone?: string;
   role: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
+  sendInvite?: boolean;
 }
 
 export const teamService = {
@@ -53,10 +56,25 @@ export const teamService = {
       throw new AppError(400, 'INVALID_ROLE', 'Nao e possivel criar membros com cargo Proprietario ou Super Admin');
     }
 
+    // Invite flow: no password provided -> send invite email to define password
+    if (!data.password || data.sendInvite) {
+      const user = await authService.createInvite({
+        tenantId,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        phone: data.phone,
+      });
+      return { ...user, isActive: true, createdAt: new Date(), invited: true };
+    }
+
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
       throw new AppError(409, 'EMAIL_EXISTS', 'Este e-mail ja esta cadastrado');
     }
+
+    const check = isPasswordValid(data.password);
+    if (!check.valid) throw new AppError(400, 'WEAK_PASSWORD', check.message);
 
     const passwordHash = await bcrypt.hash(data.password, 12);
 
@@ -68,6 +86,7 @@ export const teamService = {
         phone: data.phone,
         role: data.role,
         tenantId,
+        passwordDefined: true,
       },
       select: {
         id: true,
@@ -157,6 +176,9 @@ export const teamService = {
 
     const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!isValid) throw new AppError(400, 'INVALID_PASSWORD', 'Senha atual incorreta');
+
+    const check = isPasswordValid(newPassword);
+    if (!check.valid) throw new AppError(400, 'WEAK_PASSWORD', check.message);
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({ where: { id: userId }, data: { passwordHash } });

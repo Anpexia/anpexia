@@ -136,10 +136,12 @@ async function loadRoutes() {
     const { settingsRouter } = await import('./modules/settings/settings.controller');
     const { tussRouter } = await import('./modules/tuss/tuss.controller');
     const { doctorsRouter } = await import('./modules/tuss/doctors.controller');
+    const { auditLogRouter } = await import('./modules/admin/auditLog.controller');
+    const { autoAudit } = await import('./shared/middleware/autoAudit');
 
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/tenants', tenantRouter);
-    app.use('/api/v1/customers', customerRouter);
+    app.use('/api/v1/customers', autoAudit('Customer'), customerRouter);
     app.use('/api/v1/inventory', inventoryRouter);
     app.use('/api/v1/messaging', messagingRouter);
     app.use('/api/v1/dashboard', dashboardRouter);
@@ -184,7 +186,7 @@ async function loadRoutes() {
     });
     app.use('/api/v1/demo-eloy', demoEloyRouter);
 
-    app.use('/api/v1/scheduling', schedulingRouter);
+    app.use('/api/v1/scheduling', autoAudit('Appointment'), schedulingRouter);
     app.use('/api/v1/sales', salesRouter);
     app.use('/api/v1/admin', adminCrmRouter);
     app.use('/api/admin', adminCrmRouter); // alias per spec
@@ -200,15 +202,17 @@ async function loadRoutes() {
     app.use('/api/v1/demo-jf', demoJFRouter);
     app.use('/api/v1/financial', financialRouter);
     app.use('/api/v1', signaturesRouter);
-    app.use('/api/v1', certificatesRouter);
-    app.use('/api/v1', prescriptionsRouter);
-    app.use('/api/v1', anamnesisRouter);
-    app.use('/api/v1', evolutionsRouter);
-    app.use('/api/v1/team', teamRouter);
+    app.use('/api/v1', autoAudit('MedicalCertificate'), certificatesRouter);
+    app.use('/api/v1', autoAudit('Prescription'), prescriptionsRouter);
+    app.use('/api/v1', autoAudit('Anamnesis'), anamnesisRouter);
+    app.use('/api/v1', autoAudit('PatientEvolution'), evolutionsRouter);
+    app.use('/api/v1/team', autoAudit('User'), teamRouter);
     app.use('/api/v1/convenios', conveniosRouter);
     app.use('/api/v1/settings', settingsRouter);
     app.use('/api/v1/tuss', tussRouter);
     app.use('/api/v1/doctors', doctorsRouter);
+    app.use('/api/admin', auditLogRouter);
+    app.use('/api/v1/admin', auditLogRouter);
 
     const { errorHandler } = await import('./shared/middleware/error-handler');
     app.use(errorHandler);

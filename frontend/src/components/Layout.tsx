@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings, ShieldCheck } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
+import { useInactivityLogout } from '../hooks/useInactivityLogout';
 
 const allNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -16,22 +17,24 @@ const allNavItems = [
   { path: '/equipe', label: 'Equipe', icon: UsersRound },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
   { path: '/perfil', label: 'Meu Perfil', icon: UserCircle },
+  { path: '/seguranca', label: 'Segurança', icon: ShieldCheck },
 ];
 
 const roleAllowedPaths: Record<string, string[]> = {
   SUPER_ADMIN: allNavItems.map(i => i.path),
   OWNER: allNavItems.map(i => i.path),
   MANAGER: allNavItems.map(i => i.path),
-  DOCTOR: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/perfil'],
-  RECEPTIONIST: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/perfil'],
-  FINANCIAL: ['/dashboard', '/financeiro', '/perfil'],
-  EMPLOYEE: ['/dashboard', '/clientes', '/agendamentos', '/perfil'],
+  DOCTOR: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/perfil', '/seguranca'],
+  RECEPTIONIST: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/perfil', '/seguranca'],
+  FINANCIAL: ['/dashboard', '/financeiro', '/perfil', '/seguranca'],
+  EMPLOYEE: ['/dashboard', '/clientes', '/agendamentos', '/perfil', '/seguranca'],
 };
 
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { showWarning, dismissWarning } = useInactivityLogout();
 
   const navItems = allNavItems.filter(item => {
     const allowed = roleAllowedPaths[user?.role || 'EMPLOYEE'] || roleAllowedPaths.EMPLOYEE;
@@ -45,6 +48,14 @@ export function Layout() {
 
   return (
     <div className="min-h-screen flex">
+      {showWarning && (
+        <button
+          onClick={dismissWarning}
+          className="fixed top-0 left-0 right-0 z-[60] bg-yellow-400 text-yellow-900 text-sm font-medium px-4 py-2 text-center cursor-pointer hover:bg-yellow-300"
+        >
+          Sua sessão expirará em 5 minutos por inatividade. Clique aqui para continuar.
+        </button>
+      )}
       {/* Mobile header */}
       <div
         className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14"
