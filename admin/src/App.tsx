@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap } from 'lucide-react';
 import clsx from 'clsx';
 import api from './services/api';
@@ -436,17 +436,33 @@ function BillingPage() {
 
 // ============ LAYOUT ============
 
-const navItems = [
+const navItems: Array<{
+  to: string;
+  label: string;
+  icon: any;
+  matchPaths?: string[];
+  children?: Array<{ to: string; label: string }>;
+}> = [
   { to: '/overview', label: 'Visao geral', icon: BarChart3 },
   { to: '/empresas', label: 'Empresas', icon: Building2 },
-  { to: '/leads', label: 'Leads / CRM', icon: Users },
-  { to: '/automacao', label: 'Automacao', icon: Zap },
+  {
+    to: '/crm',
+    label: 'Leads / CRM',
+    icon: Users,
+    matchPaths: ['/crm', '/crm/automacoes', '/crm/relatorios', '/leads'],
+    children: [
+      { to: '/crm/automacoes', label: 'Automação' },
+      { to: '/crm/relatorios', label: 'Relatórios' },
+    ],
+  },
   { to: '/financeiro', label: 'Financeiro', icon: CreditCard },
 ];
 
 function AdminLayout() {
   const { logout } = useAdminAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const pathname = location.pathname;
 
   const handleLogout = async () => {
     await logout();
@@ -461,21 +477,47 @@ function AdminLayout() {
           <span className="ml-3 text-xs bg-[#2563EB] px-2 py-0.5 rounded">Admin</span>
         </div>
         <nav className="flex-1 py-4 px-3">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                clsx(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-1',
-                  isActive ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
-                )
-              }
-            >
-              <item.icon size={20} />
-              {item.label}
-            </NavLink>
-          ))}
+          {navItems.map((item) => {
+            const isParentActive = item.matchPaths
+              ? item.matchPaths.some((p) => pathname === p || pathname.startsWith(p + '/'))
+              : pathname === item.to || pathname.startsWith(item.to + '/');
+            return (
+              <div key={item.to}>
+                <NavLink
+                  to={item.to}
+                  end={!item.matchPaths}
+                  className={() =>
+                    clsx(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-1',
+                      isParentActive ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
+                    )
+                  }
+                >
+                  <item.icon size={20} />
+                  {item.label}
+                </NavLink>
+                {item.children && isParentActive && (
+                  <div className="ml-9 mb-1 flex flex-col gap-0.5">
+                    {item.children.map((child) => {
+                      const childActive = pathname === child.to || pathname.startsWith(child.to + '/');
+                      return (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          className={clsx(
+                            'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                            childActive ? 'bg-white/15 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
+                          )}
+                        >
+                          {child.label}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         <div className="p-3 border-t border-white/10">
           <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors w-full">
@@ -509,10 +551,13 @@ export default function App() {
         <Route index element={<Navigate to="/overview" replace />} />
         <Route path="overview" element={<OverviewPage />} />
         <Route path="empresas" element={<TenantsPage />} />
-        <Route path="leads" element={<CrmPage />} />
-        <Route path="leads/:id" element={<LeadDetailPage />} />
+        <Route path="crm" element={<CrmPage />} />
+        <Route path="crm/automacoes" element={<AutomationPage />} />
         <Route path="crm/relatorios" element={<CrmReportsPage />} />
-        <Route path="automacao" element={<AutomationPage />} />
+        <Route path="crm/:id" element={<LeadDetailPage />} />
+        <Route path="leads" element={<Navigate to="/crm" replace />} />
+        <Route path="leads/:id" element={<LeadDetailPage />} />
+        <Route path="automacao" element={<Navigate to="/crm/automacoes" replace />} />
         <Route path="financeiro" element={<BillingPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

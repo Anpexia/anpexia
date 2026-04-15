@@ -360,8 +360,6 @@ export default function CrmPage() {
           <p className="text-gray-600 mt-1">Pipeline de vendas e gestão de leads</p>
         </div>
         <div className="flex gap-2">
-          <a href="/automacao" className="border border-gray-300 px-3 py-2 rounded-lg text-sm">Automações</a>
-          <a href="/crm/relatorios" className="border border-gray-300 px-3 py-2 rounded-lg text-sm">Relatórios</a>
           <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2 rounded-lg text-sm font-medium">
             <Plus size={18} /> Novo lead
           </button>
