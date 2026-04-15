@@ -15,7 +15,6 @@ import { AssinaturaPage } from './pages/AssinaturaPage';
 import { LoginPage } from './pages/LoginPage';
 import { Verify2FAPage } from './pages/Verify2FAPage';
 import { CriarSenhaPage } from './pages/CriarSenhaPage';
-import { SegurancaPage } from './pages/SegurancaPage';
 import { DemoPage } from './pages/DemoPage';
 import { DemoJFPage } from './pages/DemoJFPage';
 import { EloyDemo } from './pages/demo/EloyDemo';
@@ -57,7 +56,7 @@ export default function App() {
         <Route path="convenios" element={<ConveniosPage />} />
         <Route path="configuracoes" element={<ConfiguracoesPage />} />
         <Route path="perfil" element={<ProfilePage />} />
-        <Route path="seguranca" element={<SegurancaPage />} />
+        <Route path="seguranca" element={<Navigate to="/configuracoes?tab=seguranca" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

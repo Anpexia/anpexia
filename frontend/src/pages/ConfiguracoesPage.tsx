@@ -1,9 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
-type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss';
+type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'seguranca';
+
+interface TrustedDevice {
+  id: string;
+  deviceId: string;
+  deviceName: string | null;
+  createdAt: string;
+}
 
 const PROCEDURE_TYPES = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'OUTROS'] as const;
 type ProcedureType = typeof PROCEDURE_TYPES[number];
@@ -49,9 +57,91 @@ export function ConfiguracoesPage() {
     { key: 'horarios', label: 'Horarios', icon: Clock },
     { key: 'whatsapp', label: 'WhatsApp', icon: Wifi },
     { key: 'email', label: 'Email', icon: Mail },
+    { key: 'seguranca', label: 'Segurança', icon: ShieldCheck },
   ];
 
-  const [tab, setTab] = useState<Tab>('clinica');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as Tab) || 'clinica';
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  useEffect(() => {
+    const qt = searchParams.get('tab') as Tab | null;
+    if (qt && qt !== tab) setTab(qt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const changeTab = (t: Tab) => {
+    setTab(t);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', t);
+      return next;
+    }, { replace: true });
+  };
+
+  // 2FA + devices
+  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [devices, setDevices] = useState<TrustedDevice[]>([]);
+  const [secLoaded, setSecLoaded] = useState(false);
+  const [setupData, setSetupData] = useState<{ secret: string; qrCodeDataUrl: string } | null>(null);
+  const [enableCode, setEnableCode] = useState('');
+  const [enabling, setEnabling] = useState(false);
+  const [disablePwd, setDisablePwd] = useState('');
+  const [disabling, setDisabling] = useState(false);
+
+  const loadSeguranca = useCallback(async () => {
+    try {
+      const { data: me } = await api.get('/auth/me');
+      setTwoFAEnabled(!!me.data.twoFactorEnabled);
+      const { data: dev } = await api.get('/auth/2fa/devices');
+      setDevices(dev.data || []);
+    } finally {
+      setSecLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => { if (tab === 'seguranca') void loadSeguranca(); }, [tab, loadSeguranca]);
+
+  const startSetup = async () => {
+    const { data } = await api.post('/auth/2fa/setup');
+    setSetupData(data.data);
+  };
+  const confirmEnable = async () => {
+    setEnabling(true);
+    try {
+      await api.post('/auth/2fa/enable', { code: enableCode });
+      setMsg('2FA ativado!');
+      setSetupData(null);
+      setEnableCode('');
+      void loadSeguranca();
+    } catch (err: any) {
+      setMsg(err.response?.data?.error?.message || 'Erro ao ativar 2FA');
+    } finally {
+      setEnabling(false);
+    }
+  };
+  const disable2FA = async () => {
+    setDisabling(true);
+    try {
+      await api.post('/auth/2fa/disable', { password: disablePwd });
+      setDisablePwd('');
+      setMsg('2FA desativado');
+      void loadSeguranca();
+    } catch (err: any) {
+      setMsg(err.response?.data?.error?.message || 'Erro ao desativar');
+    } finally {
+      setDisabling(false);
+    }
+  };
+  const removeDevice = async (id: string) => {
+    await api.delete(`/auth/2fa/devices/${id}`);
+    void loadSeguranca();
+  };
+  const removeAllDevices = async () => {
+    if (!confirm('Remover todos os dispositivos confiáveis? Você precisará verificar cada um novamente.')) return;
+    await Promise.all(devices.map((d) => api.delete(`/auth/2fa/devices/${d.id}`)));
+    void loadSeguranca();
+  };
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -312,7 +402,7 @@ export function ConfiguracoesPage() {
         {TABS.map(t => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => changeTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
               tab === t.key ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
             }`}
@@ -700,6 +790,102 @@ export function ConfiguracoesPage() {
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* SEGURANCA TAB */}
+      {tab === 'seguranca' && (
+        <div className="space-y-6 max-w-2xl">
+          {!secLoaded ? (
+            <div className="text-slate-500">Carregando...</div>
+          ) : (
+            <>
+              <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  {twoFAEnabled ? <ShieldCheck className="text-green-600" size={24} /> : <ShieldOff className="text-slate-400" size={24} />}
+                  <div>
+                    <h2 className="font-semibold">Autenticação em duas etapas (2FA)</h2>
+                    <p className="text-xs text-slate-500">Status: <span className={twoFAEnabled ? 'text-green-600' : 'text-slate-500'}>{twoFAEnabled ? 'Ativa' : 'Desativada'}</span></p>
+                  </div>
+                </div>
+
+                {!twoFAEnabled && !setupData && (
+                  <button onClick={startSetup} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Ativar 2FA</button>
+                )}
+
+                {setupData && (
+                  <div className="space-y-3 mt-2">
+                    <p className="text-sm text-slate-600">Escaneie o QR Code no seu app autenticador (Google Authenticator, Authy, 1Password) e digite o código gerado.</p>
+                    <img src={setupData.qrCodeDataUrl} alt="QR Code 2FA" className="w-48 h-48 border rounded" />
+                    <p className="text-xs text-slate-500">Ou digite manualmente: <code className="bg-slate-100 px-2 py-0.5 rounded">{setupData.secret}</code></p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={enableCode}
+                      onChange={(e) => setEnableCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Código de 6 dígitos"
+                      className="w-48 px-3 py-2 border border-gray-300 rounded-lg text-center tracking-widest"
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={confirmEnable} disabled={enabling || enableCode.length !== 6} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                        {enabling ? 'Ativando...' : 'Confirmar'}
+                      </button>
+                      <button onClick={() => setSetupData(null)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Cancelar</button>
+                    </div>
+                  </div>
+                )}
+
+                {twoFAEnabled && (
+                  <div className="space-y-2 mt-2">
+                    <label className="block text-sm text-slate-700">Digite sua senha para desativar:</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={disablePwd}
+                        onChange={(e) => setDisablePwd(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                      <button onClick={disable2FA} disabled={disabling || !disablePwd} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+                        {disabling ? '...' : 'Desativar 2FA'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="font-semibold">Dispositivos confiáveis</h2>
+                    <p className="text-xs text-slate-500">Dispositivos que não precisam de verificação em cada login.</p>
+                  </div>
+                  {devices.length > 0 && (
+                    <button onClick={removeAllDevices} className="text-xs text-red-600 hover:underline">Remover todos</button>
+                  )}
+                </div>
+
+                {devices.length === 0 ? (
+                  <p className="text-sm text-slate-500">Nenhum dispositivo confiável registrado.</p>
+                ) : (
+                  <ul className="divide-y">
+                    {devices.map((d) => (
+                      <li key={d.id} className="py-3 flex items-center gap-3">
+                        <Smartphone size={18} className="text-slate-400" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">{d.deviceName || 'Dispositivo desconhecido'}</div>
+                          <div className="text-xs text-slate-500">Adicionado em {new Date(d.createdAt).toLocaleString('pt-BR')}</div>
+                        </div>
+                        <button onClick={() => removeDevice(d.id)} className="text-red-600 hover:bg-red-50 p-2 rounded">
+                          <Trash2 size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </>
+          )}
         </div>
       )}
     </div>

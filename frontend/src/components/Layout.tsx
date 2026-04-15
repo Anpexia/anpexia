@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Package, MessageSquare, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
 import { useInactivityLogout } from '../hooks/useInactivityLogout';
@@ -18,17 +18,16 @@ const allNavItems = [
   { path: '/equipe', label: 'Equipe', icon: UsersRound },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
   { path: '/perfil', label: 'Meu Perfil', icon: UserCircle },
-  { path: '/seguranca', label: 'Segurança', icon: ShieldCheck },
 ];
 
 const roleAllowedPaths: Record<string, string[]> = {
   SUPER_ADMIN: allNavItems.map(i => i.path),
   OWNER: allNavItems.map(i => i.path),
   MANAGER: allNavItems.map(i => i.path),
-  DOCTOR: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/perfil', '/seguranca'],
-  RECEPTIONIST: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/perfil', '/seguranca'],
-  FINANCIAL: ['/dashboard', '/financeiro', '/perfil', '/seguranca'],
-  EMPLOYEE: ['/dashboard', '/clientes', '/agendamentos', '/perfil', '/seguranca'],
+  DOCTOR: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/perfil'],
+  RECEPTIONIST: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/perfil'],
+  FINANCIAL: ['/dashboard', '/financeiro', '/perfil'],
+  EMPLOYEE: ['/dashboard', '/clientes', '/agendamentos', '/perfil'],
 };
 
 export function Layout() {
@@ -64,7 +63,7 @@ export function Layout() {
   };
 
   const goActivate2FA = () => {
-    navigate('/perfil?tab=seguranca');
+    navigate('/configuracoes?tab=seguranca');
   };
 
   const navItems = allNavItems.filter(item => {
