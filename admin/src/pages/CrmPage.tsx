@@ -296,6 +296,8 @@ export default function CrmPage() {
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [activeDrag, setActiveDrag] = useState<any>(null);
   const [form, setForm] = useState({ name: '', phone: '', email: '', companyName: '', source: 'manual', notes: '', estimatedValue: '', responsible: '' });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const fetchData = useCallback(async () => {
@@ -328,11 +330,30 @@ export default function CrmPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const body: any = { ...form, estimatedValue: form.estimatedValue ? Number(form.estimatedValue) : null };
-    await api.post('/admin/leads', body);
-    setShowModal(false);
-    setForm({ name: '', phone: '', email: '', companyName: '', source: 'manual', notes: '', estimatedValue: '', responsible: '' });
-    fetchData();
+    if (creating) return;
+    setCreating(true);
+    setCreateError('');
+    try {
+      const body: any = {
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim() || undefined,
+        companyName: form.companyName.trim() || undefined,
+        source: form.source,
+        notes: form.notes.trim() || undefined,
+        responsible: form.responsible.trim() || undefined,
+        estimatedValue: form.estimatedValue ? Number(form.estimatedValue) : undefined,
+      };
+      await api.post('/admin/leads', body);
+      setShowModal(false);
+      setForm({ name: '', phone: '', email: '', companyName: '', source: 'manual', notes: '', estimatedValue: '', responsible: '' });
+      fetchData();
+    } catch (err: any) {
+      console.error('[CRM] Falha ao criar lead:', err?.response?.data || err);
+      setCreateError(err?.response?.data?.error?.message || err?.message || 'Erro ao criar lead');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleDragEnd = async (e: DragEndEvent) => {
@@ -431,7 +452,10 @@ export default function CrmPage() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-md p-6">
-            <div className="flex justify-between mb-4"><h3 className="font-semibold">Novo lead</h3><button onClick={() => setShowModal(false)}><X size={20} /></button></div>
+            <div className="flex justify-between mb-4"><h3 className="font-semibold">Novo lead</h3><button onClick={() => { setShowModal(false); setCreateError(''); }}><X size={20} /></button></div>
+            {createError && (
+              <div className="mb-3 bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded">{createError}</div>
+            )}
             <form onSubmit={handleCreate} className="space-y-3">
               <input required placeholder="Nome *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
               <input placeholder="Telefone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
@@ -444,8 +468,8 @@ export default function CrmPage() {
               </select>
               <textarea placeholder="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" rows={3} />
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancelar</button>
-                <button type="submit" className="flex-1 bg-[#1E3A5F] text-white py-2 rounded text-sm">Criar</button>
+                <button type="button" onClick={() => { setShowModal(false); setCreateError(''); }} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancelar</button>
+                <button type="submit" disabled={creating} className="flex-1 bg-[#1E3A5F] text-white py-2 rounded text-sm disabled:opacity-50">{creating ? 'Criando...' : 'Criar'}</button>
               </div>
             </form>
           </div>
