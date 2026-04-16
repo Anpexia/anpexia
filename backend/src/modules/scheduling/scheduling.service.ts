@@ -763,6 +763,101 @@ async function cancelCall(id: string, tenantId?: string) {
   return updated;
 }
 
+// ============================================================
+// Inventory withdrawal for a completed appointment
+// ============================================================
+interface WithdrawMaterialInput {
+  productId: string;
+  quantity: number;
+}
+
+async function withdrawInventoryForCall(
+  scheduledCallId: string,
+  tenantId: string,
+  materials: WithdrawMaterialInput[],
+  userId?: string | null,
+) {
+  if (!Array.isArray(materials) || materials.length === 0) {
+    throw new AppError(400, 'MATERIALS_REQUIRED', 'Pelo menos um material e obrigatorio');
+  }
+
+  // Validate the call exists and belongs to the tenant
+  const call = await prisma.scheduledCall.findUnique({ where: { id: scheduledCallId } });
+  if (!call || call.tenantId !== tenantId) {
+    throw new AppError(404, 'CALL_NOT_FOUND', 'Agendamento nao encontrado');
+  }
+
+  // Idempotency — already processed?
+  const existing = await prisma.inventoryMovement.findFirst({
+    where: { tenantId, reference: scheduledCallId, type: 'OUT' },
+    select: { id: true },
+  });
+  if (existing) {
+    return { alreadyProcessed: true as const, movements: [] as any[] };
+  }
+
+  // Aggregate quantities per product (in case the same product appears twice)
+  const aggregated = new Map<string, number>();
+  for (const m of materials) {
+    if (!m.productId || typeof m.quantity !== 'number' || m.quantity <= 0) {
+      throw new AppError(400, 'INVALID_MATERIAL', 'Material invalido (productId e quantity > 0 obrigatorios)');
+    }
+    aggregated.set(m.productId, (aggregated.get(m.productId) || 0) + m.quantity);
+  }
+
+  // Pre-validate: load all products + check ownership + stock availability
+  const productIds = Array.from(aggregated.keys());
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, tenantId: true, name: true, quantity: true },
+  });
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
+  for (const productId of productIds) {
+    const p = productMap.get(productId);
+    if (!p) {
+      throw new AppError(404, 'PRODUCT_NOT_FOUND', `Produto nao encontrado: ${productId}`);
+    }
+    if (p.tenantId !== tenantId) {
+      throw new AppError(403, 'FORBIDDEN', 'Produto nao pertence ao tenant');
+    }
+    const required = aggregated.get(productId)!;
+    if (p.quantity < required) {
+      throw new AppError(
+        400,
+        'INSUFFICIENT_STOCK',
+        `Estoque insuficiente para o produto: ${p.name}`,
+      );
+    }
+  }
+
+  // Apply in a single transaction
+  const movements = await prisma.$transaction(async (tx) => {
+    const created: any[] = [];
+    for (const [productId, quantity] of aggregated.entries()) {
+      const mv = await tx.inventoryMovement.create({
+        data: {
+          tenantId,
+          productId,
+          type: 'OUT',
+          quantity,
+          reason: 'Uso em procedimento',
+          reference: scheduledCallId,
+          userId: userId || null,
+        },
+      });
+      await tx.product.update({
+        where: { id: productId },
+        data: { quantity: { decrement: quantity } },
+      });
+      created.push(mv);
+    }
+    return created;
+  });
+
+  return { alreadyProcessed: false as const, movements };
+}
+
 export const schedulingService = {
   getConfig,
   updateConfig,
@@ -777,4 +872,5 @@ export const schedulingService = {
   replaceProcedures,
   updateCallDoctor,
   updateCallAuthorization,
+  withdrawInventoryForCall,
 };

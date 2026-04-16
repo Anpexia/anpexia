@@ -178,6 +178,30 @@ router.patch('/calls/:id/doctor', authenticate, requireTenant, async (req: Reque
   } catch (err) { next(err); }
 });
 
+// POST /calls/:id/inventory — withdraw materials from stock for a completed appointment
+router.post('/calls/:id/inventory', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const materials = Array.isArray(req.body?.materials) ? req.body.materials : [];
+    const result = await schedulingService.withdrawInventoryForCall(
+      id,
+      req.auth!.tenantId!,
+      materials,
+      req.auth?.userId,
+    );
+    if (!result.alreadyProcessed) {
+      await logAction({
+        ...auditCtx(req),
+        action: 'INVENTORY_WITHDRAWAL',
+        entity: 'APPOINTMENT',
+        entityId: id,
+        metadata: { callId: id, materials, movementCount: result.movements.length },
+      });
+    }
+    return success(res, result);
+  } catch (err) { next(err); }
+});
+
 // PATCH /calls/:id/authorization — update convenio authorization number
 router.patch('/calls/:id/authorization', authenticate, requireTenant, async (req: Request, res: Response, next) => {
   try {

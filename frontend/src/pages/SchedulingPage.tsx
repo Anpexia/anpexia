@@ -151,6 +151,21 @@ export function SchedulingPage() {
   // When true, the call is already completed (legacy "Registrar TUSS") — skip status change.
   const [tussAlreadyCompleted, setTussAlreadyCompleted] = useState(false);
 
+  // ---- Stock withdrawal extension (procedure templates + materials) ----
+  interface TplMaterial { productId: string; productName: string; unit: string; quantity: number }
+  interface ProcedureTpl { id: string; name: string; description: string | null; materials: TplMaterial[] }
+  interface InventoryProduct { id: string; name: string; quantity: number; unit: string }
+  interface MaterialRow { productId: string; productName: string; unit: string; quantity: number; available: number }
+  const [procedureTemplates, setProcedureTemplates] = useState<ProcedureTpl[] | null>(null);
+  const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[] | null>(null);
+  const [tussTab, setTussTab] = useState<'tuss' | 'estoque'>('tuss');
+  const [tplMaterials, setTplMaterials] = useState<MaterialRow[]>([]);
+  const [extraMaterials, setExtraMaterials] = useState<MaterialRow[]>([]);
+  const [matchedTemplate, setMatchedTemplate] = useState<ProcedureTpl | null>(null);
+  const [tussModalError, setTussModalError] = useState<string>('');
+  // Tracks whether the modal was opened via the "Registrar TUSS" badge (retro flow)
+  const [tussRetroMode, setTussRetroMode] = useState(false);
+
   // Assign/change doctor
   const [doctorEditCall, setDoctorEditCall] = useState<Appointment | null>(null);
   const [doctorEditValue, setDoctorEditValue] = useState('');
@@ -374,14 +389,79 @@ export function SchedulingPage() {
     return () => { cancelled = true; };
   }, [appointments, convenioMap]);
 
-  const openTussModalForCall = async (a: Appointment, editMode: boolean) => {
+  // Fetch procedure templates and inventory products (cached after first call)
+  const ensureTemplatesAndProducts = useCallback(async () => {
+    const tasks: Promise<unknown>[] = [];
+    if (procedureTemplates === null) {
+      tasks.push(
+        api.get('/procedure-templates')
+          .then(({ data }) => setProcedureTemplates(data.data || []))
+          .catch(() => setProcedureTemplates([])),
+      );
+    }
+    if (inventoryProducts === null) {
+      tasks.push(
+        api.get('/inventory/products', { params: { limit: 500 } })
+          .then(({ data }) => setInventoryProducts(data.data || []))
+          .catch(() => setInventoryProducts([])),
+      );
+    }
+    if (tasks.length > 0) await Promise.all(tasks);
+  }, [procedureTemplates, inventoryProducts]);
+
+  // Recompute matched template + prefilled materials when TUSS selection changes
+  useEffect(() => {
+    if (!tussModalCall) return;
+    if (!tussChosenId || procedureTemplates === null) {
+      setMatchedTemplate(null);
+      setTplMaterials([]);
+      return;
+    }
+    const chosen = tussModalProcedures.find((p) => p.id === tussChosenId);
+    if (!chosen) {
+      setMatchedTemplate(null);
+      setTplMaterials([]);
+      return;
+    }
+    const target = chosen.description.trim().toLowerCase();
+    const tpl = (procedureTemplates || []).find(
+      (t) => t.name.trim().toLowerCase() === target,
+    ) || null;
+    setMatchedTemplate(tpl);
+    if (tpl) {
+      const products = inventoryProducts || [];
+      const rows: MaterialRow[] = tpl.materials.map((m) => {
+        const prod = products.find((p) => p.id === m.productId);
+        return {
+          productId: m.productId,
+          productName: m.productName || prod?.name || '',
+          unit: m.unit || prod?.unit || 'un',
+          quantity: m.quantity,
+          available: prod?.quantity ?? 0,
+        };
+      });
+      setTplMaterials(rows);
+    } else {
+      setTplMaterials([]);
+    }
+  }, [tussChosenId, tussModalCall, tussModalProcedures, procedureTemplates, inventoryProducts]);
+
+  const openTussModalForCall = async (a: Appointment, editMode: boolean, retroMode = false) => {
     setTussModalCall(a);
     setTussEditMode(editMode);
     setTussAlreadyCompleted(a.status === 'completed');
+    setTussRetroMode(retroMode);
     setTussChosenId('');
     setTussAuthNumber('');
     setTussDoctorRepasse(null);
     setTussLoadingList(true);
+    setTussTab('tuss');
+    setTplMaterials([]);
+    setExtraMaterials([]);
+    setMatchedTemplate(null);
+    setTussModalError('');
+    // Kick off templates + products fetch in parallel (non-blocking for the TUSS list)
+    ensureTemplatesAndProducts();
     try {
       // Load procedures for the patient's convenio (if known), otherwise all
       let convenioId: string | null = null;
@@ -440,30 +520,77 @@ export function SchedulingPage() {
     }
   };
 
+  // Combined materials (template rows + extras), filtered by valid productId + qty > 0
+  const combinedMaterials = (): { productId: string; quantity: number }[] => {
+    const all = [...tplMaterials, ...extraMaterials];
+    return all
+      .filter((m) => m.productId && Number(m.quantity) > 0)
+      .map((m) => ({ productId: m.productId, quantity: Number(m.quantity) }));
+  };
+
   const submitTussModal = async () => {
     if (!tussModalCall) return;
+
+    // If we are on the TUSS tab and a template match exists, "Próximo: Estoque" navigates instead of saving
+    if (tussTab === 'tuss' && matchedTemplate && tplMaterials.length > 0) {
+      if (!tussChosenId) {
+        showToast('Selecione um procedimento TUSS');
+        return;
+      }
+      setTussTab('estoque');
+      return;
+    }
+
     if (!tussChosenId) {
       showToast('Selecione um procedimento TUSS');
       return;
     }
     const selected = [{ tussProcedureId: tussChosenId, authorizationNumber: tussAuthNumber.trim() || null }];
+    const materials = combinedMaterials();
 
     setTussSaving(true);
+    setTussModalError('');
     try {
       if (tussEditMode) {
         // Replace-all endpoint re-syncs financials automatically for completed calls
         await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
-        showToast('Procedimento atualizado!');
       } else if (tussAlreadyCompleted) {
         // Legacy "Registrar TUSS" flow: call is already completed, just attach procedure.
         // PUT replaces and re-syncs financials (idempotent — dedup by call tag in notes).
         await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
-        showToast('Procedimento registrado!');
       } else {
         await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
         await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
-        showToast('Realizacao confirmada!');
       }
+
+      // Stock withdrawal — only if we collected materials
+      if (materials.length > 0) {
+        try {
+          await api.post(`/scheduling/calls/${tussModalCall.id}/inventory`, { materials });
+        } catch (invErr: any) {
+          const code = invErr?.response?.data?.error?.code;
+          const msg = invErr?.response?.data?.error?.message || 'Erro ao baixar estoque';
+          if (code === 'INSUFFICIENT_STOCK') {
+            setTussModalError(msg);
+            setTussTab('estoque');
+            // Keep modal open + refresh available stock view
+            try {
+              const { data } = await api.get('/inventory/products', { params: { limit: 500 } });
+              setInventoryProducts(data.data || []);
+            } catch {}
+            return;
+          }
+          throw invErr;
+        }
+      }
+
+      showToast(
+        tussEditMode
+          ? 'Procedimento atualizado!'
+          : tussAlreadyCompleted
+            ? 'Procedimento registrado!'
+            : 'Realizacao confirmada!',
+      );
       setTussModalCall(null);
       fetchAppointments();
     } catch (err: any) {
@@ -473,8 +600,40 @@ export function SchedulingPage() {
     }
   };
 
+  // Retro-only inventory submission (used when TUSS is already attached)
+  const submitInventoryOnly = async () => {
+    if (!tussModalCall) return;
+    const materials = combinedMaterials();
+    if (materials.length === 0) {
+      showToast('Adicione pelo menos um material');
+      return;
+    }
+    setTussSaving(true);
+    setTussModalError('');
+    try {
+      await api.post(`/scheduling/calls/${tussModalCall.id}/inventory`, { materials });
+      showToast('Baixa de estoque registrada!');
+      setTussModalCall(null);
+      fetchAppointments();
+    } catch (err: any) {
+      const code = err?.response?.data?.error?.code;
+      const msg = err?.response?.data?.error?.message || 'Erro ao baixar estoque';
+      if (code === 'INSUFFICIENT_STOCK') {
+        setTussModalError(msg);
+        try {
+          const { data } = await api.get('/inventory/products', { params: { limit: 500 } });
+          setInventoryProducts(data.data || []);
+        } catch {}
+      } else {
+        showToast(msg);
+      }
+    } finally {
+      setTussSaving(false);
+    }
+  };
+
   const openRegistrarTussForExisting = async (a: Appointment) => {
-    await openTussModalForCall(a, false);
+    await openTussModalForCall(a, false, true);
   };
 
   // Open edit modal for doctor assignment
@@ -1076,6 +1235,32 @@ export function SchedulingPage() {
               {tussModalCall.doctor && <> · Medico: <strong>{tussModalCall.doctor.name}</strong></>}
             </p>
 
+            {tussModalError && (
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {tussModalError}
+              </div>
+            )}
+
+            {/* Tabs — second tab only visible when a template matched */}
+            {(matchedTemplate || tplMaterials.length > 0 || extraMaterials.length > 0) && (
+              <div className="flex border-b border-slate-200 mb-4 -mx-1">
+                <button
+                  type="button"
+                  onClick={() => setTussTab('tuss')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'tuss' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                  TUSS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTussTab('estoque')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                  Estoque ({tplMaterials.length + extraMaterials.length})
+                </button>
+              </div>
+            )}
+
             {tussLoadingList ? (
               <div className="flex items-center justify-center py-10">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1E3A5F]" />
@@ -1086,7 +1271,7 @@ export function SchedulingPage() {
                 <br />
                 Cadastre em Configuracoes &gt; Procedimentos TUSS.
               </div>
-            ) : (
+            ) : tussTab === 'tuss' ? (
               <>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Procedimento TUSS <span className="text-red-500">*</span></label>
@@ -1102,6 +1287,11 @@ export function SchedulingPage() {
                       </option>
                     ))}
                   </select>
+                  {matchedTemplate && (
+                    <p className="text-xs text-emerald-700 mt-1.5">
+                      Template encontrado: <strong>{matchedTemplate.name}</strong> · {matchedTemplate.materials.length} material(is) sera(ao) baixado(s) do estoque.
+                    </p>
+                  )}
                 </div>
 
                 {chosen && (
@@ -1145,6 +1335,100 @@ export function SchedulingPage() {
                   </>
                 )}
               </>
+            ) : (
+              <>
+                {/* Estoque tab content */}
+                {tplMaterials.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais do template</h4>
+                    <div className="space-y-2">
+                      {tplMaterials.map((m, i) => {
+                        const insufficient = m.available < m.quantity;
+                        return (
+                          <div key={`tpl-${m.productId}-${i}`} className="flex items-center gap-2 text-sm">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-slate-800 truncate">{m.productName}</div>
+                              <div className={`text-xs ${insufficient ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                Disponivel: {m.available} {m.unit}
+                              </div>
+                            </div>
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={m.quantity}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                setTplMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
+                              }}
+                              className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            />
+                            <span className="text-xs text-slate-500 w-10">{m.unit}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais extras</h4>
+                  {extraMaterials.length > 0 && (
+                    <div className="space-y-2 mb-2">
+                      {extraMaterials.map((m, i) => (
+                        <div key={`extra-${i}`} className="flex items-center gap-2 text-sm">
+                          <select
+                            value={m.productId}
+                            onChange={(e) => {
+                              const productId = e.target.value;
+                              const prod = (inventoryProducts || []).find((p) => p.id === productId);
+                              setExtraMaterials((rows) => rows.map((r, idx) => idx === i ? {
+                                ...r,
+                                productId,
+                                productName: prod?.name || '',
+                                unit: prod?.unit || 'un',
+                                available: prod?.quantity ?? 0,
+                              } : r));
+                            }}
+                            className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded text-sm"
+                          >
+                            <option value="">Selecione um produto...</option>
+                            {(inventoryProducts || []).map((p) => (
+                              <option key={p.id} value={p.id}>{p.name} (estoque: {p.quantity} {p.unit})</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={m.quantity}
+                            onChange={(e) => {
+                              const v = Number(e.target.value);
+                              setExtraMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
+                            }}
+                            className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setExtraMaterials((rows) => rows.filter((_, idx) => idx !== i))}
+                            className="text-slate-400 hover:text-red-500"
+                            title="Remover"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setExtraMaterials((rows) => [...rows, { productId: '', productName: '', unit: 'un', quantity: 1, available: 0 }])}
+                    className="text-xs font-medium text-[#1E3A5F] hover:underline"
+                  >
+                    + Adicionar material
+                  </button>
+                </div>
+              </>
             )}
 
             <div className="flex gap-2 pt-4 mt-2 border-t border-slate-100">
@@ -1154,12 +1438,26 @@ export function SchedulingPage() {
               >
                 Cancelar
               </button>
+              {tussRetroMode && tussAlreadyCompleted && (tussModalCall.procedures?.length || 0) > 0 && tussTab === 'estoque' && (
+                <button
+                  onClick={submitInventoryOnly}
+                  disabled={tussSaving || (tplMaterials.length + extraMaterials.length) === 0}
+                  className="flex-1 py-2.5 border border-amber-300 bg-amber-50 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-100 disabled:opacity-50"
+                  title="Registrar somente a baixa de estoque (sem mexer no TUSS)"
+                >
+                  {tussSaving ? 'Salvando...' : 'Registrar retro'}
+                </button>
+              )}
               <button
                 onClick={submitTussModal}
                 disabled={tussSaving || tussLoadingList || !tussChosenId}
                 className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
               >
-                {tussSaving ? 'Salvando...' : (tussEditMode ? 'Salvar' : 'Confirmar Realização')}
+                {tussSaving
+                  ? 'Salvando...'
+                  : tussTab === 'tuss' && matchedTemplate && tplMaterials.length > 0
+                    ? 'Próximo: Estoque'
+                    : tussEditMode ? 'Salvar' : 'Registrar procedimentos'}
               </button>
             </div>
           </div>
