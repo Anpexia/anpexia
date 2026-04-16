@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, NavLink, Outlet, useNavigate, useLocation } fr
 import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap, FileSearch, UserCog, Settings as SettingsIcon, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 import api from './services/api';
+import { getDeviceId } from './utils/device';
 import CrmPage from './pages/CrmPage';
 import LeadDetailPage from './pages/LeadDetailPage';
 import AutomationPage from './pages/AutomationPage';
@@ -11,6 +12,7 @@ import AuditLogPage from './pages/AuditLogPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import SettingsPage from './pages/SettingsPage';
 import LembretesPage from './pages/LembretesPage';
+import Verify2FAPage from './pages/Verify2FAPage';
 
 // ============ AUTH ============
 
@@ -28,7 +30,8 @@ function useAdminAuth() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const deviceId = getDeviceId();
+      const { data } = await api.post('/auth/login', { email, password, deviceId });
       const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR'];
       if (!allowedRoles.includes(data.data.user.role)) {
         throw new Error('Acesso restrito a administradores');
@@ -36,8 +39,19 @@ function useAdminAuth() {
       sessionStorage.setItem('adminToken', data.data.accessToken);
       sessionStorage.setItem('adminUser', JSON.stringify(data.data.user));
       setUser(data.data.user);
-      return data.data.user;
+      return { needs2FA: false, user: data.data.user };
     } catch (err: any) {
+      const code = err.response?.data?.error?.code;
+      const details = err.response?.data?.error?.details;
+      if (code === 'DEVICE_NOT_TRUSTED' && details?.userId) {
+        sessionStorage.setItem('admin_pending_userId', details.userId);
+        sessionStorage.setItem('admin_pending2FA', JSON.stringify({
+          userId: details.userId,
+          email: details.email,
+          twoFactorEnabled: !!details.twoFactorEnabled,
+        }));
+        return { needs2FA: true, user: null };
+      }
       const msg = err.message === 'Acesso restrito a administradores'
         ? err.message
         : err.response?.data?.error?.message || 'Erro ao fazer login';
@@ -73,8 +87,12 @@ function AdminLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
-      navigate('/overview');
+      const result = await login(email, password);
+      if (result?.needs2FA) {
+        navigate('/verificar-2fa');
+      } else {
+        navigate('/overview');
+      }
     } catch {}
   };
 
@@ -556,6 +574,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<AdminLoginPage />} />
+      <Route path="/verificar-2fa" element={<Verify2FAPage />} />
       <Route path="/" element={<ProtectedAdmin><AdminLayout /></ProtectedAdmin>}>
         <Route index element={<Navigate to="/overview" replace />} />
         <Route path="overview" element={<OverviewPage />} />

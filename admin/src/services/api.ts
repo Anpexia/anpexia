@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getDeviceId } from '../utils/device';
 
 const PROD_API_URL = 'https://api.anpexia.com.br/api/v1';
 
@@ -17,6 +18,7 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  config.headers['X-Device-ID'] = getDeviceId();
   return config;
 });
 
