@@ -10,9 +10,20 @@ interface SendEmailOptions {
   text?: string;
 }
 
+// Resend only accepts senders from a verified domain. anpexia.com.br is verified;
+// hotmail.com (the old EMAIL_FROM value) is not, which made every transactional
+// email (incl. the 2FA code) fail silently with a 403. Pin the sender to the
+// verified domain; ignore EMAIL_FROM unless it already points to anpexia.com.br.
+const VERIFIED_SENDER = 'Anpexia <noreply@anpexia.com.br>';
+function resolveSender(): string {
+  const configured = env.emailFrom || '';
+  if (/@anpexia\.com\.br/i.test(configured)) return configured;
+  return VERIFIED_SENDER;
+}
+
 export async function sendEmail(options: SendEmailOptions): Promise<{ id: string }> {
   const { data, error } = await resend.emails.send({
-    from: env.emailFrom,
+    from: resolveSender(),
     to: Array.isArray(options.to) ? options.to : [options.to],
     subject: options.subject,
     html: options.html,
