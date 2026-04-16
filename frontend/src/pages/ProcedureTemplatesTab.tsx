@@ -77,15 +77,16 @@ export function ProcedureTemplatesTab() {
   const fetchProducts = useCallback(async () => {
     try {
       const { data } = await api.get('/inventory/products', { params: { limit: 500 } });
-      const items = (data.data || []).map((p: any) => ({
+      const raw = Array.isArray(data?.data) ? data.data : [];
+      const items = raw.map((p: any) => ({
         id: p.id,
-        name: p.name,
-        quantity: p.quantity,
+        name: p.name ?? '(sem nome)',
+        quantity: typeof p.quantity === 'number' ? p.quantity : 0,
         unit: p.unit || 'un',
       }));
       setProducts(items);
-    } catch {
-      // noop
+    } catch (err) {
+      console.error('[Templates] Falha ao carregar produtos:', err);
     }
   }, []);
 
@@ -335,17 +336,22 @@ export function ProcedureTemplatesTab() {
                   </div>
                 ) : (
                   <div className="space-y-2">
+                    {products.length === 0 && (
+                      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                        Nenhum produto carregado do estoque. Verifique se ha produtos cadastrados na aba Produtos.
+                      </div>
+                    )}
                     {materials.map((m, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                      <div key={idx} className="grid grid-cols-[8fr_2fr_auto] gap-2 items-center">
                         <select
                           value={m.productId}
                           onChange={(e) => updateMaterial(idx, { productId: e.target.value })}
-                          className={`${inputCls} flex-1`}
+                          className={`${inputCls} min-w-0`}
                         >
                           <option value="">Selecione um produto</option>
                           {products.map((p) => (
                             <option key={p.id} value={p.id}>
-                              {p.name} — estoque: {p.quantity} {p.unit}
+                              {p.name} ({p.quantity} {p.unit})
                             </option>
                           ))}
                         </select>
@@ -355,13 +361,13 @@ export function ProcedureTemplatesTab() {
                           step="0.01"
                           value={m.quantity}
                           onChange={(e) => updateMaterial(idx, { quantity: Number(e.target.value) })}
-                          className={`${inputCls} w-24`}
+                          className={`${inputCls} min-w-0`}
                           placeholder="Qtd"
                         />
                         <button
                           type="button"
                           onClick={() => removeMaterial(idx)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg shrink-0"
                           title="Remover"
                         >
                           <X size={16} />
