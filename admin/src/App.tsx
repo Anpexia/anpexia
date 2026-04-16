@@ -33,7 +33,10 @@ function useAdminAuth() {
       const deviceId = getDeviceId();
       const { data } = await api.post('/auth/login', { email, password, deviceId });
       const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR'];
-      if (!allowedRoles.includes(data.data.user.role)) {
+      const u = data.data.user;
+      const hasTenant = !!(u.tenantId || u.tenant?.id);
+      // Admin panel accepts admin-panel roles OR any user without a tenant (tenantId null).
+      if (!allowedRoles.includes(u.role) && hasTenant) {
         throw new Error('Acesso restrito a administradores');
       }
       sessionStorage.setItem('adminToken', data.data.accessToken);

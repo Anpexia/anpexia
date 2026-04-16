@@ -11,6 +11,14 @@ interface Pending {
 
 const ADMIN_ALLOWED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR'];
 
+// An admin-panel user is any user whose role is in the list above, OR any user
+// with tenantId === null (admin users created via /usuarios have no tenant).
+function isAdminPanelUser(user: { role: string; tenantId?: string | null; tenant?: { id: string } | null }): boolean {
+  if (ADMIN_ALLOWED_ROLES.includes(user.role)) return true;
+  const hasTenant = !!(user.tenantId || user.tenant?.id);
+  return !hasTenant;
+}
+
 export default function Verify2FAPage() {
   const navigate = useNavigate();
   const [pending, setPending] = useState<Pending | null>(null);
@@ -47,7 +55,7 @@ export default function Verify2FAPage() {
         rememberDevice,
       });
       const user = data.data.user;
-      if (!ADMIN_ALLOWED_ROLES.includes(user.role)) {
+      if (!isAdminPanelUser(user)) {
         setError('Acesso restrito a administradores');
         setLoading(false);
         return;
