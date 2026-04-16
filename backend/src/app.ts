@@ -139,6 +139,7 @@ async function loadRoutes() {
     const { auditLogRouter } = await import('./modules/admin/auditLog.controller');
     const { adminUsersRouter } = await import('./modules/admin/adminUsers.controller');
     const { autoAudit } = await import('./shared/middleware/autoAudit');
+    const { googleRouter } = await import('./routes/google.routes');
 
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/tenants', tenantRouter);
@@ -216,6 +217,8 @@ async function loadRoutes() {
     app.use('/api/v1/admin', auditLogRouter);
     app.use('/api/admin', adminUsersRouter);
     app.use('/api/v1/admin', adminUsersRouter);
+    app.use('/api/google', googleRouter);
+    app.use('/api/v1/google', googleRouter);
 
     const { errorHandler } = await import('./shared/middleware/error-handler');
     app.use(errorHandler);

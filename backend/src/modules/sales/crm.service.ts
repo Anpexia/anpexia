@@ -1,5 +1,6 @@
 import prisma from '../../config/database';
 import { LeadStage, Prisma } from '@prisma/client';
+import * as gcal from '../../services/googleCalendar.service';
 
 export type Trigger = 'LEAD_CREATED' | 'STAGE_CHANGED' | 'LEAD_IDLE' | 'DEAL_WON';
 
@@ -22,7 +23,7 @@ export async function seedDefaultAutomations() {
   }
 }
 
-export async function executeAutomations(trigger: Trigger, lead: { id: string; responsible?: string | null }, toStage?: string) {
+export async function executeAutomations(trigger: Trigger, lead: { id: string; name?: string; companyName?: string | null; company?: string | null; responsible?: string | null }, toStage?: string) {
   const automations = await prisma.crmAutomation.findMany({ where: { active: true, trigger } });
   const now = new Date();
   for (const a of automations) {
@@ -35,9 +36,27 @@ export async function executeAutomations(trigger: Trigger, lead: { id: string; r
     if (action === 'CREATE_TASK') {
       const daysOffset = Number(cfg.daysOffset || 1);
       const dueAt = new Date(now.getTime() + daysOffset * 24 * 60 * 60 * 1000);
-      await prisma.leadTask.create({
-        data: { leadId: lead.id, type: cfg.type || 'FOLLOWUP', dueAt, responsible: lead.responsible || null, status: 'PENDING' },
+      const taskType = cfg.type || 'FOLLOWUP';
+      const task = await prisma.leadTask.create({
+        data: { leadId: lead.id, type: taskType, dueAt, responsible: lead.responsible || null, status: 'PENDING' },
       });
+
+      // Sync with Google Calendar
+      try {
+        const typeMap: Record<string, string> = { CALL: 'Ligacao', PROPOSAL: 'Proposta', FOLLOWUP: 'Follow-up', MEETING: 'Reuniao' };
+        const translatedType = typeMap[taskType] || taskType;
+        const leadName = lead.name || 'Lead';
+        const eventId = await gcal.createCalendarEvent({
+          title: `${translatedType} — ${leadName}`,
+          description: `Lead: ${leadName} | Empresa: ${lead.companyName || lead.company || '-'} | Responsavel: ${lead.responsible || '-'}`,
+          dueAt,
+        });
+        if (eventId) {
+          await prisma.leadTask.update({ where: { id: task.id }, data: { googleEventId: eventId } });
+        }
+      } catch (err: any) {
+        console.error('[CRM-AUTO-GCAL] Failed to sync automation task to calendar:', err.message);
+      }
     } else if (action === 'SEND_NOTIFICATION') {
       await prisma.leadActivity.create({
         data: { leadId: lead.id, type: 'NOTE', description: cfg.message || '', content: cfg.message || '' },

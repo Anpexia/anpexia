@@ -7,6 +7,7 @@ import { success, created } from '../../shared/utils/response';
 import { AppError } from '../../shared/middleware/error-handler';
 import * as crm from './crm.service';
 import { sendEmail } from '../../services/email.service';
+import * as gcal from '../../services/googleCalendar.service';
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => fn(req, res, next).catch(next);
@@ -110,6 +111,10 @@ adminCrmRouter.patch('/leads/tasks/:taskId', asyncHandler(async (req, res) => {
 }));
 
 adminCrmRouter.delete('/leads/tasks/:taskId', asyncHandler(async (req, res) => {
+  const task = await prisma.leadTask.findUnique({ where: { id: req.params.taskId as string } });
+  if (task?.googleEventId) {
+    await gcal.deleteCalendarEvent(task.googleEventId);
+  }
   await prisma.leadTask.delete({ where: { id: req.params.taskId as string } });
   return success(res, { ok: true });
 }));
@@ -239,6 +244,27 @@ adminCrmRouter.post('/leads/:id/tasks', asyncHandler(async (req, res) => {
       status: status || 'PENDING',
     },
   });
+
+  // Sync with Google Calendar
+  try {
+    const lead = await prisma.lead.findUnique({ where: { id: req.params.id as string } });
+    if (lead) {
+      const typeMap: Record<string, string> = { CALL: 'Ligacao', PROPOSAL: 'Proposta', FOLLOWUP: 'Follow-up', MEETING: 'Reuniao' };
+      const translatedType = typeMap[task.type] || task.type;
+      const eventId = await gcal.createCalendarEvent({
+        title: `${translatedType} — ${lead.name}`,
+        description: `Lead: ${lead.name} | Empresa: ${lead.companyName || lead.company || '-'} | Responsavel: ${task.responsible || '-'}`,
+        dueAt: task.dueAt,
+      });
+      if (eventId) {
+        await prisma.leadTask.update({ where: { id: task.id }, data: { googleEventId: eventId } });
+        task.googleEventId = eventId;
+      }
+    }
+  } catch (err: any) {
+    console.error('[CRM-GCAL] Failed to sync task to calendar:', err.message);
+  }
+
   return created(res, task);
 }));
 

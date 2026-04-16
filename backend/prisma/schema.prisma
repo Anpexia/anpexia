@@ -728,14 +728,15 @@ model LeadActivity {
 }
 
 model LeadTask {
-  id          String   @id @default(cuid())
-  leadId      String   @map("lead_id")
-  type        String // CALL, FOLLOWUP, PROPOSAL, MEETING, OTHER
-  dueAt       DateTime @map("due_at")
-  responsible String?
-  status      String   @default("PENDING") // PENDING, DONE
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  leadId        String   @map("lead_id")
+  type          String // CALL, FOLLOWUP, PROPOSAL, MEETING, OTHER
+  dueAt         DateTime @map("due_at")
+  responsible   String?
+  status        String   @default("PENDING") // PENDING, DONE
+  googleEventId String?  @map("google_event_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
@@ -770,6 +771,17 @@ model SalesMessageTemplate {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("sales_message_templates")
+}
+
+model GoogleCalendarToken {
+  id           String   @id @default(cuid())
+  accessToken  String   @map("access_token")
+  refreshToken String   @map("refresh_token")
+  expiryDate   BigInt   @map("expiry_date")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("google_calendar_tokens")
 }
 
 model ScheduledCall {

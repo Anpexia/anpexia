@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Shield, Smartphone, Mail, X, Trash2 } from 'lucide-react';
+import { Shield, Smartphone, Mail, X, Trash2, Calendar, CheckCircle, Unlink } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 
 interface TrustedDevice {
@@ -13,6 +14,10 @@ export default function SettingsPage() {
   const [devices, setDevices] = useState<TrustedDevice[]>([]);
   const [showGoogle, setShowGoogle] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+  const [gcalConnected, setGcalConnected] = useState<boolean | null>(null);
+  const [gcalLoading, setGcalLoading] = useState(false);
+  const [gcalToast, setGcalToast] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const loadDevices = async () => {
     try {
@@ -20,6 +25,39 @@ export default function SettingsPage() {
       setDevices(data.data.items || data.data.devices || data.data || []);
     } catch {
       setDevices([]);
+    }
+  };
+
+  const loadGcalStatus = async () => {
+    try {
+      const { data } = await api.get('/google/status');
+      setGcalConnected(data.data.connected);
+    } catch {
+      setGcalConnected(false);
+    }
+  };
+
+  const connectGcal = async () => {
+    setGcalLoading(true);
+    try {
+      const { data } = await api.get('/google/auth');
+      window.location.href = data.data.url;
+    } catch {
+      alert('Erro ao iniciar conexao com Google Calendar');
+    } finally {
+      setGcalLoading(false);
+    }
+  };
+
+  const disconnectGcal = async () => {
+    setGcalLoading(true);
+    try {
+      await api.delete('/google/disconnect');
+      setGcalConnected(false);
+    } catch {
+      alert('Erro ao desconectar Google Calendar');
+    } finally {
+      setGcalLoading(false);
     }
   };
 
@@ -32,6 +70,15 @@ export default function SettingsPage() {
       } catch {}
     }
     loadDevices();
+    loadGcalStatus();
+
+    if (searchParams.get('google') === 'connected') {
+      setGcalToast('Google Calendar conectado com sucesso!');
+      setGcalConnected(true);
+      searchParams.delete('google');
+      setSearchParams(searchParams, { replace: true });
+      setTimeout(() => setGcalToast(''), 5000);
+    }
   }, []);
 
   const removeDevice = async (id: string) => {
@@ -148,7 +195,61 @@ export default function SettingsPage() {
         />
       </section>
 
-      {/* 4. Sistema */}
+      {/* 4. Google Calendar */}
+      <section className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Calendar size={20} className="text-[#1E3A5F]" />
+          <h3 className="text-lg font-semibold text-gray-900">Google Calendar</h3>
+        </div>
+
+        {gcalToast && (
+          <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+            <CheckCircle size={16} className="text-green-600" />
+            <span className="text-sm text-green-700">{gcalToast}</span>
+          </div>
+        )}
+
+        {gcalConnected === null ? (
+          <p className="text-sm text-gray-500">Verificando status...</p>
+        ) : gcalConnected ? (
+          <div className="flex items-center justify-between py-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                  Conectado
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                Tarefas do CRM sao sincronizadas automaticamente com o Google Agenda.
+              </p>
+            </div>
+            <button
+              onClick={disconnectGcal}
+              disabled={gcalLoading}
+              className="px-4 py-2 text-sm rounded-lg border border-red-300 text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-60"
+            >
+              <Unlink size={16} />
+              Desconectar
+            </button>
+          </div>
+        ) : (
+          <div className="py-3">
+            <p className="text-sm text-gray-600 mb-4">
+              Conecte sua conta Google para sincronizar tarefas do CRM automaticamente.
+            </p>
+            <button
+              onClick={connectGcal}
+              disabled={gcalLoading}
+              className="px-4 py-2 text-sm rounded-lg bg-[#1E3A5F] text-white hover:bg-[#152C49] flex items-center gap-2 disabled:opacity-60"
+            >
+              <Calendar size={16} />
+              {gcalLoading ? 'Conectando...' : 'Conectar Google Calendar'}
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* 5. Sistema */}
       <section className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Sistema</h3>
         <InfoRow label="Versão" value="1.0.0" />
