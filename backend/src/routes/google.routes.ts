@@ -8,7 +8,7 @@ function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => P
 
 const router = Router();
 
-// Callback must be PUBLIC — Google redirects here without JWT
+// PUBLIC — Google redirects here without JWT
 router.get('/callback', asyncHandler(async (req, res) => {
   const code = req.query.code as string;
   if (!code) {
@@ -18,28 +18,26 @@ router.get('/callback', asyncHandler(async (req, res) => {
   return res.redirect('https://admin.anpexia.com.br/configuracoes?google=connected');
 }));
 
-// All remaining routes require SUPER_ADMIN auth
-router.use(authenticate, requireRole('SUPER_ADMIN'));
-
-// GET /api/google/auth — returns OAuth URL
+// PUBLIC — just generates a redirect URL, no sensitive data
 router.get('/auth', asyncHandler(async (_req, res) => {
   const url = gcal.getAuthUrl();
   return res.json({ success: true, data: { url } });
 }));
 
-// GET /api/google/status — check if connected
-router.get('/status', asyncHandler(async (_req, res) => {
+// Authenticated (any role) — just returns a boolean
+router.get('/status', authenticate, asyncHandler(async (_req, res) => {
   const connected = await gcal.isConnected();
   return res.json({ success: true, data: { connected } });
 }));
 
-// GET /api/google/events — list upcoming events
+// Remaining routes require SUPER_ADMIN
+router.use(authenticate, requireRole('SUPER_ADMIN'));
+
 router.get('/events', asyncHandler(async (_req, res) => {
   const events = await gcal.listUpcomingEvents();
   return res.json({ success: true, data: events });
 }));
 
-// DELETE /api/google/disconnect — remove tokens
 router.delete('/disconnect', asyncHandler(async (_req, res) => {
   await gcal.disconnect();
   return res.json({ success: true, data: { ok: true } });
