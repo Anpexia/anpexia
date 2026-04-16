@@ -13,12 +13,16 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Ensure the device ID exists in localStorage as soon as the module loads.
+// It is sent in the body of auth/login and 2fa/verify — not as a header,
+// to avoid CORS preflight issues (backend allowedHeaders: Content-Type, Authorization).
+getDeviceId();
+
 api.interceptors.request.use((config) => {
   const token = sessionStorage.getItem('adminToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  config.headers['X-Device-ID'] = getDeviceId();
   return config;
 });
 
