@@ -51,6 +51,7 @@ export function requireRole(...roles: string[]) {
     }
 
     if (!roles.includes(req.auth.role)) {
+      console.warn(`[AUTH] 403 on ${req.method} ${req.originalUrl} — user role "${req.auth.role}" not in allowed [${roles.join(',')}] (userId=${req.auth.userId})`);
       throw new AppError(403, 'FORBIDDEN', 'Sem permissão para esta ação');
     }
 
