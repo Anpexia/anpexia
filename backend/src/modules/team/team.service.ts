@@ -10,6 +10,8 @@ interface CreateMemberData {
   password?: string;
   phone?: string;
   role: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
+  especialidade?: string;
+  rqe?: string;
   sendInvite?: boolean;
 }
 
@@ -23,6 +25,8 @@ export const teamService = {
         email: true,
         phone: true,
         role: true,
+        especialidade: true,
+        rqe: true,
         isActive: true,
         lastLoginAt: true,
         createdAt: true,
@@ -41,6 +45,7 @@ export const teamService = {
         email: true,
         phone: true,
         especialidade: true,
+        rqe: true,
         tipoRegistro: true,
         numeroRegistro: true,
         duracaoConsulta: true,
@@ -64,6 +69,8 @@ export const teamService = {
         email: data.email,
         role: data.role,
         phone: data.phone,
+        especialidade: data.especialidade,
+        rqe: data.rqe,
       });
       return { ...user, isActive: true, createdAt: new Date(), invited: true };
     }
@@ -85,6 +92,8 @@ export const teamService = {
         passwordHash,
         phone: data.phone,
         role: data.role,
+        especialidade: data.especialidade,
+        rqe: data.rqe,
         tenantId,
         passwordDefined: true,
       },
@@ -94,6 +103,8 @@ export const teamService = {
         email: true,
         phone: true,
         role: true,
+        especialidade: true,
+        rqe: true,
         isActive: true,
         createdAt: true,
       },
@@ -102,7 +113,7 @@ export const teamService = {
     return user;
   },
 
-  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE' }) {
+  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'; especialidade?: string; rqe?: string }) {
     const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario nao encontrado');
 
@@ -115,6 +126,8 @@ export const teamService = {
         email: true,
         phone: true,
         role: true,
+        especialidade: true,
+        rqe: true,
         isActive: true,
         createdAt: true,
       },
@@ -148,14 +161,14 @@ export const teamService = {
       where: { id: userId },
       select: {
         id: true, name: true, email: true, phone: true, role: true,
-        especialidade: true, tipoRegistro: true, numeroRegistro: true,
+        especialidade: true, rqe: true, tipoRegistro: true, numeroRegistro: true,
         duracaoConsulta: true, bio: true,
       },
     });
   },
 
   async updateProfile(userId: string, data: {
-    name?: string; phone?: string; especialidade?: string;
+    name?: string; phone?: string; especialidade?: string; rqe?: string;
     tipoRegistro?: string; numeroRegistro?: string;
     duracaoConsulta?: number; bio?: string;
   }) {
@@ -164,7 +177,7 @@ export const teamService = {
       data,
       select: {
         id: true, name: true, email: true, phone: true, role: true,
-        especialidade: true, tipoRegistro: true, numeroRegistro: true,
+        especialidade: true, rqe: true, tipoRegistro: true, numeroRegistro: true,
         duracaoConsulta: true, bio: true,
       },
     });

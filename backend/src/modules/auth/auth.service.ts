@@ -412,6 +412,8 @@ export const authService = {
     email: string;
     role: string;
     phone?: string;
+    especialidade?: string;
+    rqe?: string;
     inviteLinkBase?: string;
   }) {
     const existing = await prisma.user.findUnique({ where: { email: params.email } });
@@ -427,12 +429,14 @@ export const authService = {
         email: params.email,
         phone: params.phone,
         role: params.role as any,
+        especialidade: params.especialidade,
+        rqe: params.rqe,
         passwordHash: crypto.randomBytes(32).toString('hex'), // placeholder; never usable
         passwordDefined: false,
         inviteToken,
         inviteTokenExpiresAt,
       },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, role: true, especialidade: true, rqe: true },
     });
 
     const base = (params.inviteLinkBase || env.frontendUrl).replace(/\/$/, '');

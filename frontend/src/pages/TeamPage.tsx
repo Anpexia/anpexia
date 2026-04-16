@@ -9,6 +9,8 @@ interface TeamMember {
   email: string;
   phone: string | null;
   role: string;
+  especialidade?: string | null;
+  rqe?: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
@@ -32,6 +34,8 @@ export function TeamPage() {
   const [formPassword, setFormPassword] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formRole, setFormRole] = useState<'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'>('RECEPTIONIST');
+  const [formEspecialidade, setFormEspecialidade] = useState('');
+  const [formRqe, setFormRqe] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Repasse (only visible when editing a DOCTOR)
@@ -57,7 +61,15 @@ export function TeamPage() {
     if (!formName || !formEmail || !formPassword) { showToast('Preencha todos os campos obrigatorios'); return; }
     setSubmitting(true);
     try {
-      await api.post('/team', { name: formName, email: formEmail, password: formPassword, phone: formPhone || undefined, role: formRole });
+      await api.post('/team', {
+        name: formName,
+        email: formEmail,
+        password: formPassword,
+        phone: formPhone || undefined,
+        role: formRole,
+        especialidade: formRole === 'DOCTOR' ? (formEspecialidade || undefined) : undefined,
+        rqe: formRole === 'DOCTOR' ? (formRqe || undefined) : undefined,
+      });
       showToast('Membro adicionado!');
       setShowCreateModal(false);
       resetForm();
@@ -75,7 +87,13 @@ export function TeamPage() {
     try {
       // OWNER can edit basic fields. MANAGER cannot (backend enforces).
       if (isOwner) {
-        await api.put(`/team/${editMember.id}`, { name: formName, phone: formPhone || undefined, role: formRole });
+        await api.put(`/team/${editMember.id}`, {
+          name: formName,
+          phone: formPhone || undefined,
+          role: formRole,
+          especialidade: formRole === 'DOCTOR' ? (formEspecialidade || undefined) : undefined,
+          rqe: formRole === 'DOCTOR' ? (formRqe || undefined) : undefined,
+        });
       }
       // Save repasse for doctors (OWNER or MANAGER)
       if ((editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && canManage) {
@@ -136,13 +154,15 @@ export function TeamPage() {
     }
   };
 
-  const resetForm = () => { setFormName(''); setFormEmail(''); setFormPassword(''); setFormPhone(''); setFormRole('RECEPTIONIST'); };
+  const resetForm = () => { setFormName(''); setFormEmail(''); setFormPassword(''); setFormPhone(''); setFormRole('RECEPTIONIST'); setFormEspecialidade(''); setFormRqe(''); };
 
   const openEdit = (m: TeamMember) => {
     setEditMember(m);
     setFormName(m.name);
     setFormPhone(m.phone || '');
     setFormRole(m.role === 'OWNER' ? 'MANAGER' : (m.role as any));
+    setFormEspecialidade(m.especialidade || '');
+    setFormRqe(m.rqe || '');
     if (m.role === 'DOCTOR') {
       loadRepasse(m.id);
     } else {
@@ -297,6 +317,18 @@ export function TeamPage() {
                   <option value="EMPLOYEE">Funcionario</option>
                 </select>
               </div>
+              {formRole === 'DOCTOR' && (
+                <div className="grid grid-cols-[7fr_3fr] gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
+                    <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Oftalmologia" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
+                    <input type="number" value={formRqe} onChange={e => setFormRqe(e.target.value)} className={inputCls} placeholder="Número" />
+                  </div>
+                </div>
+              )}
               <button onClick={handleCreate} disabled={submitting}
                 className="w-full btn-pill btn-primary justify-center">
                 {submitting ? 'Adicionando...' : 'Adicionar'}
@@ -363,6 +395,19 @@ export function TeamPage() {
                   <option value="EMPLOYEE">Funcionario</option>
                 </select>
               </div>
+
+              {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
+                <div className="grid grid-cols-[7fr_3fr] gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
+                    <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Ex: Oftalmologia" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
+                    <input type="number" value={formRqe} onChange={e => setFormRqe(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Número" />
+                  </div>
+                </div>
+              )}
 
               {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
                 <div className="border-t border-slate-200 pt-4">

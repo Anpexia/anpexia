@@ -38,6 +38,7 @@ export function ProfilePage() {
 
   // Professional fields
   const [especialidade, setEspecialidade] = useState('');
+  const [rqe, setRqe] = useState('');
   const [tipoRegistro, setTipoRegistro] = useState('');
   const [numeroRegistro, setNumeroRegistro] = useState('');
   const [duracaoConsulta, setDuracaoConsulta] = useState('');
@@ -77,6 +78,7 @@ export function ProfilePage() {
         if (p) {
           if (p.phone) setPhone(p.phone);
           if (p.especialidade) setEspecialidade(p.especialidade);
+          if (p.rqe) setRqe(p.rqe);
           if (p.tipoRegistro) setTipoRegistro(p.tipoRegistro);
           if (p.numeroRegistro) setNumeroRegistro(p.numeroRegistro);
           if (p.duracaoConsulta) setDuracaoConsulta(String(p.duracaoConsulta));
@@ -178,6 +180,7 @@ export function ProfilePage() {
       if (name && name !== user?.name) payload.name = name;
       if (phone) payload.phone = phone;
       if (especialidade) payload.especialidade = especialidade;
+      if (rqe) payload.rqe = rqe;
       if (tipoRegistro) payload.tipoRegistro = tipoRegistro;
       if (numeroRegistro) payload.numeroRegistro = numeroRegistro;
       if (duracaoConsulta) payload.duracaoConsulta = parseInt(duracaoConsulta, 10) || undefined;
@@ -344,9 +347,15 @@ export function ProfilePage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
               <input value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} placeholder="5571999999999" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-              <input value={especialidade} onChange={e => setEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Oftalmologia" />
+            <div className="grid grid-cols-[7fr_3fr] gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
+                <input value={especialidade} onChange={e => setEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Oftalmologia" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
+                <input type="number" value={rqe} onChange={e => setRqe(e.target.value)} className={inputCls} placeholder="Número" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
