@@ -162,6 +162,27 @@ financialRouter.put('/categories/:id', async (req: Request, res: Response, next:
   }
 });
 
+// ==========================================
+// DOCTORS REPORT (relatorio por medico)
+// ==========================================
+
+financialRouter.get('/doctors-report', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const dataInicio = req.query.dataInicio as string | undefined;
+    const dataFim = req.query.dataFim as string | undefined;
+
+    const report = await financialService.getDoctorsReport(
+      req.auth!.tenantId!,
+      dataInicio,
+      dataFim,
+    );
+
+    return success(res, report);
+  } catch (err) {
+    next(err);
+  }
+});
+
 financialRouter.delete('/categories/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     await financialService.deleteCategory(req.auth!.tenantId!, req.params.id as string);

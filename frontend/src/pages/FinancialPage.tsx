@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Edit2, X } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Edit2, X, Stethoscope, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../services/api';
 
 // --- Types ---
@@ -34,7 +34,75 @@ interface Transaction {
   createdAt: string;
 }
 
-type ActiveTab = 'dashboard' | 'transactions' | 'categories';
+type ActiveTab = 'dashboard' | 'transactions' | 'categories' | 'doctors';
+
+// --- Doctors report types ---
+
+interface DoctorProcedureEntry {
+  date: string;
+  patientName: string;
+  procedures: string[];
+  valorFaturado: number;
+  valorRepasse: number;
+}
+
+interface DoctorReportItem {
+  id: string;
+  name: string;
+  especialidade: string | null;
+  totalProcedimentos: number;
+  totalFaturado: number;
+  totalRepasse: number;
+  procedures: DoctorProcedureEntry[];
+}
+
+interface DoctorsReport {
+  totalFaturado: number;
+  totalRepasse: number;
+  totalProcedimentos: number;
+  doctors: DoctorReportItem[];
+}
+
+type PeriodChip = 'hoje' | 'semana' | 'mes' | 'ano' | 'personalizado';
+
+function computeRange(chip: PeriodChip, customStart?: string, customEnd?: string): { start: string; end: string } {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const d = today.getDate();
+
+  const fmt = (dt: Date) => dt.toISOString();
+
+  switch (chip) {
+    case 'hoje': {
+      const s = new Date(y, m, d, 0, 0, 0, 0);
+      const e = new Date(y, m, d, 23, 59, 59, 999);
+      return { start: fmt(s), end: fmt(e) };
+    }
+    case 'semana': {
+      const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+      const mondayOffset = (dayOfWeek + 6) % 7; // days since Monday
+      const s = new Date(y, m, d - mondayOffset, 0, 0, 0, 0);
+      const e = new Date(y, m, d - mondayOffset + 6, 23, 59, 59, 999);
+      return { start: fmt(s), end: fmt(e) };
+    }
+    case 'mes': {
+      const s = new Date(y, m, 1, 0, 0, 0, 0);
+      const e = new Date(y, m + 1, 0, 23, 59, 59, 999);
+      return { start: fmt(s), end: fmt(e) };
+    }
+    case 'ano': {
+      const s = new Date(y, 0, 1, 0, 0, 0, 0);
+      const e = new Date(y, 11, 31, 23, 59, 59, 999);
+      return { start: fmt(s), end: fmt(e) };
+    }
+    case 'personalizado': {
+      const s = customStart ? new Date(customStart + 'T00:00:00') : new Date(y, m, 1);
+      const e = customEnd ? new Date(customEnd + 'T23:59:59') : new Date(y, m + 1, 0, 23, 59, 59, 999);
+      return { start: fmt(s), end: fmt(e) };
+    }
+  }
+}
 
 // Composite key used in UI Type selects. Maps to (type, subtype).
 type TypeKey = 'INCOME' | 'EXPENSE_FIXA' | 'EXPENSE_VARIAVEL' | 'EXPENSE_ADMINISTRATIVA';
@@ -146,6 +214,19 @@ export function FinancialPage() {
   const [editCatName, setEditCatName] = useState('');
   const [editCatTypeKey, setEditCatTypeKey] = useState<TypeKey>('INCOME');
 
+  // --- Doctors report state ---
+  const [doctorsReport, setDoctorsReport] = useState<DoctorsReport>({
+    totalFaturado: 0,
+    totalRepasse: 0,
+    totalProcedimentos: 0,
+    doctors: [],
+  });
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [periodChip, setPeriodChip] = useState<PeriodChip>('mes');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [expandedDoctorIds, setExpandedDoctorIds] = useState<Record<string, boolean>>({});
+
   // --- Fetchers ---
 
   const fetchSummary = useCallback(async () => {
@@ -198,9 +279,36 @@ export function FinancialPage() {
     }
   }, []);
 
+  const fetchDoctorsReport = useCallback(async () => {
+    setLoadingDoctors(true);
+    try {
+      const { start, end } = computeRange(periodChip, customStart, customEnd);
+      const { data } = await api.get('/financial/doctors-report', {
+        params: { dataInicio: start, dataFim: end },
+      });
+      const payload = data?.data || data || {};
+      setDoctorsReport({
+        totalFaturado: Number(payload.totalFaturado) || 0,
+        totalRepasse: Number(payload.totalRepasse) || 0,
+        totalProcedimentos: Number(payload.totalProcedimentos) || 0,
+        doctors: Array.isArray(payload.doctors) ? payload.doctors : [],
+      });
+    } catch {
+      setDoctorsReport({ totalFaturado: 0, totalRepasse: 0, totalProcedimentos: 0, doctors: [] });
+    } finally {
+      setLoadingDoctors(false);
+    }
+  }, [periodChip, customStart, customEnd]);
+
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
   useEffect(() => { fetchCategories(); }, [fetchCategories]);
+  useEffect(() => {
+    if (activeTab === 'doctors') {
+      fetchDoctorsReport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, fetchDoctorsReport]);
 
   // --- Handlers ---
 
@@ -360,7 +468,25 @@ export function FinancialPage() {
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'transactions', label: 'Lançamentos' },
     { key: 'categories', label: 'Categorias' },
+    { key: 'doctors', label: 'Médicos' },
   ];
+
+  const periodChips: { key: PeriodChip; label: string }[] = [
+    { key: 'hoje', label: 'Hoje' },
+    { key: 'semana', label: 'Esta semana' },
+    { key: 'mes', label: 'Este mês' },
+    { key: 'ano', label: 'Este ano' },
+    { key: 'personalizado', label: 'Personalizado' },
+  ];
+
+  const toggleDoctor = (id: string) => {
+    setExpandedDoctorIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const formatDatePtBR = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
   return (
     <div className="space-y-6">
@@ -746,6 +872,165 @@ export function FinancialPage() {
                         );
                       })}
                     </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== TAB: DOCTORS (Medicos) ==================== */}
+      {activeTab === 'doctors' && (
+        <div className="space-y-6">
+          {/* Period filter chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            {periodChips.map((chip) => (
+              <button
+                key={chip.key}
+                onClick={() => setPeriodChip(chip.key)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  periodChip === chip.key
+                    ? 'bg-[#1E3A5F] text-white border-[#1E3A5F]'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+            {periodChip === 'personalizado' && (
+              <div className="flex items-center gap-2 ml-2">
+                <span className="text-xs text-slate-500">De</span>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                />
+                <span className="text-xs text-slate-500">Até</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* KPI cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg border border-slate-200 p-4">
+              <div className="flex items-center gap-2 text-slate-500 mb-2">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                <span className="text-xs font-medium uppercase tracking-wide">Total Faturado Geral</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-800">
+                {formatBRL(doctorsReport.totalFaturado)}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-4">
+              <div className="flex items-center gap-2 text-slate-500 mb-2">
+                <DollarSign className="w-4 h-4 text-[#2563EB]" />
+                <span className="text-xs font-medium uppercase tracking-wide">Total Repasses Geral</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-800">
+                {formatBRL(doctorsReport.totalRepasse)}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-4">
+              <div className="flex items-center gap-2 text-slate-500 mb-2">
+                <Stethoscope className="w-4 h-4 text-slate-600" />
+                <span className="text-xs font-medium uppercase tracking-wide">Total Procedimentos</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-800">
+                {doctorsReport.totalProcedimentos}
+              </div>
+            </div>
+          </div>
+
+          {/* Doctors list */}
+          {loadingDoctors ? (
+            <div className="bg-white rounded-lg border border-slate-200 p-6 text-sm text-slate-400">Carregando...</div>
+          ) : doctorsReport.doctors.length === 0 ? (
+            <div className="bg-white rounded-lg border border-slate-200 p-8 text-sm text-slate-400 text-center">
+              Nenhum procedimento registrado no período.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {doctorsReport.doctors.map((doc) => {
+                const expanded = !!expandedDoctorIds[doc.id];
+                return (
+                  <div key={doc.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-800">{doc.name}</div>
+                        {doc.especialidade ? (
+                          <div className="text-xs text-slate-500 mt-0.5">{doc.especialidade}</div>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-center">
+                          <div className="text-xs text-slate-500">Procedimentos</div>
+                          <div className="text-sm font-semibold text-slate-800">{doc.totalProcedimentos}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-slate-500">Faturado</div>
+                          <div className="text-sm font-semibold text-green-700">{formatBRL(doc.totalFaturado)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-slate-500">Repasse</div>
+                          <div className="text-sm font-semibold text-[#1E3A5F]">{formatBRL(doc.totalRepasse)}</div>
+                        </div>
+                        <button
+                          onClick={() => toggleDoctor(doc.id)}
+                          className="flex items-center gap-1 text-xs font-medium text-[#1E3A5F] hover:underline"
+                        >
+                          {expanded ? (
+                            <>
+                              Ocultar <ChevronUp className="w-4 h-4" />
+                            </>
+                          ) : (
+                            <>
+                              Ver detalhes <ChevronDown className="w-4 h-4" />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {expanded && (
+                      <div className="border-t border-slate-200 overflow-x-auto">
+                        {doc.procedures.length === 0 ? (
+                          <div className="p-4 text-sm text-slate-400">Nenhum procedimento no período.</div>
+                        ) : (
+                          <table className="w-full text-sm">
+                            <thead className="bg-slate-50">
+                              <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-2 font-medium">Data</th>
+                                <th className="px-4 py-2 font-medium">Paciente</th>
+                                <th className="px-4 py-2 font-medium">Procedimentos</th>
+                                <th className="px-4 py-2 font-medium text-right">Valor Faturado</th>
+                                <th className="px-4 py-2 font-medium text-right">Valor Repasse</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {doc.procedures.map((p, idx) => (
+                                <tr key={idx}>
+                                  <td className="px-4 py-2 text-slate-700 whitespace-nowrap">{formatDatePtBR(p.date)}</td>
+                                  <td className="px-4 py-2 text-slate-700">{p.patientName}</td>
+                                  <td className="px-4 py-2 text-slate-600">
+                                    {p.procedures.length > 0 ? p.procedures.join(', ') : '—'}
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-green-700 whitespace-nowrap">{formatBRL(p.valorFaturado)}</td>
+                                  <td className="px-4 py-2 text-right text-[#1E3A5F] whitespace-nowrap">{formatBRL(p.valorRepasse)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

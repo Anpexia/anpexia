@@ -254,4 +254,181 @@ export const financialService = {
 
     await prisma.financialCategory.delete({ where: { id } });
   },
+
+  // ==========================================
+  // DOCTORS REPORT
+  // ==========================================
+  //
+  // Schema field references (verified against backend/prisma/schema.prisma):
+  //
+  //  User (line 111)
+  //    - id, tenantId, name, role (Role enum, DOCTOR), especialidade (String?),
+  //      isActive (Boolean)
+  //
+  //  ScheduledCall (line 788)
+  //    - id, tenantId, customerId, doctorId, name, date (DateTime),
+  //      status (String; value 'completed' for done appointments)
+  //    - relations: doctor (User "DoctorScheduledCalls"), customer,
+  //      procedures (ScheduledCallProcedure[])
+  //    - NOTE: there is NO per-appointment repasseValue field.
+  //
+  //  ScheduledCallProcedure (line 1204)
+  //    - id, scheduledCallId, tussProcedureId, authorizationNumber
+  //    - relations: tussProcedure (TussProcedure)
+  //    - NOTE: there is NO per-procedure repasseValue override.
+  //
+  //  TussProcedure (line 1184)
+  //    - id, tenantId, code, description, type (CONSULTA|EXAME|CIRURGIA|TERAPIA|OUTROS),
+  //      value (Float)
+  //
+  //  DoctorRepasse (line 1219)
+  //    - id, tenantId, doctorId, procedureType (same enum as TussProcedure.type),
+  //      percentage (Float, 0-100)
+  //
+  // Computation rules:
+  //   - Faturado of a procedure = TussProcedure.value.
+  //   - Repasse of a procedure = TussProcedure.value * DoctorRepasse.percentage / 100
+  //     where DoctorRepasse matches doctorId + procedureType. If no matching repasse,
+  //     repasse of that procedure = 0.
+  //   - An appointment without procedures contributes 0 to totalFaturado/totalRepasse
+  //     but still counts as a procedimento (1 appointment).
+  //
+  async getDoctorsReport(tenantId: string, startDate?: string, endDate?: string) {
+    const now = new Date();
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const end = endDate
+      ? new Date(endDate)
+      : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Ensure the end date includes the full day when caller passes a plain date.
+    if (endDate && endDate.length <= 10) {
+      end.setHours(23, 59, 59, 999);
+    }
+
+    const [doctors, repasses, calls] = await Promise.all([
+      prisma.user.findMany({
+        where: { tenantId, role: 'DOCTOR', isActive: true },
+        select: { id: true, name: true, especialidade: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.doctorRepasse.findMany({ where: { tenantId } }),
+      prisma.scheduledCall.findMany({
+        where: {
+          tenantId,
+          status: 'completed',
+          doctorId: { not: null },
+          date: { gte: start, lte: end },
+        },
+        orderBy: { date: 'asc' },
+        include: {
+          customer: { select: { id: true, name: true } },
+          procedures: {
+            include: {
+              tussProcedure: {
+                select: { id: true, code: true, description: true, type: true, value: true },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    // Build lookup map: doctorId -> procedureType -> percentage.
+    const repasseMap: Record<string, Record<string, number>> = {};
+    for (const r of repasses) {
+      if (!repasseMap[r.doctorId]) repasseMap[r.doctorId] = {};
+      repasseMap[r.doctorId][r.procedureType] = Number(r.percentage) || 0;
+    }
+
+    type ProcedureEntry = {
+      date: string;
+      patientName: string;
+      procedures: string[];
+      valorFaturado: number;
+      valorRepasse: number;
+    };
+
+    type DoctorBucket = {
+      id: string;
+      name: string;
+      especialidade: string | null;
+      totalProcedimentos: number;
+      totalFaturado: number;
+      totalRepasse: number;
+      procedures: ProcedureEntry[];
+    };
+
+    const buckets: Record<string, DoctorBucket> = {};
+    for (const doc of doctors) {
+      buckets[doc.id] = {
+        id: doc.id,
+        name: doc.name,
+        especialidade: doc.especialidade ?? null,
+        totalProcedimentos: 0,
+        totalFaturado: 0,
+        totalRepasse: 0,
+        procedures: [],
+      };
+    }
+
+    for (const call of calls) {
+      if (!call.doctorId) continue;
+      const bucket = buckets[call.doctorId];
+      // Only include calls whose doctor is still in the active-doctors list.
+      if (!bucket) continue;
+
+      let valorFaturado = 0;
+      let valorRepasse = 0;
+      const descs: string[] = [];
+
+      for (const proc of call.procedures) {
+        const tp = proc.tussProcedure;
+        if (!tp) continue;
+        const value = Number(tp.value) || 0;
+        valorFaturado += value;
+        const pct = repasseMap[call.doctorId]?.[tp.type] ?? 0;
+        valorRepasse += value * (pct / 100);
+        descs.push(tp.description || tp.code);
+      }
+
+      const patientName = call.customer?.name || call.name || 'Paciente';
+
+      bucket.totalProcedimentos += 1;
+      bucket.totalFaturado += valorFaturado;
+      bucket.totalRepasse += valorRepasse;
+      bucket.procedures.push({
+        date: call.date.toISOString(),
+        patientName,
+        procedures: descs,
+        valorFaturado,
+        valorRepasse,
+      });
+    }
+
+    const doctorsResult = Object.values(buckets)
+      .filter((b) => b.totalProcedimentos >= 1)
+      .map((b) => ({
+        ...b,
+        totalFaturado: Math.round(b.totalFaturado * 100) / 100,
+        totalRepasse: Math.round(b.totalRepasse * 100) / 100,
+        procedures: b.procedures.map((p) => ({
+          ...p,
+          valorFaturado: Math.round(p.valorFaturado * 100) / 100,
+          valorRepasse: Math.round(p.valorRepasse * 100) / 100,
+        })),
+      }));
+
+    const totalFaturado = doctorsResult.reduce((sum, d) => sum + d.totalFaturado, 0);
+    const totalRepasse = doctorsResult.reduce((sum, d) => sum + d.totalRepasse, 0);
+    const totalProcedimentos = doctorsResult.reduce((sum, d) => sum + d.totalProcedimentos, 0);
+
+    return {
+      totalFaturado: Math.round(totalFaturado * 100) / 100,
+      totalRepasse: Math.round(totalRepasse * 100) / 100,
+      totalProcedimentos,
+      doctors: doctorsResult,
+    };
+  },
 };
