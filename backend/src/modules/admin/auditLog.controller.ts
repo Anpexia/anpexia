@@ -6,7 +6,7 @@ import { success } from '../../shared/utils/response';
 export const auditLogRouter = Router();
 
 auditLogRouter.use(authenticate);
-auditLogRouter.use(requireRole('SUPER_ADMIN', 'OWNER'));
+auditLogRouter.use(requireRole('SUPER_ADMIN', 'OWNER', 'ADMIN', 'GERENTE'));
 
 function buildWhere(req: Request) {
   const { userId, action, entity, tenantId, startDate, endDate } = req.query as Record<string, string>;

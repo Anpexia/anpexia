@@ -66,7 +66,7 @@ publicLeadsRouter.post('/', publicLimiter, asyncHandler(async (req, res) => {
 
 // ============ Admin router ============
 export const adminCrmRouter = Router();
-adminCrmRouter.use(authenticate, requireRole('SUPER_ADMIN'));
+adminCrmRouter.use(authenticate, requireRole('SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR'));
 
 // Automations — placed before /leads/:id (different path so no conflict)
 adminCrmRouter.get('/automations', asyncHandler(async (_req, res) => {

@@ -29,7 +29,8 @@ function useAdminAuth() {
     setError('');
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      if (data.data.user.role !== 'SUPER_ADMIN') {
+      const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR'];
+      if (!allowedRoles.includes(data.data.user.role)) {
         throw new Error('Acesso restrito a administradores');
       }
       sessionStorage.setItem('adminToken', data.data.accessToken);
