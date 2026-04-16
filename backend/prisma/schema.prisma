@@ -929,6 +929,7 @@ model FinancialCategory {
   tenantId  String          @map("tenant_id")
   name      String
   type      TransactionType
+  subtype   String?         @map("subtype")
   createdAt DateTime        @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

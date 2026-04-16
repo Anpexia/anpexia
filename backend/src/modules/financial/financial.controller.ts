@@ -18,6 +18,7 @@ financialRouter.get('/transactions', async (req: Request, res: Response, next: N
   try {
     const { page, limit, skip } = getPagination(req);
     const type = req.query.type as string | undefined;
+    const subtype = req.query.subtype as string | undefined;
     const category = req.query.category as string | undefined;
     const status = req.query.status as string | undefined;
     const startDate = req.query.startDate as string | undefined;
@@ -25,7 +26,7 @@ financialRouter.get('/transactions', async (req: Request, res: Response, next: N
 
     const { transactions, total } = await financialService.listTransactions(
       req.auth!.tenantId!,
-      { skip, take: limit, type, category, status, startDate, endDate },
+      { skip, take: limit, type, subtype, category, status, startDate, endDate },
     );
 
     return success(res, transactions, paginationMeta(total, page, limit));

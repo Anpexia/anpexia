@@ -6,6 +6,7 @@ interface ListTransactionsParams {
   skip: number;
   take: number;
   type?: string;
+  subtype?: string;
   category?: string;
   status?: string;
   startDate?: string;
@@ -24,9 +25,12 @@ interface CreateTransactionData {
   notes?: string;
 }
 
+type CategorySubtype = 'FIXA' | 'VARIAVEL' | 'ADMINISTRATIVA' | null | undefined;
+
 interface CreateCategoryData {
   name: string;
   type: 'INCOME' | 'EXPENSE';
+  subtype?: CategorySubtype;
 }
 
 export const financialService = {
@@ -53,6 +57,21 @@ export const financialService = {
       if (params.endDate) {
         where.date.lte = new Date(params.endDate);
       }
+    }
+
+    // When subtype is provided, restrict the transaction list to those whose
+    // category name matches a FinancialCategory with that subtype for the tenant.
+    if (params.subtype) {
+      const matchedCategories = await prisma.financialCategory.findMany({
+        where: {
+          tenantId,
+          subtype: params.subtype,
+          ...(params.type ? { type: params.type as any } : {}),
+        },
+        select: { name: true },
+      });
+      const names = matchedCategories.map((c) => c.name);
+      where.category = names.length > 0 ? { in: names } : '__NO_MATCH__';
     }
 
     const [transactions, total] = await Promise.all([
@@ -190,11 +209,14 @@ export const financialService = {
   },
 
   async createCategory(tenantId: string, data: CreateCategoryData) {
+    const normalizedSubtype = data.type === 'INCOME' ? null : data.subtype ?? null;
+
     const category = await prisma.financialCategory.create({
       data: {
         tenantId,
         name: data.name,
         type: data.type,
+        subtype: normalizedSubtype,
       },
     });
 
@@ -207,9 +229,18 @@ export const financialService = {
       throw new AppError(404, 'CATEGORY_NOT_FOUND', 'Categoria nao encontrada');
     }
 
+    const effectiveType = (data.type ?? existing.type) as 'INCOME' | 'EXPENSE';
+    const updateData: any = { ...data };
+
+    if (effectiveType === 'INCOME') {
+      updateData.subtype = null;
+    } else if (data.subtype !== undefined) {
+      updateData.subtype = data.subtype ?? null;
+    }
+
     const category = await prisma.financialCategory.update({
       where: { id },
-      data,
+      data: updateData,
     });
 
     return category;

@@ -10,10 +10,13 @@ interface FinancialSummary {
   netProfit: number;
 }
 
+type CategorySubtype = 'FIXA' | 'VARIAVEL' | 'ADMINISTRATIVA' | null;
+
 interface Category {
   id: string;
   name: string;
   type: 'INCOME' | 'EXPENSE';
+  subtype?: CategorySubtype;
 }
 
 interface Transaction {
@@ -32,6 +35,42 @@ interface Transaction {
 }
 
 type ActiveTab = 'dashboard' | 'transactions' | 'categories';
+
+// Composite key used in UI Type selects. Maps to (type, subtype).
+type TypeKey = 'INCOME' | 'EXPENSE_FIXA' | 'EXPENSE_VARIAVEL' | 'EXPENSE_ADMINISTRATIVA';
+
+const typeKeyOptions: { key: TypeKey; label: string }[] = [
+  { key: 'INCOME', label: 'Receita' },
+  { key: 'EXPENSE_FIXA', label: 'Despesa Fixa' },
+  { key: 'EXPENSE_VARIAVEL', label: 'Despesa Variável' },
+  { key: 'EXPENSE_ADMINISTRATIVA', label: 'Despesa Administrativa' },
+];
+
+function typeKeyToPair(key: TypeKey): { type: 'INCOME' | 'EXPENSE'; subtype: CategorySubtype } {
+  switch (key) {
+    case 'INCOME': return { type: 'INCOME', subtype: null };
+    case 'EXPENSE_FIXA': return { type: 'EXPENSE', subtype: 'FIXA' };
+    case 'EXPENSE_VARIAVEL': return { type: 'EXPENSE', subtype: 'VARIAVEL' };
+    case 'EXPENSE_ADMINISTRATIVA': return { type: 'EXPENSE', subtype: 'ADMINISTRATIVA' };
+  }
+}
+
+function pairToTypeKey(type: 'INCOME' | 'EXPENSE', subtype: CategorySubtype): TypeKey {
+  if (type === 'INCOME') return 'INCOME';
+  if (subtype === 'FIXA') return 'EXPENSE_FIXA';
+  if (subtype === 'VARIAVEL') return 'EXPENSE_VARIAVEL';
+  if (subtype === 'ADMINISTRATIVA') return 'EXPENSE_ADMINISTRATIVA';
+  // EXPENSE without subtype: default to Variável bucket in selects
+  return 'EXPENSE_VARIAVEL';
+}
+
+const subtypeBadge: Record<string, { label: string; cls: string }> = {
+  INCOME: { label: 'Receita', cls: 'bg-green-100 text-green-700' },
+  FIXA: { label: 'Fixa', cls: 'bg-red-100 text-red-700' },
+  VARIAVEL: { label: 'Variável', cls: 'bg-orange-100 text-orange-700' },
+  ADMINISTRATIVA: { label: 'Administrativa', cls: 'bg-purple-100 text-purple-700' },
+  OTHER: { label: 'Despesa', cls: 'bg-slate-100 text-slate-600' },
+};
 
 const paymentMethodLabels: Record<string, string> = {
   DINHEIRO: 'Dinheiro',
@@ -63,7 +102,7 @@ function formatBRL(value: number): string {
 }
 
 const emptyTxForm = {
-  type: 'INCOME' as 'INCOME' | 'EXPENSE',
+  typeKey: 'INCOME' as TypeKey,
   category: '',
   description: '',
   amount: '',
@@ -87,7 +126,7 @@ export function FinancialPage() {
   // --- Transactions state ---
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loadingTx, setLoadingTx] = useState(true);
-  const [filterType, setFilterType] = useState('');
+  const [filterTypeKey, setFilterTypeKey] = useState<'' | TypeKey>('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -101,8 +140,11 @@ export function FinancialPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCat, setLoadingCat] = useState(true);
   const [newCatName, setNewCatName] = useState('');
-  const [newCatType, setNewCatType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
+  const [newCatTypeKey, setNewCatTypeKey] = useState<TypeKey>('INCOME');
   const [savingCat, setSavingCat] = useState(false);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatName, setEditCatName] = useState('');
+  const [editCatTypeKey, setEditCatTypeKey] = useState<TypeKey>('INCOME');
 
   // --- Fetchers ---
 
@@ -127,7 +169,11 @@ export function FinancialPage() {
     setLoadingTx(true);
     try {
       const params: Record<string, string> = {};
-      if (filterType) params.type = filterType;
+      if (filterTypeKey) {
+        const { type, subtype } = typeKeyToPair(filterTypeKey);
+        params.type = type;
+        if (subtype) params.subtype = subtype;
+      }
       if (filterStatus) params.status = filterStatus;
       if (filterStartDate) params.startDate = filterStartDate;
       if (filterEndDate) params.endDate = filterEndDate;
@@ -138,7 +184,7 @@ export function FinancialPage() {
     } finally {
       setLoadingTx(false);
     }
-  }, [filterType, filterStatus, filterStartDate, filterEndDate]);
+  }, [filterTypeKey, filterStatus, filterStartDate, filterEndDate]);
 
   const fetchCategories = useCallback(async () => {
     setLoadingCat(true);
@@ -162,8 +208,9 @@ export function FinancialPage() {
     e.preventDefault();
     setSavingTx(true);
     try {
+      const { type } = typeKeyToPair(txForm.typeKey);
       const payload = {
-        type: txForm.type,
+        type,
         category: txForm.category || 'Outros',
         description: txForm.description,
         amount: parseFloat(txForm.amount) || 0,
@@ -198,8 +245,13 @@ export function FinancialPage() {
   };
 
   const openEditTx = (tx: Transaction) => {
+    // Infer the typeKey from the transaction category (lookup in loaded categories).
+    const matchedCat = categories.find(c => c.name === tx.category && c.type === tx.type);
+    const key = matchedCat
+      ? pairToTypeKey(matchedCat.type, matchedCat.subtype ?? null)
+      : pairToTypeKey(tx.type, null);
     setTxForm({
-      type: tx.type,
+      typeKey: key,
       category: tx.category || '',
       description: tx.description,
       amount: String(tx.amount),
@@ -218,12 +270,44 @@ export function FinancialPage() {
     if (!newCatName.trim()) return;
     setSavingCat(true);
     try {
-      await api.post('/financial/categories', { name: newCatName.trim(), type: newCatType });
+      const { type, subtype } = typeKeyToPair(newCatTypeKey);
+      await api.post('/financial/categories', {
+        name: newCatName.trim(),
+        type,
+        subtype,
+      });
       setNewCatName('');
+      setNewCatTypeKey('INCOME');
       fetchCategories();
     } catch {} finally {
       setSavingCat(false);
     }
+  };
+
+  const startEditCategory = (cat: Category) => {
+    setEditingCatId(cat.id);
+    setEditCatName(cat.name);
+    setEditCatTypeKey(pairToTypeKey(cat.type, cat.subtype ?? null));
+  };
+
+  const cancelEditCategory = () => {
+    setEditingCatId(null);
+    setEditCatName('');
+    setEditCatTypeKey('INCOME');
+  };
+
+  const saveEditCategory = async () => {
+    if (!editingCatId || !editCatName.trim()) return;
+    try {
+      const { type, subtype } = typeKeyToPair(editCatTypeKey);
+      await api.put(`/financial/categories/${editingCatId}`, {
+        name: editCatName.trim(),
+        type,
+        subtype,
+      });
+      cancelEditCategory();
+      fetchCategories();
+    } catch {}
   };
 
   const handleDeleteCategory = async (id: string) => {
@@ -239,8 +323,38 @@ export function FinancialPage() {
   // --- Year options ---
   const yearOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i);
 
-  // Categories filtered by type for transaction form
-  const formCategories = categories.filter(c => c.type === txForm.type);
+  // Categories filtered by {type, subtype} of current tx form typeKey
+  const { type: formType, subtype: formSubtype } = typeKeyToPair(txForm.typeKey);
+  const formCategories = categories.filter(c => {
+    if (c.type !== formType) return false;
+    if (formType === 'INCOME') return true;
+    return (c.subtype ?? null) === formSubtype;
+  });
+
+  // Grouped categories for the Categorias tab listing
+  const groupedCategories = {
+    RECEITAS: categories.filter(c => c.type === 'INCOME'),
+    FIXAS: categories.filter(c => c.type === 'EXPENSE' && c.subtype === 'FIXA'),
+    VARIAVEIS: categories.filter(c => c.type === 'EXPENSE' && c.subtype === 'VARIAVEL'),
+    ADMINISTRATIVAS: categories.filter(c => c.type === 'EXPENSE' && c.subtype === 'ADMINISTRATIVA'),
+    OUTRAS: categories.filter(c => c.type === 'EXPENSE' && !c.subtype),
+  };
+
+  const categorySections: { key: keyof typeof groupedCategories; title: string }[] = [
+    { key: 'RECEITAS', title: 'RECEITAS' },
+    { key: 'FIXAS', title: 'DESPESAS FIXAS' },
+    { key: 'VARIAVEIS', title: 'DESPESAS VARIÁVEIS' },
+    { key: 'ADMINISTRATIVAS', title: 'DESPESAS ADMINISTRATIVAS' },
+    { key: 'OUTRAS', title: 'OUTRAS DESPESAS' },
+  ];
+
+  const categoryBadge = (cat: Category) => {
+    if (cat.type === 'INCOME') return subtypeBadge.INCOME;
+    if (cat.subtype === 'FIXA') return subtypeBadge.FIXA;
+    if (cat.subtype === 'VARIAVEL') return subtypeBadge.VARIAVEL;
+    if (cat.subtype === 'ADMINISTRATIVA') return subtypeBadge.ADMINISTRATIVA;
+    return subtypeBadge.OTHER;
+  };
 
   const tabs: { key: ActiveTab; label: string }[] = [
     { key: 'dashboard', label: 'Dashboard' },
@@ -386,13 +500,14 @@ export function FinancialPage() {
           <div className="bg-white rounded-lg border border-slate-200 p-4">
             <div className="flex flex-wrap items-center gap-3">
               <select
-                value={filterType}
-                onChange={e => setFilterType(e.target.value)}
+                value={filterTypeKey}
+                onChange={e => setFilterTypeKey(e.target.value as '' | TypeKey)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
               >
                 <option value="">Todos os tipos</option>
-                <option value="INCOME">Receita</option>
-                <option value="EXPENSE">Despesa</option>
+                {typeKeyOptions.map(o => (
+                  <option key={o.key} value={o.key}>{o.label}</option>
+                ))}
               </select>
               <select
                 value={filterStatus}
@@ -532,12 +647,13 @@ export function FinancialPage() {
                 required
               />
               <select
-                value={newCatType}
-                onChange={e => setNewCatType(e.target.value as 'INCOME' | 'EXPENSE')}
+                value={newCatTypeKey}
+                onChange={e => setNewCatTypeKey(e.target.value as TypeKey)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
               >
-                <option value="INCOME">Receita</option>
-                <option value="EXPENSE">Despesa</option>
+                {typeKeyOptions.map(o => (
+                  <option key={o.key} value={o.key}>{o.label}</option>
+                ))}
               </select>
               <button
                 type="submit"
@@ -549,35 +665,92 @@ export function FinancialPage() {
             </form>
           </div>
 
-          {/* Categories list */}
-          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-            {loadingCat ? (
-              <div className="p-6 text-sm text-slate-400">Carregando...</div>
-            ) : categories.length === 0 ? (
-              <div className="p-6 text-sm text-slate-400 text-center">Nenhuma categoria cadastrada</div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {categories.map(cat => {
-                  const cInfo = typeMap[cat.type] || { label: cat.type, cls: 'bg-slate-100 text-slate-600' };
-                  return (
-                    <div key={cat.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-slate-700 font-medium">{cat.name}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cInfo.cls}`}>{cInfo.label}</span>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteCategory(cat.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+          {/* Categories grouped by section */}
+          {loadingCat ? (
+            <div className="bg-white rounded-lg border border-slate-200 p-6 text-sm text-slate-400">Carregando...</div>
+          ) : categories.length === 0 ? (
+            <div className="bg-white rounded-lg border border-slate-200 p-6 text-sm text-slate-400 text-center">
+              Nenhuma categoria cadastrada
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {categorySections.map(section => {
+                const list = groupedCategories[section.key];
+                if (list.length === 0) return null;
+                return (
+                  <div key={section.key} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-200">
+                      <span className="text-xs font-semibold text-slate-600 tracking-wide">{section.title}</span>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    <div className="divide-y divide-slate-100">
+                      {list.map(cat => {
+                        const badge = categoryBadge(cat);
+                        const isEditing = editingCatId === cat.id;
+                        return (
+                          <div key={cat.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
+                            {isEditing ? (
+                              <div className="flex flex-1 items-center gap-3">
+                                <input
+                                  type="text"
+                                  value={editCatName}
+                                  onChange={e => setEditCatName(e.target.value)}
+                                  className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                                />
+                                <select
+                                  value={editCatTypeKey}
+                                  onChange={e => setEditCatTypeKey(e.target.value as TypeKey)}
+                                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                                >
+                                  {typeKeyOptions.map(o => (
+                                    <option key={o.key} value={o.key}>{o.label}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={saveEditCategory}
+                                  className="text-xs text-[#1E3A5F] font-medium hover:underline"
+                                >
+                                  Salvar
+                                </button>
+                                <button
+                                  onClick={cancelEditCategory}
+                                  className="text-xs text-slate-400 hover:underline"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-slate-700 font-medium">{cat.name}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => startEditCategory(cat)}
+                                    className="p-1.5 text-slate-400 hover:text-[#1E3A5F] transition-colors"
+                                    title="Editar"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteCategory(cat.id)}
+                                    className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                                    title="Excluir"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -601,12 +774,13 @@ export function FinancialPage() {
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
                   <select
-                    value={txForm.type}
-                    onChange={e => setTxForm({ ...txForm, type: e.target.value as 'INCOME' | 'EXPENSE', category: '' })}
+                    value={txForm.typeKey}
+                    onChange={e => setTxForm({ ...txForm, typeKey: e.target.value as TypeKey, category: '' })}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   >
-                    <option value="INCOME">Receita</option>
-                    <option value="EXPENSE">Despesa</option>
+                    {typeKeyOptions.map(o => (
+                      <option key={o.key} value={o.key}>{o.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
