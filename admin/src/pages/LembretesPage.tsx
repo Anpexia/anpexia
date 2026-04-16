@@ -21,11 +21,15 @@ export default function LembretesPage() {
     (async () => {
       try {
         const { data: statusData } = await api.get('/google/status');
-        const isConnected = statusData.data.connected;
+        const isConnected = statusData.data?.connected ?? false;
         setConnected(isConnected);
         if (isConnected) {
-          const { data: eventsData } = await api.get('/google/events');
-          setEvents(eventsData.data || []);
+          try {
+            const { data: eventsData } = await api.get('/google/events');
+            setEvents(eventsData.data || []);
+          } catch {
+            setEvents([]);
+          }
         }
       } catch {
         setConnected(false);

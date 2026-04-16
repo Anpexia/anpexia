@@ -30,15 +30,14 @@ router.get('/status', authenticate, asyncHandler(async (_req, res) => {
   return res.json({ success: true, data: { connected } });
 }));
 
-// Remaining routes require SUPER_ADMIN
-router.use(authenticate, requireRole('SUPER_ADMIN'));
-
-router.get('/events', asyncHandler(async (_req, res) => {
+// Authenticated — list events
+router.get('/events', authenticate, asyncHandler(async (_req, res) => {
   const events = await gcal.listUpcomingEvents();
   return res.json({ success: true, data: events });
 }));
 
-router.delete('/disconnect', asyncHandler(async (_req, res) => {
+// SUPER_ADMIN only — destructive action
+router.delete('/disconnect', authenticate, requireRole('SUPER_ADMIN'), asyncHandler(async (_req, res) => {
   await gcal.disconnect();
   return res.json({ success: true, data: { ok: true } });
 }));
