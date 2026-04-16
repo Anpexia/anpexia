@@ -8,16 +8,7 @@ function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => P
 
 const router = Router();
 
-// All routes require SUPER_ADMIN auth
-router.use(authenticate, requireRole('SUPER_ADMIN'));
-
-// GET /api/google/auth — returns OAuth URL
-router.get('/auth', asyncHandler(async (_req, res) => {
-  const url = gcal.getAuthUrl();
-  return res.json({ success: true, data: { url } });
-}));
-
-// GET /api/google/callback — handles OAuth callback, saves tokens, redirects
+// Callback must be PUBLIC — Google redirects here without JWT
 router.get('/callback', asyncHandler(async (req, res) => {
   const code = req.query.code as string;
   if (!code) {
@@ -25,6 +16,15 @@ router.get('/callback', asyncHandler(async (req, res) => {
   }
   await gcal.saveTokens(code);
   return res.redirect('https://admin.anpexia.com.br/configuracoes?google=connected');
+}));
+
+// All remaining routes require SUPER_ADMIN auth
+router.use(authenticate, requireRole('SUPER_ADMIN'));
+
+// GET /api/google/auth — returns OAuth URL
+router.get('/auth', asyncHandler(async (_req, res) => {
+  const url = gcal.getAuthUrl();
+  return res.json({ success: true, data: { url } });
 }));
 
 // GET /api/google/status — check if connected

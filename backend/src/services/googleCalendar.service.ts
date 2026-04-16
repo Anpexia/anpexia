@@ -2,7 +2,16 @@ import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../config/database';
 
-const SCOPES = ['https://www.googleapis.com/auth/calendar'];
+console.log('[GOOGLE-CAL] ENV check:', {
+  clientId: !!process.env.GOOGLE_CLIENT_ID,
+  clientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+  redirectUri: process.env.GOOGLE_REDIRECT_URI,
+});
+
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
+];
 
 function getOAuth2Client(): OAuth2Client {
   const clientId = process.env.GOOGLE_CLIENT_ID;
