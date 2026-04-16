@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import api from '../services/api';
 import { SuppliersTab } from './SuppliersTab';
 import { PurchaseOrdersTab } from './PurchaseOrdersTab';
+import { ProcedureTemplatesTab } from './ProcedureTemplatesTab';
 
 interface Product {
   id: string;
@@ -121,7 +122,7 @@ export function InventoryPage() {
   const productsRef = useRef<Product[]>([]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'products' | 'suppliers' | 'orders'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'suppliers' | 'orders' | 'templates'>('products');
 
   // Supplier linking state (for product edit modal)
   const [allSuppliers, setAllSuppliers] = useState<SupplierOption[]>([]);
@@ -616,10 +617,17 @@ export function InventoryPage() {
         >
           Pedidos de Compra
         </button>
+        <button
+          onClick={() => setActiveTab('templates')}
+          className={`px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'templates' ? 'border-b-2 border-[#1E3A5F] text-[#1E3A5F]' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Templates
+        </button>
       </div>
 
       {activeTab === 'suppliers' && <SuppliersTab />}
       {activeTab === 'orders' && <PurchaseOrdersTab />}
+      {activeTab === 'templates' && <ProcedureTemplatesTab />}
 
       {activeTab === 'products' && (<>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">

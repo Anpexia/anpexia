@@ -136,6 +136,7 @@ async function loadRoutes() {
     const { settingsRouter } = await import('./modules/settings/settings.controller');
     const { tussRouter } = await import('./modules/tuss/tuss.controller');
     const { doctorsRouter } = await import('./modules/tuss/doctors.controller');
+    const { procedureTemplatesRouter } = await import('./modules/procedureTemplates/procedureTemplates.controller');
     const { auditLogRouter } = await import('./modules/admin/auditLog.controller');
     const { adminUsersRouter } = await import('./modules/admin/adminUsers.controller');
     const { autoAudit } = await import('./shared/middleware/autoAudit');
@@ -213,6 +214,7 @@ async function loadRoutes() {
     app.use('/api/v1/settings', settingsRouter);
     app.use('/api/v1/tuss', tussRouter);
     app.use('/api/v1/doctors', doctorsRouter);
+    app.use('/api/v1/procedure-templates', procedureTemplatesRouter);
     app.use('/api/admin', auditLogRouter);
     app.use('/api/v1/admin', auditLogRouter);
     app.use('/api/admin', adminUsersRouter);

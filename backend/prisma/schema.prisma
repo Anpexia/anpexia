@@ -64,6 +64,7 @@ model Tenant {
   autorizacoes          Autorizacao[]
   tussProcedures        TussProcedure[]
   doctorRepasses        DoctorRepasse[]
+  procedureTemplates    ProcedureTemplate[]
   settings              TenantSettings?
 
   @@map("tenants")
@@ -333,10 +334,11 @@ model Product {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category         ProductCategory?    @relation(fields: [categoryId], references: [id])
-  movements        InventoryMovement[]
-  supplierProducts SupplierProduct[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category           ProductCategory?    @relation(fields: [categoryId], references: [id])
+  movements          InventoryMovement[]
+  supplierProducts   SupplierProduct[]
+  procedureMaterials ProcedureMaterial[]
 
   @@index([tenantId])
   @@map("products")
@@ -1231,4 +1233,32 @@ model DoctorRepasse {
   @@index([tenantId])
   @@index([doctorId])
   @@map("doctor_repasses")
+}
+
+model ProcedureTemplate {
+  id          String              @id @default(cuid())
+  tenantId    String              @map("tenant_id")
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdAt   DateTime            @default(now()) @map("created_at")
+  materials   ProcedureMaterial[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("procedure_templates")
+}
+
+model ProcedureMaterial {
+  id         String            @id @default(cuid())
+  templateId String            @map("template_id")
+  template   ProcedureTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  productId  String            @map("product_id")
+  product    Product           @relation(fields: [productId], references: [id])
+  quantity   Float             @default(1)
+
+  @@unique([templateId, productId])
+  @@index([templateId])
+  @@index([productId])
+  @@map("procedure_materials")
 }
