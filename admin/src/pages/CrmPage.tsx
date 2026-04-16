@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, X, Phone, Building, Mail, TrendingUp, Users, DollarSign, Target, List, LayoutGrid, Calendar, CheckCircle2, Clock, StickyNote, Link as LinkIcon, Trash2 } from 'lucide-react';
 import api from '../services/api';
+import { datetimeLocalToBrazilISO } from '../utils/date';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -130,7 +131,10 @@ function LeadSlideOver({ lead, onClose, onChanged }: { lead: any; onClose: () =>
 
   const addTask = async () => {
     if (!newTask.dueAt) return;
-    await api.post(`/admin/leads/${lead.id}/tasks`, newTask);
+    await api.post(`/admin/leads/${lead.id}/tasks`, {
+      ...newTask,
+      dueAt: datetimeLocalToBrazilISO(newTask.dueAt),
+    });
     setNewTask({ type: 'FOLLOWUP', dueAt: '', responsible: '' });
     setShowTaskForm(false);
     const r = await api.get(`/admin/leads/${lead.id}/tasks`);
