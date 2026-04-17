@@ -438,6 +438,7 @@ async function listCalls(tenantId: string, filters: {
         customer: { select: { id: true, name: true, phone: true, email: true } },
         doctor: { select: { id: true, name: true } },
         procedures: { include: { tussProcedure: { select: { id: true, code: true, description: true, type: true, value: true } } } },
+        _count: { select: { privateProcedureCalls: true } },
       },
       orderBy: { date: 'asc' },
       skip: filters.skip,

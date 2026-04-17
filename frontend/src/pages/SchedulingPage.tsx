@@ -191,6 +191,9 @@ export function SchedulingPage() {
   const [partSubmitting, setPartSubmitting] = useState(false);
   const [partRetro, setPartRetro] = useState(false);
   const [partLoading, setPartLoading] = useState(false);
+  const [partTussSelectedId, setPartTussSelectedId] = useState<string>('');
+  const [partTussTplMaterials, setPartTussTplMaterials] = useState<MaterialRow[]>([]);
+  const [partTussList, setPartTussList] = useState<TussProc[]>([]);
 
   // Assign/change doctor
   const [doctorEditCall, setDoctorEditCall] = useState<Appointment | null>(null);
@@ -750,9 +753,16 @@ export function SchedulingPage() {
     setPartExtraMaterials([]);
     setPartError('');
     setPartSubmitting(false);
+    setPartTussSelectedId('');
+    setPartTussTplMaterials([]);
     setPartLoading(true);
-    // Fetch private procedures + templates + products in parallel
+    // Fetch private procedures + templates + products + TUSS list in parallel
     const tasks: Promise<unknown>[] = [];
+    tasks.push(
+      api.get('/tuss/procedures')
+        .then(({ data }) => setPartTussList(data.data || []))
+        .catch(() => setPartTussList([])),
+    );
     tasks.push(
       api.get('/private-procedures')
         .then(({ data }) => setPartProcedures((data.data || []).filter((p: PrivProc) => p.isActive)))
@@ -809,8 +819,31 @@ export function SchedulingPage() {
     }
   }, [partSelectedId, partModalCall, partProcedures, procedureTemplates, inventoryProducts]);
 
+  // Match TUSS selection against templates (independent of particular procedure)
+  useEffect(() => {
+    if (!partModalCall || !partTussSelectedId) {
+      setPartTussTplMaterials([]);
+      return;
+    }
+    const tussItem = partTussList.find((t) => t.id === partTussSelectedId);
+    if (!tussItem) { setPartTussTplMaterials([]); return; }
+    const target = (tussItem.description || '').trim().toLowerCase();
+    const tpl = (procedureTemplates || []).find((t: any) => t.name.trim().toLowerCase() === target) || null;
+    if (tpl) {
+      const products = inventoryProducts || [];
+      setPartTussTplMaterials(
+        tpl.materials.map((m: any) => {
+          const prod = products.find((p: any) => p.id === m.productId);
+          return { productId: m.productId, productName: m.productName || prod?.name || '', unit: m.unit || prod?.unit || 'un', quantity: m.quantity, available: prod?.quantity ?? 0 };
+        }),
+      );
+    } else {
+      setPartTussTplMaterials([]);
+    }
+  }, [partTussSelectedId, partModalCall, partTussList, procedureTemplates, inventoryProducts]);
+
   const partCombinedMaterials = (): { productId: string; quantity: number }[] => {
-    return [...partTplMaterials, ...partExtraMaterials]
+    return [...partTplMaterials, ...partTussTplMaterials, ...partExtraMaterials]
       .filter((m) => m.productId && Number(m.quantity) > 0)
       .map((m) => ({ productId: m.productId, quantity: Number(m.quantity) }));
   };
@@ -1215,7 +1248,7 @@ export function SchedulingPage() {
                                 Registrar TUSS
                               </button>
                             )}
-                            {isRealized && a.paymentType === 'PARTICULAR' && (
+                            {isRealized && a.paymentType === 'PARTICULAR' && !(a as any)._count?.privateProcedureCalls && (
                               <button
                                 onClick={() => openPartModalForCall(a, true)}
                                 className="px-2 py-1 text-xs font-medium rounded bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200"
@@ -1827,9 +1860,9 @@ export function SchedulingPage() {
                 onClick={() => setPartTab('estoque')}
                 className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
               >
-                Estoque {(partTplMaterials.length + partExtraMaterials.length) > 0 && (
+                Estoque {(partTplMaterials.length + partTussTplMaterials.length + partExtraMaterials.length) > 0 && (
                   <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-[#1E3A5F] text-white rounded-full">
-                    {partTplMaterials.length + partExtraMaterials.length}
+                    {partTplMaterials.length + partTussTplMaterials.length + partExtraMaterials.length}
                   </span>
                 )}
               </button>
@@ -1910,6 +1943,54 @@ export function SchedulingPage() {
                               onChange={(e) => {
                                 const v = Number(e.target.value);
                                 setPartTplMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
+                              }}
+                              className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            />
+                            <span className="text-xs text-slate-500 w-10">{m.unit}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* TUSS selection (independent of particular procedure) */}
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-slate-700 mb-2">Procedimento TUSS (opcional)</h4>
+                  <select
+                    value={partTussSelectedId}
+                    onChange={(e) => setPartTussSelectedId(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  >
+                    <option value="">Selecione um procedimento TUSS...</option>
+                    {partTussList.map((t) => (
+                      <option key={t.id} value={t.id}>[{t.code}] {t.description} {t.value != null ? `— R$ ${Number(t.value).toFixed(2)}` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {partTussTplMaterials.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais do TUSS</h4>
+                    <div className="space-y-2">
+                      {partTussTplMaterials.map((m, i) => {
+                        const insufficient = m.available < m.quantity;
+                        return (
+                          <div key={`part-tuss-tpl-${m.productId}-${i}`} className="flex items-center gap-2 text-sm">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-slate-800 truncate">{m.productName}</div>
+                              <div className={`text-xs ${insufficient ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                Disponivel: {m.available} {m.unit}
+                              </div>
+                            </div>
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={m.quantity}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                setPartTussTplMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
                               }}
                               className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
                             />
