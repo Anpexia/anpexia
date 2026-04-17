@@ -66,6 +66,7 @@ model Tenant {
   doctorRepasses        DoctorRepasse[]
   procedureTemplates    ProcedureTemplate[]
   repasseTypes          RepasseType[]
+  privateProcedures     PrivateProcedure[]
   settings              TenantSettings?
 
   @@map("tenants")
@@ -814,6 +815,7 @@ model ScheduledCall {
   customer   Customer?                @relation(fields: [customerId], references: [id])
   doctor     User?                    @relation("DoctorScheduledCalls", fields: [doctorId], references: [id])
   procedures ScheduledCallProcedure[]
+  privateProcedureCalls PrivateProcedureCall[]
 
   @@index([tenantId])
   @@index([date])
@@ -1275,4 +1277,32 @@ model RepasseType {
   @@unique([tenantId, name])
   @@index([tenantId])
   @@map("repasse_types")
+}
+
+model PrivateProcedure {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  value       Float?
+  duration    Int?     @default(30)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  calls       PrivateProcedureCall[]
+
+  @@unique([tenantId, name])
+  @@map("private_procedures")
+}
+
+model PrivateProcedureCall {
+  id                 String           @id @default(cuid())
+  scheduledCallId    String           @map("scheduled_call_id")
+  scheduledCall      ScheduledCall    @relation(fields: [scheduledCallId], references: [id], onDelete: Cascade)
+  privateProcedureId String           @map("private_procedure_id")
+  privateProcedure   PrivateProcedure @relation(fields: [privateProcedureId], references: [id])
+  notes              String?
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  @@map("private_procedure_calls")
 }

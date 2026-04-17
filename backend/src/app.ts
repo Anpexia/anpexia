@@ -138,6 +138,7 @@ async function loadRoutes() {
     const { doctorsRouter } = await import('./modules/tuss/doctors.controller');
     const { procedureTemplatesRouter } = await import('./modules/procedureTemplates/procedureTemplates.controller');
     const { repasseTypesRouter } = await import('./modules/repasseTypes/repasseTypes.controller');
+    const { privateProceduresRouter, privateProcedureCallsRouter } = await import('./modules/privateProcedures/privateProcedures.controller');
     const { auditLogRouter } = await import('./modules/admin/auditLog.controller');
     const { adminUsersRouter } = await import('./modules/admin/adminUsers.controller');
     const { autoAudit } = await import('./shared/middleware/autoAudit');
@@ -191,6 +192,8 @@ async function loadRoutes() {
     app.use('/api/v1/demo-eloy', demoEloyRouter);
 
     app.use('/api/v1/scheduling', schedulingRouter);
+    // Private procedures attach-to-call endpoint, mounted under scheduling path
+    app.use('/api/v1/scheduling', privateProcedureCallsRouter);
     app.use('/api/v1/sales', salesRouter);
     app.use('/api/v1/admin', adminCrmRouter);
     app.use('/api/admin', adminCrmRouter); // alias per spec
@@ -217,6 +220,7 @@ async function loadRoutes() {
     app.use('/api/v1/doctors', doctorsRouter);
     app.use('/api/v1/procedure-templates', procedureTemplatesRouter);
     app.use('/api/v1/repasse-types', repasseTypesRouter);
+    app.use('/api/v1/private-procedures', privateProceduresRouter);
     app.use('/api/admin', auditLogRouter);
     app.use('/api/v1/admin', auditLogRouter);
     app.use('/api/admin', adminUsersRouter);

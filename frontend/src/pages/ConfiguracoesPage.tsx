@@ -1,10 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X } from 'lucide-react';
+import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X, List } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
-type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'repasse' | 'seguranca';
+type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'repasse' | 'procedimentos' | 'seguranca';
+
+interface PrivateProcedureItem {
+  id: string;
+  name: string;
+  description: string | null;
+  value: number | null;
+  duration: number | null;
+  isActive: boolean;
+  createdAt: string;
+}
 
 interface RepasseTypeItem {
   id: string;
@@ -61,6 +71,7 @@ export function ConfiguracoesPage() {
     { key: 'clinica', label: 'Clinica', icon: Building2 },
     { key: 'convenios', label: 'Convenios', icon: Shield },
     ...(canManageTuss ? [{ key: 'tuss' as Tab, label: 'Procedimentos TUSS', icon: FileCode }] : []),
+    ...(canManageTuss ? [{ key: 'procedimentos' as Tab, label: 'Procedimentos', icon: List }] : []),
     ...(canManageTuss ? [{ key: 'repasse' as Tab, label: 'Repasse', icon: Percent }] : []),
     { key: 'horarios', label: 'Horarios', icon: Clock },
     { key: 'whatsapp', label: 'WhatsApp', icon: Wifi },
@@ -198,6 +209,15 @@ export function ConfiguracoesPage() {
   const [repasseError, setRepasseError] = useState('');
   const [addingRepasse, setAddingRepasse] = useState(false);
 
+  // Procedimentos particulares
+  const [procList, setProcList] = useState<PrivateProcedureItem[]>([]);
+  const [procModalOpen, setProcModalOpen] = useState(false);
+  const [procEditing, setProcEditing] = useState<PrivateProcedureItem | null>(null);
+  const [procSaving, setProcSaving] = useState(false);
+  const [procForm, setProcForm] = useState<{ name: string; description: string; value: string; duration: string; isActive: boolean }>({
+    name: '', description: '', value: '', duration: '30', isActive: true,
+  });
+
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
@@ -257,9 +277,18 @@ export function ConfiguracoesPage() {
     } catch {}
   }, [canManageTuss]);
 
+  const loadPrivateProcedures = useCallback(async () => {
+    if (!canManageTuss) return;
+    try {
+      const { data } = await api.get('/private-procedures');
+      setProcList(data.data || []);
+    } catch {}
+  }, [canManageTuss]);
+
   useEffect(() => { loadSettings(); loadConvenios(); }, [loadSettings, loadConvenios]);
   useEffect(() => { if (tab === 'tuss') loadTuss(); }, [tab, loadTuss]);
   useEffect(() => { if (tab === 'repasse') loadRepasseTypes(); }, [tab, loadRepasseTypes]);
+  useEffect(() => { if (tab === 'procedimentos') loadPrivateProcedures(); }, [tab, loadPrivateProcedures]);
 
   const addRepasseType = async () => {
     const name = newRepasseType.trim();
@@ -339,6 +368,73 @@ export function ConfiguracoesPage() {
       await api.delete(`/tuss/procedures/${id}`);
       flash('Procedimento excluido!');
       loadTuss();
+    } catch (err: any) {
+      flash(err.response?.data?.error?.message || 'Erro ao excluir');
+    }
+  };
+
+  const openProcCreate = () => {
+    setProcEditing(null);
+    setProcForm({ name: '', description: '', value: '', duration: '30', isActive: true });
+    setProcModalOpen(true);
+  };
+
+  const openProcEdit = (p: PrivateProcedureItem) => {
+    setProcEditing(p);
+    setProcForm({
+      name: p.name,
+      description: p.description || '',
+      value: p.value != null ? String(p.value) : '',
+      duration: p.duration != null ? String(p.duration) : '',
+      isActive: p.isActive,
+    });
+    setProcModalOpen(true);
+  };
+
+  const saveProc = async () => {
+    const name = procForm.name.trim();
+    if (!name) {
+      flash('Nome do procedimento e obrigatorio');
+      return;
+    }
+    const payload: any = {
+      name,
+      description: procForm.description.trim() || null,
+      value: procForm.value === '' ? null : Number(procForm.value),
+      duration: procForm.duration === '' ? null : Number(procForm.duration),
+    };
+    if (payload.value !== null && isNaN(payload.value)) {
+      flash('Valor invalido');
+      return;
+    }
+    if (payload.duration !== null && isNaN(payload.duration)) {
+      flash('Duracao invalida');
+      return;
+    }
+    setProcSaving(true);
+    try {
+      if (procEditing) {
+        await api.put(`/private-procedures/${procEditing.id}`, { ...payload, isActive: procForm.isActive });
+        flash('Procedimento atualizado!');
+      } else {
+        await api.post('/private-procedures', payload);
+        flash('Procedimento criado!');
+      }
+      setProcModalOpen(false);
+      await loadPrivateProcedures();
+    } catch (err: any) {
+      flash(err.response?.data?.error?.message || 'Erro ao salvar');
+    } finally {
+      setProcSaving(false);
+    }
+  };
+
+  const deleteProc = async (p: PrivateProcedureItem) => {
+    if (!confirm(`Excluir o procedimento "${p.name}"?`)) return;
+    try {
+      await api.delete(`/private-procedures/${p.id}`);
+      flash('Procedimento excluido!');
+      await loadPrivateProcedures();
     } catch (err: any) {
       flash(err.response?.data?.error?.message || 'Erro ao excluir');
     }
@@ -778,6 +874,137 @@ export function ConfiguracoesPage() {
             >
               {addingRepasse ? 'Adicionando...' : 'Adicionar'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* PROCEDIMENTOS PARTICULARES TAB */}
+      {tab === 'procedimentos' && canManageTuss && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Procedimentos Particulares</h2>
+              <p className="text-sm text-gray-500 mt-1">Cadastre procedimentos oferecidos em atendimentos particulares (fora de convenio).</p>
+            </div>
+            <button
+              onClick={openProcCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              <Plus size={16} /> Novo Procedimento
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-left text-gray-600">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Nome</th>
+                  <th className="px-3 py-2 font-medium">Descricao</th>
+                  <th className="px-3 py-2 font-medium">Valor</th>
+                  <th className="px-3 py-2 font-medium">Duracao (min)</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium text-right">Acoes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {procList.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">Nenhum procedimento cadastrado</td></tr>
+                )}
+                {procList.map((p) => (
+                  <tr key={p.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-gray-800">{p.name}</td>
+                    <td className="px-3 py-2 text-gray-600">{p.description || '-'}</td>
+                    <td className="px-3 py-2 text-gray-700">{p.value != null ? `R$ ${Number(p.value).toFixed(2)}` : '-'}</td>
+                    <td className="px-3 py-2 text-gray-700">{p.duration != null ? p.duration : '-'}</td>
+                    <td className="px-3 py-2">
+                      {p.isActive ? (
+                        <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">Ativo</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 text-xs font-medium">Inativo</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => openProcEdit(p)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Edit2 size={14} /></button>
+                        <button onClick={() => deleteProc(p)} className="p-1.5 rounded hover:bg-red-50 text-red-500" title="Excluir"><Trash2 size={14} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* PROCEDIMENTO MODAL */}
+      {procModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">{procEditing ? 'Editar' : 'Novo'} Procedimento</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                <input
+                  value={procForm.name}
+                  onChange={(e) => setProcForm({ ...procForm, name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Ex: Consulta particular"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descricao</label>
+                <textarea
+                  value={procForm.description}
+                  onChange={(e) => setProcForm({ ...procForm, description: e.target.value })}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+                  placeholder="Detalhes do procedimento"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={procForm.value}
+                    onChange={(e) => setProcForm({ ...procForm, value: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Duracao (min)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={procForm.duration}
+                    onChange={(e) => setProcForm({ ...procForm, duration: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="30"
+                  />
+                </div>
+              </div>
+              {procEditing && (
+                <label className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    checked={procForm.isActive}
+                    onChange={(e) => setProcForm({ ...procForm, isActive: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm text-gray-700">Procedimento ativo</span>
+                </label>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setProcModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
+              <button onClick={saveProc} disabled={procSaving} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                {procSaving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
