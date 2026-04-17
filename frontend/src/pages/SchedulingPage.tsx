@@ -178,6 +178,20 @@ export function SchedulingPage() {
   // Tracks whether the modal was opened via the "Registrar TUSS" badge (retro flow)
   const [tussRetroMode, setTussRetroMode] = useState(false);
 
+  // ---- PARTICULAR procedure modal (completely separate from TUSS) ----
+  interface PrivProc { id: string; name: string; description: string | null; value: number | null; duration: number | null; isActive: boolean }
+  const [partModalCall, setPartModalCall] = useState<Appointment | null>(null);
+  const [partProcedures, setPartProcedures] = useState<PrivProc[]>([]);
+  const [partSelectedId, setPartSelectedId] = useState<string>('');
+  const [partNotes, setPartNotes] = useState<string>('');
+  const [partTab, setPartTab] = useState<'procedimento' | 'estoque'>('procedimento');
+  const [partTplMaterials, setPartTplMaterials] = useState<MaterialRow[]>([]);
+  const [partExtraMaterials, setPartExtraMaterials] = useState<MaterialRow[]>([]);
+  const [partError, setPartError] = useState<string>('');
+  const [partSubmitting, setPartSubmitting] = useState(false);
+  const [partRetro, setPartRetro] = useState(false);
+  const [partLoading, setPartLoading] = useState(false);
+
   // Assign/change doctor
   const [doctorEditCall, setDoctorEditCall] = useState<Appointment | null>(null);
   const [doctorEditValue, setDoctorEditValue] = useState('');
@@ -436,10 +450,15 @@ export function SchedulingPage() {
     } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao atualizar status.'); } finally { setUpdatingId(null); }
   };
 
-  // When clicking "Realizado": always open the "Confirmar Realizacao" modal
-  // so the user picks the TUSS procedure that triggers the financial posting.
+  // When clicking "Realizado": branch by paymentType.
+  // PARTICULAR → open the new particular-procedure modal.
+  // CONVENIO / null / undefined → open the existing TUSS modal (unchanged).
   const handleRealized = async (a: Appointment) => {
-    await openTussModalForCall(a, false);
+    if (a.paymentType === 'PARTICULAR') {
+      await openPartModalForCall(a, false);
+    } else {
+      await openTussModalForCall(a, false);
+    }
   };
 
   // Prefetch convenio flags for all appointments with customers so we can show
@@ -720,6 +739,145 @@ export function SchedulingPage() {
     await openTussModalForCall(a, false, true);
   };
 
+  // ---- PARTICULAR modal logic ----
+  const openPartModalForCall = async (a: Appointment, retro: boolean) => {
+    setPartModalCall(a);
+    setPartRetro(retro);
+    setPartSelectedId('');
+    setPartNotes('');
+    setPartTab('procedimento');
+    setPartTplMaterials([]);
+    setPartExtraMaterials([]);
+    setPartError('');
+    setPartSubmitting(false);
+    setPartLoading(true);
+    // Fetch private procedures + templates + products in parallel
+    const tasks: Promise<unknown>[] = [];
+    tasks.push(
+      api.get('/private-procedures')
+        .then(({ data }) => setPartProcedures((data.data || []).filter((p: PrivProc) => p.isActive)))
+        .catch(() => setPartProcedures([])),
+    );
+    // Reuse cached templates/products from TUSS flow or fetch fresh
+    if (procedureTemplates === null) {
+      tasks.push(
+        api.get('/procedure-templates')
+          .then(({ data }) => setProcedureTemplates(data.data || []))
+          .catch(() => setProcedureTemplates([])),
+      );
+    }
+    if (inventoryProducts === null) {
+      tasks.push(
+        api.get('/inventory/products', { params: { limit: 500 } })
+          .then(({ data }) => setInventoryProducts(data.data || []))
+          .catch(() => setInventoryProducts([])),
+      );
+    }
+    await Promise.all(tasks);
+    setPartLoading(false);
+  };
+
+  // Match selected private procedure against templates to prefill materials
+  useEffect(() => {
+    if (!partModalCall || !partSelectedId) {
+      setPartTplMaterials([]);
+      return;
+    }
+    const proc = partProcedures.find((p) => p.id === partSelectedId);
+    if (!proc || !procedureTemplates) {
+      setPartTplMaterials([]);
+      return;
+    }
+    const target = proc.name.trim().toLowerCase();
+    const tpl = (procedureTemplates || []).find((t) => t.name.trim().toLowerCase() === target) || null;
+    if (tpl) {
+      const products = inventoryProducts || [];
+      setPartTplMaterials(
+        tpl.materials.map((m) => {
+          const prod = products.find((p) => p.id === m.productId);
+          return {
+            productId: m.productId,
+            productName: m.productName || prod?.name || '',
+            unit: m.unit || prod?.unit || 'un',
+            quantity: m.quantity,
+            available: prod?.quantity ?? 0,
+          };
+        }),
+      );
+    } else {
+      setPartTplMaterials([]);
+    }
+  }, [partSelectedId, partModalCall, partProcedures, procedureTemplates, inventoryProducts]);
+
+  const partCombinedMaterials = (): { productId: string; quantity: number }[] => {
+    return [...partTplMaterials, ...partExtraMaterials]
+      .filter((m) => m.productId && Number(m.quantity) > 0)
+      .map((m) => ({ productId: m.productId, quantity: Number(m.quantity) }));
+  };
+
+  const submitPartModal = async () => {
+    if (!partModalCall) return;
+
+    // If on procedimento tab and template materials exist, navigate to estoque first
+    if (partTab === 'procedimento' && (partTplMaterials.length > 0 || partExtraMaterials.length > 0)) {
+      if (!partSelectedId) {
+        showToast('Selecione um procedimento');
+        return;
+      }
+      setPartTab('estoque');
+      return;
+    }
+
+    if (!partSelectedId) {
+      showToast('Selecione um procedimento');
+      return;
+    }
+
+    setPartSubmitting(true);
+    setPartError('');
+    try {
+      // 1. Attach private procedure
+      await api.post(`/scheduling/calls/${partModalCall.id}/private-procedure`, {
+        privateProcedureId: partSelectedId,
+        notes: partNotes.trim() || null,
+      });
+
+      // 2. Inventory withdrawal
+      const materials = partCombinedMaterials();
+      if (materials.length > 0) {
+        try {
+          await api.post(`/scheduling/calls/${partModalCall.id}/inventory`, { materials });
+        } catch (invErr: any) {
+          const code = invErr?.response?.data?.error?.code;
+          const msg = invErr?.response?.data?.error?.message || 'Erro ao baixar estoque';
+          if (code === 'INSUFFICIENT_STOCK') {
+            setPartError(msg);
+            setPartTab('estoque');
+            try {
+              const { data } = await api.get('/inventory/products', { params: { limit: 500 } });
+              setInventoryProducts(data.data || []);
+            } catch {}
+            return;
+          }
+          throw invErr;
+        }
+      }
+
+      // 3. Mark as completed (unless retro — already completed)
+      if (!partRetro) {
+        await api.patch(`/scheduling/calls/${partModalCall.id}`, { status: 'completed' });
+      }
+
+      showToast(partRetro ? 'Procedimento registrado!' : 'Realizacao confirmada!');
+      setPartModalCall(null);
+      fetchAppointments();
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao salvar procedimento');
+    } finally {
+      setPartSubmitting(false);
+    }
+  };
+
   // Open edit modal for doctor assignment
   const openDoctorEdit = (a: Appointment) => {
     setDoctorEditCall(a);
@@ -967,7 +1125,7 @@ export function SchedulingPage() {
                                   <FileCheck2 size={12} /> TUSS {a.procedures?.[0]?.tussProcedure.code}
                                 </button>
                               )}
-                              {isRealized && !hasProcs && (
+                              {isRealized && !hasProcs && a.paymentType !== 'PARTICULAR' && (
                                 <span title="Sem TUSS vinculado" className="flex items-center text-amber-500"><AlertCircle size={14} /></span>
                               )}
                               <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
@@ -1049,12 +1207,20 @@ export function SchedulingPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            {isRealized && !hasProcs && (
+                            {isRealized && !hasProcs && a.paymentType !== 'PARTICULAR' && (
                               <button
                                 onClick={() => openRegistrarTussForExisting(a)}
                                 className="px-2 py-1 text-xs font-medium rounded bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
                               >
                                 Registrar TUSS
+                              </button>
+                            )}
+                            {isRealized && a.paymentType === 'PARTICULAR' && (
+                              <button
+                                onClick={() => openPartModalForCall(a, true)}
+                                className="px-2 py-1 text-xs font-medium rounded bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200"
+                              >
+                                Registrar Procedimento
                               </button>
                             )}
                             <span className={`text-xs px-2 py-0.5 rounded ${st.cls}`}>{st.icon} {st.label}</span>
@@ -1625,6 +1791,218 @@ export function SchedulingPage() {
         </div>
         );
       })()}
+
+      {/* PARTICULAR procedure modal — separate from TUSS */}
+      {partModalCall && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-slate-800">
+                {partRetro ? 'Registrar Procedimento Particular' : 'Confirmar Realizacao — Particular'}
+              </h3>
+              <button onClick={() => setPartModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Paciente: <strong>{partModalCall.customer?.name || partModalCall.name}</strong> — {format(new Date(partModalCall.date), 'dd/MM/yyyy HH:mm')}
+              {partModalCall.doctor && <> · Medico: <strong>{partModalCall.doctor.name}</strong></>}
+            </p>
+
+            {partError && (
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {partError}
+              </div>
+            )}
+
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200 mb-4 -mx-1">
+              <button
+                type="button"
+                onClick={() => setPartTab('procedimento')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'procedimento' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              >
+                Procedimento
+              </button>
+              <button
+                type="button"
+                onClick={() => setPartTab('estoque')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              >
+                Estoque {(partTplMaterials.length + partExtraMaterials.length) > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-[#1E3A5F] text-white rounded-full">
+                    {partTplMaterials.length + partExtraMaterials.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {partLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1E3A5F]" />
+              </div>
+            ) : partTab === 'procedimento' ? (
+              <>
+                {partProcedures.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-slate-500">
+                    Nenhum procedimento particular cadastrado.
+                    <br />
+                    Cadastre em Configuracoes &rarr; Procedimentos.
+                  </div>
+                ) : (
+                  <div className="mb-4 space-y-2 max-h-60 overflow-y-auto">
+                    {partProcedures.map((p) => (
+                      <label
+                        key={p.id}
+                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${partSelectedId === p.id ? 'border-[#2563EB] bg-[#EFF6FF]' : 'border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="partProc"
+                          value={p.id}
+                          checked={partSelectedId === p.id}
+                          onChange={() => setPartSelectedId(p.id)}
+                          className="mt-0.5 accent-[#1E3A5F]"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-slate-800">{p.name}</div>
+                          {p.description && <div className="text-xs text-slate-500 mt-0.5">{p.description}</div>}
+                          <div className="flex gap-3 mt-1 text-xs text-slate-500">
+                            {p.value != null && <span>R$ {Number(p.value).toFixed(2)}</span>}
+                            {p.duration != null && <span>{p.duration} min</span>}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <div className="mb-4">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes (opcional)</label>
+                  <textarea
+                    value={partNotes}
+                    onChange={(e) => setPartNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Observacoes sobre o procedimento..."
+                    className={inputCls}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Estoque tab */}
+                {partTplMaterials.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais do template</h4>
+                    <div className="space-y-2">
+                      {partTplMaterials.map((m, i) => {
+                        const insufficient = m.available < m.quantity;
+                        return (
+                          <div key={`part-tpl-${m.productId}-${i}`} className="flex items-center gap-2 text-sm">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-slate-800 truncate">{m.productName}</div>
+                              <div className={`text-xs ${insufficient ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                Disponivel: {m.available} {m.unit}
+                              </div>
+                            </div>
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={m.quantity}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                setPartTplMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
+                              }}
+                              className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            />
+                            <span className="text-xs text-slate-500 w-10">{m.unit}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais extras</h4>
+                  {partExtraMaterials.length > 0 && (
+                    <div className="space-y-2 mb-2">
+                      {partExtraMaterials.map((m, i) => (
+                        <div key={`part-extra-${i}`} className="flex items-center gap-2 text-sm">
+                          <select
+                            value={m.productId}
+                            onChange={(e) => {
+                              const productId = e.target.value;
+                              const prod = (inventoryProducts || []).find((p) => p.id === productId);
+                              setPartExtraMaterials((rows) => rows.map((r, idx) => idx === i ? {
+                                ...r,
+                                productId,
+                                productName: prod?.name || '',
+                                unit: prod?.unit || 'un',
+                                available: prod?.quantity ?? 0,
+                              } : r));
+                            }}
+                            className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded text-sm"
+                          >
+                            <option value="">Selecione um produto...</option>
+                            {(inventoryProducts || []).map((p) => (
+                              <option key={p.id} value={p.id}>{p.name} (estoque: {p.quantity} {p.unit})</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={m.quantity}
+                            onChange={(e) => {
+                              const v = Number(e.target.value);
+                              setPartExtraMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
+                            }}
+                            className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPartExtraMaterials((rows) => rows.filter((_, idx) => idx !== i))}
+                            className="text-slate-400 hover:text-red-500"
+                            title="Remover"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPartExtraMaterials((rows) => [...rows, { productId: '', productName: '', unit: 'un', quantity: 1, available: 0 }])}
+                    className="text-xs font-medium text-[#1E3A5F] hover:underline"
+                  >
+                    + Adicionar material
+                  </button>
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-2 pt-4 mt-2 border-t border-slate-100">
+              <button
+                onClick={() => setPartModalCall(null)}
+                className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitPartModal}
+                disabled={partSubmitting || partLoading || !partSelectedId}
+                className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
+              >
+                {partSubmitting
+                  ? 'Salvando...'
+                  : partTab === 'procedimento' && (partTplMaterials.length > 0 || partExtraMaterials.length > 0)
+                    ? 'Proximo: Estoque'
+                    : partRetro ? 'Registrar' : 'Confirmar Realizacao'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Doctor edit modal */}
       {doctorEditCall && (
