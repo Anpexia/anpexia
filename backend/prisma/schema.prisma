@@ -65,6 +65,7 @@ model Tenant {
   tussProcedures        TussProcedure[]
   doctorRepasses        DoctorRepasse[]
   procedureTemplates    ProcedureTemplate[]
+  repasseTypes          RepasseType[]
   settings              TenantSettings?
 
   @@map("tenants")
@@ -1261,4 +1262,17 @@ model ProcedureMaterial {
   @@index([templateId])
   @@index([productId])
   @@map("procedure_materials")
+}
+
+model RepasseType {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("repasse_types")
 }

@@ -2,9 +2,19 @@ import crypto from 'crypto';
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
 
-export type ProcedureType = 'CONSULTA' | 'EXAME' | 'CIRURGIA' | 'TERAPIA' | 'OUTROS';
+export type ProcedureType = string;
 
-const VALID_TYPES: ProcedureType[] = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'OUTROS'];
+const DEFAULT_TYPES: string[] = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'OUTROS'];
+
+async function getTenantRepasseTypes(tenantId: string): Promise<string[]> {
+  const rows = await prisma.repasseType.findMany({
+    where: { tenantId },
+    orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+    select: { name: true },
+  });
+  if (rows.length === 0) return DEFAULT_TYPES;
+  return rows.map((r) => r.name);
+}
 
 interface CreateProcedureInput {
   code: string;
@@ -14,11 +24,16 @@ interface CreateProcedureInput {
   convenioId?: string | null;
 }
 
-function validateType(type: string): ProcedureType {
-  if (!VALID_TYPES.includes(type as ProcedureType)) {
-    throw new AppError(400, 'INVALID_TYPE', `Tipo inválido. Valores aceitos: ${VALID_TYPES.join(', ')}`);
+async function validateTypeForTenant(tenantId: string, type: string): Promise<string> {
+  const normalized = (type || '').trim().toUpperCase();
+  if (!normalized) {
+    throw new AppError(400, 'INVALID_TYPE', 'Tipo obrigatório');
   }
-  return type as ProcedureType;
+  const validTypes = await getTenantRepasseTypes(tenantId);
+  if (!validTypes.includes(normalized)) {
+    throw new AppError(400, 'INVALID_TYPE', `Tipo inválido. Valores aceitos: ${validTypes.join(', ')}`);
+  }
+  return normalized;
 }
 
 export const tussService = {
@@ -35,7 +50,7 @@ export const tussService = {
   },
 
   async create(tenantId: string, data: CreateProcedureInput) {
-    const type = validateType(data.type);
+    const type = await validateTypeForTenant(tenantId, data.type);
     if (!data.code?.trim()) {
       throw new AppError(400, 'INVALID_CODE', 'Código TUSS obrigatório');
     }
@@ -68,7 +83,7 @@ export const tussService = {
     const updateData: any = {};
     if (data.code !== undefined) updateData.code = data.code.trim();
     if (data.description !== undefined) updateData.description = data.description.trim();
-    if (data.type !== undefined) updateData.type = validateType(data.type);
+    if (data.type !== undefined) updateData.type = await validateTypeForTenant(tenantId, data.type);
     if (data.value !== undefined) updateData.value = data.value;
     if (data.convenioId !== undefined) updateData.convenioId = data.convenioId || null;
 
@@ -303,9 +318,10 @@ export const tussService = {
       where: { tenantId, doctorId },
     });
 
-    // Ensure all 5 types are always returned (default 0)
+    // Return percentages for all tenant repasse types (default 0)
+    const validTypes = await getTenantRepasseTypes(tenantId);
     const map = new Map(repasses.map((r) => [r.procedureType, r.percentage]));
-    return VALID_TYPES.map((type) => ({
+    return validTypes.map((type) => ({
       procedureType: type,
       percentage: map.get(type) ?? 0,
     }));
@@ -321,7 +337,7 @@ export const tussService = {
 
     const results = [];
     for (const r of repasses) {
-      const type = validateType(r.procedureType);
+      const type = await validateTypeForTenant(tenantId, r.procedureType);
       const pct = Number(r.percentage);
       if (isNaN(pct) || pct < 0 || pct > 100) {
         throw new AppError(400, 'INVALID_PERCENTAGE', 'Percentual deve estar entre 0 e 100');

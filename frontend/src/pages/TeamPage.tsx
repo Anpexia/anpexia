@@ -39,9 +39,8 @@ export function TeamPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Repasse (only visible when editing a DOCTOR)
-  const [repasse, setRepasse] = useState<{ CONSULTA: number; EXAME: number; CIRURGIA: number; TERAPIA: number; OUTROS: number }>({
-    CONSULTA: 0, EXAME: 0, CIRURGIA: 0, TERAPIA: 0, OUTROS: 0,
-  });
+  const [repasseTypes, setRepasseTypes] = useState<Array<{ id: string; name: string; isDefault: boolean }>>([]);
+  const [repasse, setRepasse] = useState<Record<string, number>>({});
   const [loadingRepasse, setLoadingRepasse] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
@@ -56,6 +55,16 @@ export function TeamPage() {
   };
 
   useEffect(() => { fetchMembers(); }, []);
+
+  const fetchRepasseTypes = async () => {
+    try {
+      const { data } = await api.get('/repasse-types');
+      setRepasseTypes(data.data || []);
+      return data.data || [];
+    } catch {
+      return [];
+    }
+  };
 
   const handleCreate = async () => {
     if (!formName || !formEmail || !formPassword) { showToast('Preencha todos os campos obrigatorios'); return; }
@@ -97,13 +106,10 @@ export function TeamPage() {
       }
       // Save repasse for doctors (OWNER or MANAGER)
       if ((editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && canManage) {
-        const repasses = [
-          { procedureType: 'CONSULTA', percentage: Number(repasse.CONSULTA) || 0 },
-          { procedureType: 'EXAME', percentage: Number(repasse.EXAME) || 0 },
-          { procedureType: 'CIRURGIA', percentage: Number(repasse.CIRURGIA) || 0 },
-          { procedureType: 'TERAPIA', percentage: Number(repasse.TERAPIA) || 0 },
-          { procedureType: 'OUTROS', percentage: Number(repasse.OUTROS) || 0 },
-        ];
+        const repasses = repasseTypes.map((t) => ({
+          procedureType: t.name,
+          percentage: Number(repasse[t.name]) || 0,
+        }));
         await api.put(`/doctors/${editMember.id}/repasse`, { repasses });
       }
       showToast('Membro atualizado!');
@@ -120,14 +126,18 @@ export function TeamPage() {
   const loadRepasse = async (doctorId: string) => {
     setLoadingRepasse(true);
     try {
+      const types = await fetchRepasseTypes();
+      const map: Record<string, number> = {};
+      for (const t of types) {
+        map[t.name] = 0;
+      }
       const { data } = await api.get(`/doctors/${doctorId}/repasse`);
-      const map: any = { CONSULTA: 0, EXAME: 0, CIRURGIA: 0, TERAPIA: 0, OUTROS: 0 };
       for (const r of data.data || []) {
         map[r.procedureType] = r.percentage;
       }
       setRepasse(map);
     } catch {
-      setRepasse({ CONSULTA: 0, EXAME: 0, CIRURGIA: 0, TERAPIA: 0, OUTROS: 0 });
+      setRepasse({});
     } finally {
       setLoadingRepasse(false);
     }
@@ -166,7 +176,7 @@ export function TeamPage() {
     if (m.role === 'DOCTOR') {
       loadRepasse(m.id);
     } else {
-      setRepasse({ CONSULTA: 0, EXAME: 0, CIRURGIA: 0, TERAPIA: 0, OUTROS: 0 });
+      setRepasse({});
     }
   };
 
@@ -415,20 +425,22 @@ export function TeamPage() {
                   <p className="text-xs text-slate-500 mb-3">Percentual do valor do procedimento repassado ao medico.</p>
                   {loadingRepasse ? (
                     <div className="text-xs text-slate-400">Carregando repasses...</div>
+                  ) : repasseTypes.length === 0 ? (
+                    <div className="text-xs text-slate-400">Nenhum tipo de repasse cadastrado. Configure em Configurações {'>'} Repasse.</div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
-                      {(['CONSULTA','EXAME','CIRURGIA','TERAPIA','OUTROS'] as const).map(type => (
-                        <div key={type}>
+                      {repasseTypes.map((t) => (
+                        <div key={t.id}>
                           <label className="block text-xs font-medium text-slate-600 mb-1">
-                            {type.charAt(0) + type.slice(1).toLowerCase()} %
+                            {t.name.charAt(0) + t.name.slice(1).toLowerCase()} %
                           </label>
                           <input
                             type="number"
                             min="0"
                             max="100"
                             step="0.01"
-                            value={repasse[type]}
-                            onChange={e => setRepasse(r => ({ ...r, [type]: Number(e.target.value) }))}
+                            value={repasse[t.name] ?? 0}
+                            onChange={e => setRepasse(r => ({ ...r, [t.name]: Number(e.target.value) }))}
                             className={inputCls}
                           />
                         </div>
