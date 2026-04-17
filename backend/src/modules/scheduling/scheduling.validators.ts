@@ -9,6 +9,8 @@ export const bookCallSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
   customerId: z.string().optional().nullable(),
   doctorId: z.string().optional().nullable(),
+  paymentType: z.enum(['PARTICULAR', 'CONVENIO']).optional(),
+  convenioId: z.string().optional().nullable(),
 });
 
 export const linkProceduresSchema = z.object({

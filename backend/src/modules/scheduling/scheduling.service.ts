@@ -348,6 +348,10 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     // Resolve tenantId: explicit param > customer's tenant > null
     const resolvedTenantId = tenantId || customer?.tenantId || null;
 
+    // Default paymentType to PARTICULAR; only store convenioId when CONVENIO
+    const paymentType = data.paymentType || 'PARTICULAR';
+    const convenioId = paymentType === 'CONVENIO' ? (data.convenioId || null) : null;
+
     const scheduledCall = await tx.scheduledCall.create({
       data: {
         tenantId: resolvedTenantId ?? undefined,
@@ -361,6 +365,8 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
         leadId: lead?.id,
         customerId: customer?.id,
         doctorId: data.doctorId || undefined,
+        paymentType,
+        convenioId: convenioId ?? undefined,
       },
     });
 
@@ -424,7 +430,7 @@ async function listCalls(tenantId: string, filters: {
     where.date = { gte: startOfDay, lte: endOfDay };
   }
 
-  const [calls, total] = await Promise.all([
+  const [callsRaw, total] = await Promise.all([
     prisma.scheduledCall.findMany({
       where,
       include: {
@@ -439,6 +445,23 @@ async function listCalls(tenantId: string, filters: {
     }),
     prisma.scheduledCall.count({ where }),
   ]);
+
+  // Resolve convenio names for rows with convenioId (loose FK, no Prisma relation)
+  const convenioIds = Array.from(
+    new Set(callsRaw.map((c: any) => c.convenioId).filter((v: any): v is string => !!v)),
+  );
+  let convenioMap = new Map<string, { id: string; nome: string }>();
+  if (convenioIds.length > 0) {
+    const convenios = await prisma.convenio.findMany({
+      where: { id: { in: convenioIds }, tenantId },
+      select: { id: true, nome: true },
+    });
+    convenioMap = new Map(convenios.map((c) => [c.id, c]));
+  }
+  const calls = callsRaw.map((c: any) => ({
+    ...c,
+    convenio: c.convenioId ? convenioMap.get(c.convenioId) || null : null,
+  }));
 
   return { calls, total };
 }

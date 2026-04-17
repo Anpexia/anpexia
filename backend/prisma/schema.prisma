@@ -804,6 +804,8 @@ model ScheduledCall {
   notes      String?
   meetLink   String?  @map("meet_link")
   authorizationNumber  String?  @map("authorization_number")
+  paymentType          String?  @default("PARTICULAR") @map("payment_type")
+  convenioId           String?  @map("convenio_id")
   confirmationSentAt   DateTime? @map("confirmation_sent_at")
   reminderSentAt       DateTime? @map("reminder_sent_at")
   cancelConfirmPending Boolean  @default(false) @map("cancel_confirm_pending")

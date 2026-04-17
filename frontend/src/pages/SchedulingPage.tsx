@@ -54,11 +54,16 @@ interface Appointment {
   customerId: string | null;
   doctorId: string | null;
   authorizationNumber: string | null;
+  paymentType: string | null;
+  convenioId: string | null;
   customer: { id: string; name: string; phone: string; email: string | null } | null;
   doctor: { id: string; name: string } | null;
+  convenio?: { id: string; nome: string } | null;
   procedures?: CallProcedure[];
   createdAt: string;
 }
+
+interface ConvenioOption { id: string; nome: string; ativo: boolean }
 
 interface CustomerSearch {
   id: string;
@@ -131,6 +136,13 @@ export function SchedulingPage() {
   const [showBookModal, setShowBookModal] = useState(false);
   const [bookForm, setBookForm] = useState({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
   const [saving, setSaving] = useState(false);
+  // Payment type for new appointment
+  const [bookPaymentType, setBookPaymentType] = useState<'PARTICULAR' | 'CONVENIO'>('PARTICULAR');
+  const [bookConvenioId, setBookConvenioId] = useState<string>('');
+  const [patientConvenios, setPatientConvenios] = useState<ConvenioOption[]>([]);
+  const [loadingPatientConvenios, setLoadingPatientConvenios] = useState(false);
+  // Tenant-wide convenios lookup (for rendering badges in the list)
+  const [conveniosLookup, setConveniosLookup] = useState<Record<string, ConvenioOption>>({});
 
   // Doctors
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -228,7 +240,19 @@ export function SchedulingPage() {
     } catch {}
   }, []);
 
-  useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); }, [fetchAppointments, fetchDates, fetchDoctors]);
+  // Fetch all tenant convenios once to resolve badge names (fallback when the
+  // backend's inlined convenio resolve is absent — e.g. during cache lag).
+  const fetchConveniosLookup = useCallback(async () => {
+    try {
+      const { data } = await api.get('/convenios');
+      const list: ConvenioOption[] = data.data || [];
+      const map: Record<string, ConvenioOption> = {};
+      for (const c of list) map[c.id] = c;
+      setConveniosLookup(map);
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchConveniosLookup(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchConveniosLookup]);
 
   useEffect(() => {
     if (view === 'calendar') fetchMonthAppointments(calMonth);
@@ -284,10 +308,17 @@ export function SchedulingPage() {
     } catch {} finally { setLoadingSlots(false); }
   };
 
+  const resetPaymentState = () => {
+    setBookPaymentType('PARTICULAR');
+    setBookConvenioId('');
+    setPatientConvenios([]);
+  };
+
   const openBookWithSlot = (date: string, time: string) => {
     setBookForm({ name: '', phone: '', email: '', date, time, notes: '', customerId: '', doctorId: '' });
     setSelectedBookCustomer(null);
     setCustomerSearch('');
+    resetPaymentState();
     setShowBookModal(true);
   };
 
@@ -295,8 +326,46 @@ export function SchedulingPage() {
     setBookForm({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
     setSelectedBookCustomer(null);
     setCustomerSearch('');
+    resetPaymentState();
     setShowBookModal(true);
   };
+
+  // Load the patient's active convenio(s) when entering CONVENIO mode or switching patient.
+  // The backend stores a single patient-convenio link (see convenios.service.getPatientConvenio),
+  // so we fetch that and expose it as a single-option dropdown when active.
+  const loadPatientConvenios = useCallback(async (customerId: string) => {
+    setLoadingPatientConvenios(true);
+    try {
+      const { data } = await api.get(`/convenios/patients/${customerId}`);
+      const pc = data.data;
+      if (pc && pc.convenio && pc.convenio.id) {
+        // Enrich with the `ativo` flag from the tenant-wide lookup
+        const tenantConv = conveniosLookup[pc.convenio.id];
+        setPatientConvenios([{
+          id: pc.convenio.id,
+          nome: pc.convenio.nome,
+          ativo: tenantConv ? tenantConv.ativo : true,
+        }].filter((c) => c.ativo));
+      } else {
+        setPatientConvenios([]);
+      }
+    } catch {
+      setPatientConvenios([]);
+    } finally {
+      setLoadingPatientConvenios(false);
+    }
+  }, [conveniosLookup]);
+
+  // Whenever the user switches to CONVENIO and has a patient selected, load the list
+  useEffect(() => {
+    if (!showBookModal) return;
+    if (bookPaymentType !== 'CONVENIO') return;
+    if (!bookForm.customerId) {
+      setPatientConvenios([]);
+      return;
+    }
+    loadPatientConvenios(bookForm.customerId);
+  }, [showBookModal, bookPaymentType, bookForm.customerId, loadPatientConvenios]);
 
   const selectCustomerForBooking = (c: CustomerSearch) => {
     setSelectedBookCustomer(c);
@@ -309,11 +378,17 @@ export function SchedulingPage() {
     }));
     setCustomerSearch('');
     setCustomerResults([]);
+    // Reset convenio selection whenever patient changes
+    setBookConvenioId('');
+    setPatientConvenios([]);
   };
 
   const clearSelectedCustomer = () => {
     setSelectedBookCustomer(null);
     setBookForm(prev => ({ ...prev, customerId: '' }));
+    // Reset convenio selection whenever patient is cleared
+    setBookConvenioId('');
+    setPatientConvenios([]);
   };
 
   const handleBook = async (e: React.FormEvent) => {
@@ -322,9 +397,13 @@ export function SchedulingPage() {
       showToast('Selecione o medico responsavel pela consulta');
       return;
     }
+    if (bookPaymentType === 'CONVENIO' && !bookConvenioId) {
+      showToast('Selecione o convenio do paciente');
+      return;
+    }
     setSaving(true);
     try {
-      await api.post('/scheduling/book', {
+      const payload: any = {
         name: bookForm.name,
         phone: bookForm.phone,
         email: bookForm.email || undefined,
@@ -333,7 +412,12 @@ export function SchedulingPage() {
         notes: bookForm.notes || undefined,
         customerId: bookForm.customerId || undefined,
         doctorId: bookForm.doctorId,
-      });
+        paymentType: bookPaymentType,
+      };
+      if (bookPaymentType === 'CONVENIO') {
+        payload.convenioId = bookConvenioId;
+      }
+      await api.post('/scheduling/book', payload);
       setShowBookModal(false);
       fetchAppointments();
       fetchDates();
@@ -751,6 +835,18 @@ export function SchedulingPage() {
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium text-slate-800">{a.customer?.name || a.name}</span>
+                                {(() => {
+                                  const pt = a.paymentType || 'PARTICULAR';
+                                  if (pt === 'CONVENIO') {
+                                    const nome = a.convenio?.nome || (a.convenioId ? conveniosLookup[a.convenioId]?.nome : null) || 'Convenio';
+                                    return (
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{nome}</span>
+                                    );
+                                  }
+                                  return (
+                                    <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Particular</span>
+                                  );
+                                })()}
                                 {a.customer && <span className="text-xs bg-[#EFF6FF] text-[#1E3A5F] px-1.5 py-0.5 rounded">Paciente vinculado</span>}
                                 {a.doctor ? (
                                   <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
@@ -876,6 +972,18 @@ export function SchedulingPage() {
                               )}
                               <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
                               <span className="text-sm font-medium text-slate-800 truncate">{a.customer?.name || a.name}</span>
+                              {(() => {
+                                const pt = a.paymentType || 'PARTICULAR';
+                                if (pt === 'CONVENIO') {
+                                  const nome = a.convenio?.nome || (a.convenioId ? conveniosLookup[a.convenioId]?.nome : null) || 'Convenio';
+                                  return (
+                                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{nome}</span>
+                                  );
+                                }
+                                return (
+                                  <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Particular</span>
+                                );
+                              })()}
                               <span className="text-sm text-slate-500 hidden sm:inline">{a.phone}</span>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1146,6 +1254,59 @@ export function SchedulingPage() {
                       </div>
                     )}
                     {searchingCustomer && <p className="text-xs text-slate-400 mt-1">Buscando...</p>}
+                  </div>
+                )}
+              </div>
+
+              {/* Tipo de pagamento */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de pagamento</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="paymentType"
+                      value="PARTICULAR"
+                      checked={bookPaymentType === 'PARTICULAR'}
+                      onChange={() => {
+                        setBookPaymentType('PARTICULAR');
+                        setBookConvenioId('');
+                      }}
+                    />
+                    <span>Particular</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="paymentType"
+                      value="CONVENIO"
+                      checked={bookPaymentType === 'CONVENIO'}
+                      onChange={() => setBookPaymentType('CONVENIO')}
+                    />
+                    <span>Convenio</span>
+                  </label>
+                </div>
+                {bookPaymentType === 'CONVENIO' && (
+                  <div className="mt-2">
+                    {!bookForm.customerId ? (
+                      <p className="text-xs text-amber-600">Selecione um paciente para ver os convenios.</p>
+                    ) : loadingPatientConvenios ? (
+                      <p className="text-xs text-slate-500">Carregando convenios...</p>
+                    ) : patientConvenios.length === 0 ? (
+                      <p className="text-xs text-amber-600">Paciente sem convenios cadastrados</p>
+                    ) : (
+                      <select
+                        value={bookConvenioId}
+                        onChange={(e) => setBookConvenioId(e.target.value)}
+                        className={inputCls}
+                        required
+                      >
+                        <option value="">Selecione o convenio</option>
+                        {patientConvenios.map((c) => (
+                          <option key={c.id} value={c.id}>{c.nome}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 )}
               </div>
