@@ -54,10 +54,9 @@ export const authService = {
     email = email.trim().toLowerCase();
 
     const user = await prisma.user.findFirst({
-      where: {
-        email,
-        tenantId: context === 'admin' ? null : { not: null },
-      },
+      where: context === 'admin'
+        ? { email, OR: [{ tenantId: null }, { role: 'SUPER_ADMIN' }] }
+        : { email, tenantId: { not: null } },
       include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
     });
 
