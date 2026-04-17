@@ -13,6 +13,7 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import SettingsPage from './pages/SettingsPage';
 import LembretesPage from './pages/LembretesPage';
 import Verify2FAPage from './pages/Verify2FAPage';
+import CriarSenhaPage from './pages/CriarSenhaPage';
 
 // ============ AUTH ============
 
@@ -582,6 +583,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<AdminLoginPage />} />
+      <Route path="/criar-senha" element={<CriarSenhaPage />} />
       <Route path="/verificar-2fa" element={<Verify2FAPage />} />
       <Route path="/" element={<ProtectedAdmin><AdminLayout /></ProtectedAdmin>}>
         <Route index element={<Navigate to="/overview" replace />} />
