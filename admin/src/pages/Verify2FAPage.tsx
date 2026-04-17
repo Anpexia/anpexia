@@ -9,7 +9,7 @@ interface Pending {
   twoFactorEnabled: boolean;
 }
 
-const ADMIN_ALLOWED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR'];
+const ADMIN_ALLOWED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR', 'OWNER'];
 
 // An admin-panel user is any user whose role is in the list above, OR any user
 // with tenantId === null (admin users created via /usuarios have no tenant).

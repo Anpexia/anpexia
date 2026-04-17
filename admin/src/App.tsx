@@ -32,7 +32,7 @@ function useAdminAuth() {
     try {
       const deviceId = getDeviceId();
       const { data } = await api.post('/auth/login', { email, password, deviceId });
-      const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR'];
+      const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR', 'OWNER'];
       const u = data.data.user;
       const hasTenant = !!(u.tenantId || u.tenant?.id);
       // Admin panel accepts admin-panel roles OR any user without a tenant (tenantId null).

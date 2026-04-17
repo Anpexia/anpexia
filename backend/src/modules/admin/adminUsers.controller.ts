@@ -26,7 +26,6 @@ adminUsersRouter.get('/usuarios', async (req: Request, res: Response, next: Next
     const { role, search } = req.query as Record<string, string>;
     const where: any = {
       tenantId: null,
-      role: { in: [...ADMIN_ROLES] },
     };
     if (role && isAdminRole(role)) where.role = role;
     if (search && search.trim()) {
