@@ -31,7 +31,6 @@ export function TeamPage() {
   // Create form
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
-  const [formPassword, setFormPassword] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formRole, setFormRole] = useState<'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'>('RECEPTIONIST');
   const [formEspecialidade, setFormEspecialidade] = useState('');
@@ -67,19 +66,18 @@ export function TeamPage() {
   };
 
   const handleCreate = async () => {
-    if (!formName || !formEmail || !formPassword) { showToast('Preencha todos os campos obrigatorios'); return; }
+    if (!formName || !formEmail) { showToast('Preencha todos os campos obrigatorios'); return; }
     setSubmitting(true);
     try {
       await api.post('/team', {
         name: formName,
         email: formEmail,
-        password: formPassword,
         phone: formPhone || undefined,
         role: formRole,
         especialidade: formRole === 'DOCTOR' ? (formEspecialidade || undefined) : undefined,
         rqe: formRole === 'DOCTOR' ? (formRqe || undefined) : undefined,
       });
-      showToast('Membro adicionado!');
+      showToast(`Convite enviado para ${formEmail}. O membro receberá um email para definir sua senha.`);
       setShowCreateModal(false);
       resetForm();
       fetchMembers();
@@ -164,7 +162,7 @@ export function TeamPage() {
     }
   };
 
-  const resetForm = () => { setFormName(''); setFormEmail(''); setFormPassword(''); setFormPhone(''); setFormRole('RECEPTIONIST'); setFormEspecialidade(''); setFormRqe(''); };
+  const resetForm = () => { setFormName(''); setFormEmail(''); setFormPhone(''); setFormRole('RECEPTIONIST'); setFormEspecialidade(''); setFormRqe(''); };
 
   const openEdit = (m: TeamMember) => {
     setEditMember(m);
@@ -307,10 +305,6 @@ export function TeamPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">E-mail *</label>
                 <input type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Senha *</label>
-                <input type="password" value={formPassword} onChange={e => setFormPassword(e.target.value)} className={inputCls} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
