@@ -9,12 +9,16 @@ interface MaterialInput {
 interface CreateTemplateInput {
   name: string;
   description?: string | null;
+  procedureType?: string;
+  privateProcedureId?: string | null;
   materials: MaterialInput[];
 }
 
 interface UpdateTemplateInput {
   name?: string;
   description?: string | null;
+  procedureType?: string;
+  privateProcedureId?: string | null;
   materials?: MaterialInput[];
 }
 
@@ -23,6 +27,9 @@ function shapeTemplate(tpl: any) {
     id: tpl.id,
     name: tpl.name,
     description: tpl.description,
+    procedureType: tpl.procedureType || 'TUSS',
+    privateProcedureId: tpl.privateProcedureId || null,
+    privateProcedure: tpl.privateProcedure ? { id: tpl.privateProcedure.id, name: tpl.privateProcedure.name } : null,
     createdAt: tpl.createdAt,
     materials: (tpl.materials || []).map((m: any) => ({
       productId: m.productId,
@@ -60,6 +67,7 @@ export const procedureTemplatesService = {
         materials: {
           include: { product: { select: { name: true, unit: true } } },
         },
+        privateProcedure: { select: { id: true, name: true } },
       },
       orderBy: { name: 'asc' },
     });
@@ -72,12 +80,24 @@ export const procedureTemplatesService = {
     }
     await validateMaterials(tenantId, data.materials);
 
+    const procType = data.procedureType === 'PARTICULAR' ? 'PARTICULAR' : 'TUSS';
+    let privateProcId: string | null = null;
+    if (procType === 'PARTICULAR' && data.privateProcedureId) {
+      const pp = await prisma.privateProcedure.findUnique({ where: { id: data.privateProcedureId } });
+      if (!pp || pp.tenantId !== tenantId) {
+        throw new AppError(400, 'INVALID_PRIVATE_PROCEDURE', 'Procedimento particular nao pertence ao tenant');
+      }
+      privateProcId = pp.id;
+    }
+
     const created = await prisma.$transaction(async (tx) => {
       const tpl = await tx.procedureTemplate.create({
         data: {
           tenantId,
           name: data.name.trim(),
           description: data.description?.trim() || null,
+          procedureType: procType,
+          privateProcedureId: privateProcId,
         },
       });
       await tx.procedureMaterial.createMany({
@@ -93,6 +113,7 @@ export const procedureTemplatesService = {
           materials: {
             include: { product: { select: { name: true, unit: true } } },
           },
+          privateProcedure: { select: { id: true, name: true } },
         },
       });
     });
@@ -112,6 +133,19 @@ export const procedureTemplatesService = {
       await validateMaterials(tenantId, data.materials);
     }
 
+    let privateProcId: string | null | undefined = undefined;
+    if (data.procedureType !== undefined) {
+      if (data.procedureType === 'PARTICULAR' && data.privateProcedureId) {
+        const pp = await prisma.privateProcedure.findUnique({ where: { id: data.privateProcedureId } });
+        if (!pp || pp.tenantId !== tenantId) {
+          throw new AppError(400, 'INVALID_PRIVATE_PROCEDURE', 'Procedimento particular nao pertence ao tenant');
+        }
+        privateProcId = pp.id;
+      } else if (data.procedureType === 'TUSS') {
+        privateProcId = null;
+      }
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       await tx.procedureTemplate.update({
         where: { id },
@@ -120,6 +154,8 @@ export const procedureTemplatesService = {
           ...(data.description !== undefined
             ? { description: data.description?.trim() || null }
             : {}),
+          ...(data.procedureType !== undefined ? { procedureType: data.procedureType === 'PARTICULAR' ? 'PARTICULAR' : 'TUSS' } : {}),
+          ...(privateProcId !== undefined ? { privateProcedureId: privateProcId } : {}),
         },
       });
 
@@ -140,6 +176,7 @@ export const procedureTemplatesService = {
           materials: {
             include: { product: { select: { name: true, unit: true } } },
           },
+          privateProcedure: { select: { id: true, name: true } },
         },
       });
     });

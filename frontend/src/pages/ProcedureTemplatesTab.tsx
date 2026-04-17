@@ -13,8 +13,17 @@ interface ProcedureTemplate {
   id: string;
   name: string;
   description: string | null;
+  procedureType: string;
+  privateProcedureId: string | null;
+  privateProcedure: { id: string; name: string } | null;
   createdAt: string;
   materials: TemplateMaterial[];
+}
+
+interface PrivateProcOption {
+  id: string;
+  name: string;
+  isActive: boolean;
 }
 
 interface ProductOption {
@@ -55,6 +64,9 @@ export function ProcedureTemplatesTab() {
   const [description, setDescription] = useState('');
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [selectedTuss, setSelectedTuss] = useState<string>('');
+  const [procedureType, setProcedureType] = useState<'TUSS' | 'PARTICULAR'>('TUSS');
+  const [selectedPrivate, setSelectedPrivate] = useState<string>('');
+  const [privateProcs, setPrivateProcs] = useState<PrivateProcOption[]>([]);
 
   useEffect(() => {
     if (!toast) return;
@@ -104,17 +116,34 @@ export function ProcedureTemplatesTab() {
     }
   }, []);
 
+  const fetchPrivateProcs = useCallback(async () => {
+    try {
+      const { data } = await api.get('/private-procedures');
+      const items = (data.data || []).filter((p: any) => p.isActive).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        isActive: p.isActive,
+      }));
+      setPrivateProcs(items);
+    } catch {
+      // noop
+    }
+  }, []);
+
   useEffect(() => {
     fetchTemplates();
     fetchProducts();
     fetchTuss();
-  }, [fetchTemplates, fetchProducts, fetchTuss]);
+    fetchPrivateProcs();
+  }, [fetchTemplates, fetchProducts, fetchTuss, fetchPrivateProcs]);
 
   const resetForm = () => {
     setName('');
     setDescription('');
     setMaterials([]);
     setSelectedTuss('');
+    setProcedureType('TUSS');
+    setSelectedPrivate('');
     setSelected(null);
   };
 
@@ -131,6 +160,8 @@ export function ProcedureTemplatesTab() {
       (tpl.materials || []).map((m) => ({ productId: m.productId, quantity: m.quantity })),
     );
     setSelectedTuss('');
+    setProcedureType((tpl.procedureType === 'PARTICULAR' ? 'PARTICULAR' : 'TUSS') as 'TUSS' | 'PARTICULAR');
+    setSelectedPrivate(tpl.privateProcedureId || '');
     setModalMode('edit');
   };
 
@@ -158,6 +189,20 @@ export function ProcedureTemplatesTab() {
     if (tuss) setName(tuss.description);
   };
 
+  const handlePrivateSelect = (procId: string) => {
+    setSelectedPrivate(procId);
+    if (!procId) return;
+    const proc = privateProcs.find((p) => p.id === procId);
+    if (proc) setName(proc.name);
+  };
+
+  const handleTypeChange = (type: 'TUSS' | 'PARTICULAR') => {
+    setProcedureType(type);
+    setName('');
+    setSelectedTuss('');
+    setSelectedPrivate('');
+  };
+
   const canSave =
     name.trim().length > 0 &&
     materials.length > 0 &&
@@ -167,9 +212,11 @@ export function ProcedureTemplatesTab() {
     if (!canSave) return;
     setSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         name: name.trim(),
         description: description.trim() || null,
+        procedureType,
+        privateProcedureId: procedureType === 'PARTICULAR' && selectedPrivate ? selectedPrivate : null,
         materials: materials.map((m) => ({ productId: m.productId, quantity: Number(m.quantity) })),
       };
       if (modalMode === 'create') {
@@ -221,6 +268,7 @@ export function ProcedureTemplatesTab() {
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Nome</th>
+              <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 hidden sm:table-cell">Tipo</th>
               <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 hidden md:table-cell">Descricao</th>
               <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Materiais</th>
               <th className="text-right text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Acoes</th>
@@ -229,16 +277,21 @@ export function ProcedureTemplatesTab() {
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-6 py-10 text-center text-slate-400 text-sm">Carregando...</td>
+                <td colSpan={5} className="px-6 py-10 text-center text-slate-400 text-sm">Carregando...</td>
               </tr>
             ) : templates.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-10 text-center text-slate-400 text-sm">Nenhum template cadastrado</td>
+                <td colSpan={5} className="px-6 py-10 text-center text-slate-400 text-sm">Nenhum template cadastrado</td>
               </tr>
             ) : (
               templates.map((tpl) => (
                 <tr key={tpl.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">{tpl.name}</td>
+                  <td className="px-6 py-4 hidden sm:table-cell">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${tpl.procedureType === 'PARTICULAR' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {tpl.procedureType === 'PARTICULAR' ? 'Particular' : 'TUSS'}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-sm text-slate-500 hidden md:table-cell">{tpl.description || '-'}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{tpl.materials.length}</td>
                   <td className="px-6 py-4 text-right">
@@ -280,30 +333,75 @@ export function ProcedureTemplatesTab() {
             </div>
 
             <div className="px-6 py-5 space-y-5">
+              {/* Tipo do procedimento */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Procedimento</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="procedureType"
+                      checked={procedureType === 'TUSS'}
+                      onChange={() => handleTypeChange('TUSS')}
+                      className="accent-[#2563EB]"
+                    />
+                    <span className="text-sm text-slate-700 font-medium">TUSS</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="procedureType"
+                      checked={procedureType === 'PARTICULAR'}
+                      onChange={() => handleTypeChange('PARTICULAR')}
+                      className="accent-[#7C3AED]"
+                    />
+                    <span className="text-sm text-slate-700 font-medium">Particular</span>
+                  </label>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome do Procedimento *</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Digite o nome ou selecione um procedimento TUSS abaixo"
+                  placeholder={procedureType === 'TUSS' ? 'Digite o nome ou selecione um TUSS abaixo' : 'Digite o nome ou selecione um particular abaixo'}
                   className={inputCls}
                 />
-                <div className="mt-2 flex items-center gap-2">
-                  <select
-                    value={selectedTuss}
-                    onChange={(e) => handleTussSelect(e.target.value)}
-                    className={inputCls}
-                  >
-                    <option value="">Selecionar procedimento TUSS (opcional)</option>
-                    {tussList.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        [{t.code}] {t.description}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-xs text-slate-400 mt-1">Voce pode digitar manualmente ou escolher um procedimento da tabela TUSS para preencher o nome.</p>
+                {procedureType === 'TUSS' ? (
+                  <div className="mt-2">
+                    <select
+                      value={selectedTuss}
+                      onChange={(e) => handleTussSelect(e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="">Selecionar procedimento TUSS (opcional)</option>
+                      {tussList.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          [{t.code}] {t.description}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">Escolha um procedimento TUSS para preencher o nome ou digite manualmente.</p>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <select
+                      value={selectedPrivate}
+                      onChange={(e) => handlePrivateSelect(e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="">Selecionar procedimento particular (opcional)</option>
+                      {privateProcs.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">Escolha um procedimento particular para preencher o nome ou digite manualmente.</p>
+                  </div>
+                )}
               </div>
 
               <div>

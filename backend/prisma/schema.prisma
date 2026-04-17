@@ -1241,13 +1241,16 @@ model DoctorRepasse {
 }
 
 model ProcedureTemplate {
-  id          String              @id @default(cuid())
-  tenantId    String              @map("tenant_id")
-  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String
-  description String?
-  createdAt   DateTime            @default(now()) @map("created_at")
-  materials   ProcedureMaterial[]
+  id                 String              @id @default(cuid())
+  tenantId           String              @map("tenant_id")
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  procedureType      String              @default("TUSS") @map("procedure_type")
+  privateProcedureId String?             @map("private_procedure_id")
+  privateProcedure   PrivateProcedure?   @relation(fields: [privateProcedureId], references: [id])
+  createdAt          DateTime            @default(now()) @map("created_at")
+  materials          ProcedureMaterial[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -1292,6 +1295,7 @@ model PrivateProcedure {
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   calls       PrivateProcedureCall[]
+  templates   ProcedureTemplate[]
 
   @@unique([tenantId, name])
   @@map("private_procedures")

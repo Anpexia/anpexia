@@ -165,7 +165,7 @@ export function SchedulingPage() {
 
   // ---- Stock withdrawal extension (procedure templates + materials) ----
   interface TplMaterial { productId: string; productName: string; unit: string; quantity: number }
-  interface ProcedureTpl { id: string; name: string; description: string | null; materials: TplMaterial[] }
+  interface ProcedureTpl { id: string; name: string; description: string | null; procedureType?: string; privateProcedureId?: string | null; materials: TplMaterial[] }
   interface InventoryProduct { id: string; name: string; quantity: number; unit: string }
   interface MaterialRow { productId: string; productName: string; unit: string; quantity: number; available: number }
   const [procedureTemplates, setProcedureTemplates] = useState<ProcedureTpl[] | null>(null);
@@ -531,7 +531,7 @@ export function SchedulingPage() {
     }
     const target = chosen.description.trim().toLowerCase();
     const tpl = (procedureTemplates || []).find(
-      (t) => t.name.trim().toLowerCase() === target,
+      (t) => t.name.trim().toLowerCase() === target && (!t.procedureType || t.procedureType === 'TUSS'),
     ) || null;
     setMatchedTemplate(tpl);
     if (tpl) {
@@ -799,7 +799,7 @@ export function SchedulingPage() {
       return;
     }
     const target = proc.name.trim().toLowerCase();
-    const tpl = (procedureTemplates || []).find((t) => t.name.trim().toLowerCase() === target) || null;
+    const tpl = (procedureTemplates || []).find((t) => t.name.trim().toLowerCase() === target && (!t.procedureType || t.procedureType === 'PARTICULAR')) || null;
     if (tpl) {
       const products = inventoryProducts || [];
       setPartTplMaterials(
@@ -828,7 +828,7 @@ export function SchedulingPage() {
     const tussItem = partTussList.find((t) => t.id === partTussSelectedId);
     if (!tussItem) { setPartTussTplMaterials([]); return; }
     const target = (tussItem.description || '').trim().toLowerCase();
-    const tpl = (procedureTemplates || []).find((t: any) => t.name.trim().toLowerCase() === target) || null;
+    const tpl = (procedureTemplates || []).find((t: any) => t.name.trim().toLowerCase() === target && (!t.procedureType || t.procedureType === 'TUSS')) || null;
     if (tpl) {
       const products = inventoryProducts || [];
       setPartTussTplMaterials(
