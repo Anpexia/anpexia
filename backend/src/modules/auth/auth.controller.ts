@@ -25,7 +25,25 @@ authRouter.post('/login', publicRateLimit, async (req: Request, res: Response, n
     const data = loginSchema.parse(req.body);
     const deviceId = (req.body?.deviceId as string | undefined) || (req.headers['x-device-id'] as string | undefined);
     const ip = getClientIp(req);
-    const result = await authService.login(data.email, data.password, deviceId, ip);
+    const result = await authService.login(data.email, data.password, deviceId, ip, 'app');
+
+    res.cookie('refreshToken', result.refreshToken, refreshCookieOptions());
+
+    return success(res, {
+      accessToken: result.accessToken,
+      user: result.user,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/admin/login', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = loginSchema.parse(req.body);
+    const deviceId = (req.body?.deviceId as string | undefined) || (req.headers['x-device-id'] as string | undefined);
+    const ip = getClientIp(req);
+    const result = await authService.login(data.email, data.password, deviceId, ip, 'admin');
 
     res.cookie('refreshToken', result.refreshToken, refreshCookieOptions());
 

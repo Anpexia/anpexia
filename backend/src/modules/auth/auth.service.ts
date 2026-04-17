@@ -48,13 +48,16 @@ async function cleanupExpiredBlacklist(): Promise<void> {
 }
 
 export const authService = {
-  async login(email: string, password: string, deviceId: string | undefined, ipAddress: string) {
+  async login(email: string, password: string, deviceId: string | undefined, ipAddress: string, context: 'admin' | 'app' = 'app') {
     // Fire-and-forget cleanup
     cleanupExpiredBlacklist();
     email = email.trim().toLowerCase();
 
     const user = await prisma.user.findFirst({
-      where: { email },
+      where: {
+        email,
+        tenantId: context === 'admin' ? null : { not: null },
+      },
       include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
     });
 
