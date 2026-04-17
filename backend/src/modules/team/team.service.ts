@@ -75,7 +75,7 @@ export const teamService = {
       return { ...user, isActive: true, createdAt: new Date(), invited: true };
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    const existing = await prisma.user.findFirst({ where: { email: data.email, tenantId } });
     if (existing) {
       throw new AppError(409, 'EMAIL_EXISTS', 'Este e-mail ja esta cadastrado');
     }
