@@ -51,6 +51,7 @@ export const authService = {
   async login(email: string, password: string, deviceId: string | undefined, ipAddress: string) {
     // Fire-and-forget cleanup
     cleanupExpiredBlacklist();
+    email = email.trim().toLowerCase();
 
     const user = await prisma.user.findUnique({
       where: { email },
@@ -247,6 +248,7 @@ export const authService = {
   },
 
   async register(data: RegisterData) {
+    data.email = data.email.trim().toLowerCase();
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
       throw new AppError(409, 'EMAIL_EXISTS', 'Este e-mail já está cadastrado');
@@ -416,7 +418,8 @@ export const authService = {
     rqe?: string;
     inviteLinkBase?: string;
   }) {
-    const existing = await prisma.user.findUnique({ where: { email: params.email } });
+    const normalizedEmail = params.email.trim().toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) throw new AppError(409, 'EMAIL_EXISTS', 'Este e-mail já está cadastrado');
 
     const inviteToken = crypto.randomUUID();
@@ -426,7 +429,7 @@ export const authService = {
       data: {
         tenantId: params.tenantId,
         name: params.name,
-        email: params.email,
+        email: normalizedEmail,
         phone: params.phone,
         role: params.role as any,
         especialidade: params.especialidade,
