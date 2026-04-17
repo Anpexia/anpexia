@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Plus, X, Pencil, Trash2, Search } from 'lucide-react';
 import api from '../services/api';
 
-type Role = 'ADMIN' | 'GERENTE' | 'VENDEDOR';
+type Role = 'SUPER_ADMIN' | 'ADMIN' | 'GERENTE' | 'VENDEDOR';
 
 interface AdminUser {
   id: string;
@@ -16,6 +16,7 @@ interface AdminUser {
 const ROLES: Role[] = ['ADMIN', 'GERENTE', 'VENDEDOR'];
 
 const ROLE_STYLES: Record<Role, string> = {
+  SUPER_ADMIN: 'bg-red-700 text-white',
   ADMIN: 'bg-[#1E3A5F] text-white',
   GERENTE: 'bg-purple-600 text-white',
   VENDEDOR: 'bg-green-600 text-white',
@@ -32,6 +33,7 @@ function formatDate(iso: string) {
 export default function AdminUsersPage() {
   const [items, setItems] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -39,14 +41,16 @@ export default function AdminUsersPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const params: any = {};
       if (search.trim()) params.search = search.trim();
       if (roleFilter) params.role = roleFilter;
       const { data } = await api.get('/admin/usuarios', { params });
       setItems(data.data.items || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.response?.data?.error?.message || 'Erro ao carregar usuários');
     } finally {
       setLoading(false);
     }
@@ -114,6 +118,8 @@ export default function AdminUsersPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="text-center py-8 text-gray-500">Carregando...</td></tr>
+            ) : error ? (
+              <tr><td colSpan={6} className="text-center py-8 text-red-500">{error}</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={6} className="text-center py-8 text-gray-500">Nenhum usuário cadastrado.</td></tr>
             ) : items.map((u) => (

@@ -25,13 +25,15 @@ adminUsersRouter.get('/usuarios', async (req: Request, res: Response, next: Next
   try {
     const { role, search } = req.query as Record<string, string>;
     const where: any = {
-      tenantId: null,
+      OR: [{ tenantId: null }, { role: 'SUPER_ADMIN' }],
     };
     if (role && isAdminRole(role)) where.role = role;
     if (search && search.trim()) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
+      where.AND = [
+        { OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ] },
       ];
     }
     const items = await prisma.user.findMany({
