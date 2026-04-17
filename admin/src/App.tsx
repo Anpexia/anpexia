@@ -462,13 +462,16 @@ function BillingPage() {
 
 // ============ LAYOUT ============
 
-const navItems: Array<{
+interface NavItem {
   to: string;
   label: string;
   icon: any;
   matchPaths?: string[];
   children?: Array<{ to: string; label: string }>;
-}> = [
+  roles?: string[];
+}
+
+const navItems: NavItem[] = [
   { to: '/overview', label: 'Visao geral', icon: BarChart3 },
   { to: '/empresas', label: 'Empresas', icon: Building2 },
   {
@@ -484,15 +487,17 @@ const navItems: Array<{
   { to: '/financeiro', label: 'Financeiro', icon: CreditCard },
   { to: '/audit-log', label: 'Audit Log', icon: FileSearch },
   { to: '/lembretes', label: 'Lembretes', icon: Calendar },
-  { to: '/usuarios', label: 'Usuários', icon: UserCog },
-  { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon },
+  { to: '/usuarios', label: 'Usuários', icon: UserCog, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
 
 function AdminLayout() {
-  const { logout } = useAdminAuth();
+  const { logout, user } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
+  const userRole = user?.role || '';
+  const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(userRole));
 
   const handleLogout = async () => {
     await logout();
@@ -507,7 +512,7 @@ function AdminLayout() {
           <span className="ml-3 text-xs bg-[#2563EB] px-2 py-0.5 rounded">Admin</span>
         </div>
         <nav className="flex-1 py-4 px-3">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isParentActive = item.matchPaths
               ? item.matchPaths.some((p) => pathname === p || pathname.startsWith(p + '/'))
               : pathname === item.to || pathname.startsWith(item.to + '/');
