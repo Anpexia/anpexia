@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 interface Doctor {
   id: string;
@@ -124,6 +125,8 @@ function StatusTimeline({ status }: { status: string }) {
 }
 
 export function SchedulingPage() {
+  const { user } = useAuth();
+  const canRevert = user?.role === 'OWNER' || user?.role === 'MANAGER' || user?.role === 'SUPER_ADMIN';
   const [view, setView] = useState<View>('list');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [, setAvailableDates] = useState<AvailableDate[]>([]);
@@ -971,6 +974,25 @@ export function SchedulingPage() {
     } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao cancelar agendamento.'); }
   };
 
+  // Revert status
+  const [revertTarget, setRevertTarget] = useState<Appointment | null>(null);
+  const [reverting, setReverting] = useState(false);
+
+  const handleRevertStatus = async () => {
+    if (!revertTarget) return;
+    setReverting(true);
+    try {
+      await api.patch(`/scheduling/calls/${revertTarget.id}/revert-status`);
+      fetchAppointments();
+      showToast('Status revertido com sucesso.');
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao reverter status.');
+    } finally {
+      setReverting(false);
+      setRevertTarget(null);
+    }
+  };
+
   const upcomingAppointments = appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed');
   const pastAppointments = appointments.filter(a => a.status !== 'scheduled' && a.status !== 'confirmed');
 
@@ -1115,6 +1137,11 @@ export function SchedulingPage() {
                                 <Check size={14} />Confirmar
                               </button>
                             )}
+                            {canRevert && a.status === 'confirmed' && (
+                              <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
+                                <Undo2 size={14} />Desconfirmar
+                              </button>
+                            )}
                             <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">
                               Realizado
                             </button>
@@ -1254,6 +1281,14 @@ export function SchedulingPage() {
                                 className="px-2 py-1 text-xs font-medium rounded bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200"
                               >
                                 Registrar Procedimento
+                              </button>
+                            )}
+                            {canRevert && isRealized && (
+                              <button
+                                onClick={() => setRevertTarget(a)}
+                                className="px-2 py-1 text-xs font-medium rounded bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 flex items-center gap-1"
+                              >
+                                <Undo2 size={12} />Desfazer realizado
                               </button>
                             )}
                             <span className={`text-xs px-2 py-0.5 rounded ${st.cls}`}>{st.icon} {st.label}</span>
@@ -2129,6 +2164,31 @@ export function SchedulingPage() {
                 className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
               >
                 {savingDoctor ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revert Status Confirmation Modal */}
+      {revertTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-semibold text-slate-800 mb-3">Reverter status</h3>
+            <p className="text-sm text-slate-600 mb-1">
+              {revertTarget.status === 'completed'
+                ? 'Deseja reverter este agendamento para Confirmado?'
+                : 'Deseja reverter este agendamento para Aguardando confirmação?'}
+            </p>
+            {revertTarget.status === 'completed' && (
+              <p className="text-xs text-amber-600 mb-4">O estoque baixado não será estornado automaticamente.</p>
+            )}
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setRevertTarget(null)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={handleRevertStatus} disabled={reverting} className="px-4 py-2 text-sm rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50">
+                {reverting ? 'Revertendo...' : 'Confirmar'}
               </button>
             </div>
           </div>

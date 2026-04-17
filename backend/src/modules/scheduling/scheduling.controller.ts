@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import prisma from '../../config/database';
 import { schedulingService } from './scheduling.service';
 import {
   bookCallSchema,
@@ -209,6 +210,24 @@ router.patch('/calls/:id/authorization', authenticate, requireTenant, async (req
     const data = updateCallAuthorizationSchema.parse(req.body);
     const call = await schedulingService.updateCallAuthorization(id, req.auth!.tenantId!, data.authorizationNumber);
     return success(res, call);
+  } catch (err) { next(err); }
+});
+
+// PATCH /calls/:id/revert-status — revert confirmed→scheduled or completed→confirmed
+router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId: req.auth!.tenantId! } });
+    if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
+
+    const revertMap: Record<string, string> = { confirmed: 'scheduled', completed: 'confirmed' };
+    const newStatus = revertMap[call.status];
+    if (!newStatus) throw new AppError(400, 'INVALID_REVERT', 'Status não pode ser revertido');
+
+    const updated = await prisma.scheduledCall.update({ where: { id }, data: { status: newStatus } });
+    await logAction({ ...auditCtx(req), action: 'revert_status', entity: 'scheduled_call', entityId: id, metadata: { statusAnterior: call.status, statusNovo: newStatus } });
+
+    return success(res, updated);
   } catch (err) { next(err); }
 });
 
