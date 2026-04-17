@@ -202,6 +202,14 @@ async function loadRoutes() {
     // Seed default CRM automations (idempotent by name)
     seedDefaultAutomations().catch((err) => console.error('[CRM] seed automations error', err));
 
+    // Admin routers MUST be registered before generic /api/v1 routers.
+    // Routers mounted on /api/v1 with router.use(requireTenant) would intercept
+    // /api/v1/admin/* requests and throw 403 for users with tenantId=null.
+    app.use('/api/admin', auditLogRouter);
+    app.use('/api/v1/admin', auditLogRouter);
+    app.use('/api/admin', adminUsersRouter);
+    app.use('/api/v1/admin', adminUsersRouter);
+
     app.use('/api/v1/onboarding', onboardingRouter);
     app.use('/api/v1/scripts', scriptsRouter);
     app.use('/api/v1/suppliers', supplierRouter);
@@ -221,10 +229,6 @@ async function loadRoutes() {
     app.use('/api/v1/procedure-templates', procedureTemplatesRouter);
     app.use('/api/v1/repasse-types', repasseTypesRouter);
     app.use('/api/v1/private-procedures', privateProceduresRouter);
-    app.use('/api/admin', auditLogRouter);
-    app.use('/api/v1/admin', auditLogRouter);
-    app.use('/api/admin', adminUsersRouter);
-    app.use('/api/v1/admin', adminUsersRouter);
     app.use('/api/google', googleRouter);
     app.use('/api/v1/google', googleRouter);
 
