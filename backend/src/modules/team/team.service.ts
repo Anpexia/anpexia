@@ -27,6 +27,7 @@ export const teamService = {
         role: true,
         especialidade: true,
         rqe: true,
+        horarios: true,
         isActive: true,
         lastLoginAt: true,
         createdAt: true,
@@ -49,6 +50,7 @@ export const teamService = {
         tipoRegistro: true,
         numeroRegistro: true,
         duracaoConsulta: true,
+        horarios: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -113,7 +115,7 @@ export const teamService = {
     return user;
   },
 
-  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'; especialidade?: string; rqe?: string }) {
+  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'; especialidade?: string; rqe?: string; horarios?: any }) {
     const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario nao encontrado');
 
@@ -128,6 +130,7 @@ export const teamService = {
         role: true,
         especialidade: true,
         rqe: true,
+        horarios: true,
         isActive: true,
         createdAt: true,
       },
@@ -162,7 +165,7 @@ export const teamService = {
       select: {
         id: true, name: true, email: true, phone: true, role: true,
         especialidade: true, rqe: true, tipoRegistro: true, numeroRegistro: true,
-        duracaoConsulta: true, bio: true,
+        duracaoConsulta: true, horarios: true, bio: true,
       },
     });
   },
@@ -170,7 +173,7 @@ export const teamService = {
   async updateProfile(userId: string, data: {
     name?: string; phone?: string; especialidade?: string; rqe?: string;
     tipoRegistro?: string; numeroRegistro?: string;
-    duracaoConsulta?: number; bio?: string;
+    duracaoConsulta?: number; horarios?: any; bio?: string;
   }) {
     return prisma.user.update({
       where: { id: userId },
@@ -178,7 +181,7 @@ export const teamService = {
       select: {
         id: true, name: true, email: true, phone: true, role: true,
         especialidade: true, rqe: true, tipoRegistro: true, numeroRegistro: true,
-        duracaoConsulta: true, bio: true,
+        duracaoConsulta: true, horarios: true, bio: true,
       },
     });
   },

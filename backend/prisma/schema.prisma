@@ -124,6 +124,7 @@ model User {
   tipoRegistro     String?  @map("tipo_registro")  // CRM, CRO, CRF, COREN, etc.
   numeroRegistro   String?  @map("numero_registro") // ex: 12345/BA
   duracaoConsulta  Int?     @map("duracao_consulta") // minutos
+  horarios         Json?    @map("horarios") // { seg: { ativo, inicio, fim }, ... }
   bio              String?
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime? @map("last_login_at")

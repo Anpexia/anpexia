@@ -117,7 +117,24 @@ async function validateBookingWithinHours(params: {
   // Day of week in SP
   const dayOfWeek = new Date(`${params.date}T12:00:00${SP_OFFSET}`).getDay();
   const key = DAY_KEYS[dayOfWeek];
-  const daySettings = hours.days[key];
+
+  // Check doctor-specific hours first, fall back to tenant hours
+  let daySettings = hours.days[key];
+  let durationMin = hours.durationMin;
+
+  if (params.doctorId) {
+    const doctor = await prisma.user.findUnique({
+      where: { id: params.doctorId },
+      select: { horarios: true, duracaoConsulta: true },
+    });
+    if (doctor?.horarios && typeof doctor.horarios === 'object') {
+      const dh = (doctor.horarios as any)[key];
+      if (dh && typeof dh === 'object') {
+        daySettings = { ativo: Boolean(dh.ativo), inicio: String(dh.inicio || '08:00'), fim: String(dh.fim || '18:00') };
+      }
+    }
+    if (doctor?.duracaoConsulta) durationMin = doctor.duracaoConsulta;
+  }
 
   if (!daySettings || !daySettings.ativo) {
     throw new AppError(400, 'INVALID_DATE', 'Esta data não está disponível para agendamento');
@@ -127,7 +144,7 @@ async function validateBookingWithinHours(params: {
   const startMin = timeToMinutes(daySettings.inicio);
   const endMin = timeToMinutes(daySettings.fim);
 
-  if (reqMin < startMin || reqMin + hours.durationMin > endMin) {
+  if (reqMin < startMin || reqMin + durationMin > endMin) {
     throw new AppError(400, 'INVALID_TIME', 'Horário fora do expediente configurado');
   }
 
@@ -149,7 +166,7 @@ async function validateBookingWithinHours(params: {
     }
   }
 
-  return { durationMin: hours.durationMin };
+  return { durationMin };
 }
 
 // Get or create default ScheduleConfig

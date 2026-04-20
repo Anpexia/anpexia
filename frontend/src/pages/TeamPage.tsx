@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, X, CheckCircle, UserCheck, UserX, Shield, Edit2, Trash2 } from 'lucide-react';
+import { Users, Plus, X, CheckCircle, UserCheck, UserX, Shield, Edit2, Trash2, Clock } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+
+interface DaySchedule {
+  ativo: boolean;
+  inicio: string;
+  fim: string;
+}
+
+type Horarios = Record<string, DaySchedule>;
+
+const DAY_LABELS: Record<string, string> = {
+  dom: 'Domingo', seg: 'Segunda', ter: 'Terca', qua: 'Quarta',
+  qui: 'Quinta', sex: 'Sexta', sab: 'Sabado',
+};
+const DAY_KEYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+
+const DEFAULT_HORARIOS: Horarios = Object.fromEntries(
+  DAY_KEYS.map(k => [k, { ativo: ['seg', 'ter', 'qua', 'qui', 'sex'].includes(k), inicio: '08:00', fim: '18:00' }])
+);
 
 interface TeamMember {
   id: string;
@@ -11,6 +29,7 @@ interface TeamMember {
   role: string;
   especialidade?: string | null;
   rqe?: string | null;
+  horarios?: Horarios | null;
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
@@ -36,6 +55,13 @@ export function TeamPage() {
   const [formEspecialidade, setFormEspecialidade] = useState('');
   const [formRqe, setFormRqe] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Edit modal tab
+  const [editTab, setEditTab] = useState<'dados' | 'horarios' | 'repasse'>('dados');
+
+  // Doctor schedule
+  const [horarios, setHorarios] = useState<Horarios>(DEFAULT_HORARIOS);
+  const [savingHorarios, setSavingHorarios] = useState(false);
 
   // Repasse (only visible when editing a DOCTOR)
   const [repasseTypes, setRepasseTypes] = useState<Array<{ id: string; name: string; isDefault: boolean }>>([]);
@@ -166,6 +192,7 @@ export function TeamPage() {
 
   const openEdit = (m: TeamMember) => {
     setEditMember(m);
+    setEditTab('dados');
     setFormName(m.name);
     setFormPhone(m.phone || '');
     setFormRole(m.role === 'OWNER' ? 'MANAGER' : (m.role as any));
@@ -173,8 +200,23 @@ export function TeamPage() {
     setFormRqe(m.rqe || '');
     if (m.role === 'DOCTOR') {
       loadRepasse(m.id);
+      setHorarios(m.horarios && typeof m.horarios === 'object' ? { ...DEFAULT_HORARIOS, ...m.horarios } : { ...DEFAULT_HORARIOS });
     } else {
       setRepasse({});
+      setHorarios({ ...DEFAULT_HORARIOS });
+    }
+  };
+
+  const handleSaveHorarios = async () => {
+    if (!editMember) return;
+    setSavingHorarios(true);
+    try {
+      await api.put(`/team/${editMember.id}/horarios`, { horarios });
+      showToast('Horarios atualizados!');
+    } catch (err: any) {
+      showToast(err.response?.data?.error?.message || 'Erro ao salvar horarios');
+    } finally {
+      setSavingHorarios(false);
     }
   };
 
@@ -365,62 +407,127 @@ export function TeamPage() {
       {/* Edit Modal */}
       {editMember && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setEditMember(null)}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-slate-800">Editar Membro</h2>
               <button onClick={() => setEditMember(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
+
+            {/* Tabs */}
+            {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
+              <div className="border-b border-slate-200 flex gap-1 mb-4">
+                {([['dados', 'Dados'], ['horarios', 'Horarios'], ['repasse', 'Repasse']] as const).map(([k, label]) => (
+                  <button key={k} onClick={() => setEditTab(k)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${editTab === k ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-              {!isOwner && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2">
-                  Apenas o Proprietario pode editar dados basicos. Voce pode ajustar o repasse do medico.
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
-                <input value={formName} onChange={e => setFormName(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
-                <input value={editMember.email} disabled className={inputCls + ' bg-slate-50 text-slate-400'} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                <input value={formPhone} onChange={e => setFormPhone(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
-                <select value={formRole} onChange={e => setFormRole(e.target.value as any)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')}>
-                  <option value="MANAGER">Gerente</option>
-                  <option value="DOCTOR">Medico</option>
-                  <option value="RECEPTIONIST">Recepcionista</option>
-                  <option value="FINANCIAL">Financeiro</option>
-                  <option value="STOCK">Estoque</option>
-                  <option value="EMPLOYEE">Funcionario</option>
-                </select>
-              </div>
-
-              {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
-                <div className="grid grid-cols-[7fr_3fr] gap-3">
+              {/* Tab: Dados */}
+              {editTab === 'dados' && (
+                <>
+                  {!isOwner && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2">
+                      Apenas o Proprietario pode editar dados basicos. Voce pode ajustar horarios e repasse do medico.
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                    <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Ex: Oftalmologia" />
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
+                    <input value={formName} onChange={e => setFormName(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
-                    <input type="number" value={formRqe} onChange={e => setFormRqe(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Número" />
+                    <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+                    <input value={editMember.email} disabled className={inputCls + ' bg-slate-50 text-slate-400'} />
                   </div>
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+                    <input value={formPhone} onChange={e => setFormPhone(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
+                    <select value={formRole} onChange={e => setFormRole(e.target.value as any)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')}>
+                      <option value="MANAGER">Gerente</option>
+                      <option value="DOCTOR">Medico</option>
+                      <option value="RECEPTIONIST">Recepcionista</option>
+                      <option value="FINANCIAL">Financeiro</option>
+                      <option value="STOCK">Estoque</option>
+                      <option value="EMPLOYEE">Funcionario</option>
+                    </select>
+                  </div>
+                  {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
+                    <div className="grid grid-cols-[7fr_3fr] gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
+                        <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Ex: Oftalmologia" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
+                        <input type="number" value={formRqe} onChange={e => setFormRqe(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Numero" />
+                      </div>
+                    </div>
+                  )}
+                  <button onClick={handleUpdate} disabled={submitting}
+                    className="w-full btn-pill btn-primary justify-center">
+                    {submitting ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </>
               )}
 
-              {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
-                <div className="border-t border-slate-200 pt-4">
+              {/* Tab: Horarios */}
+              {editTab === 'horarios' && (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock size={18} className="text-slate-600" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-800">Dias e horarios de atendimento</h3>
+                      <p className="text-xs text-slate-500">Configure os dias e horarios em que este medico atende.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {DAY_KEYS.map(day => {
+                      const d = horarios[day] || { ativo: false, inicio: '08:00', fim: '18:00' };
+                      return (
+                        <div key={day} className={`flex items-center gap-3 p-3 rounded-lg border ${d.ativo ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50'}`}>
+                          <label className="flex items-center gap-2 min-w-[100px] cursor-pointer">
+                            <input type="checkbox" checked={d.ativo}
+                              onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, ativo: e.target.checked } }))}
+                              className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]" />
+                            <span className={`text-sm font-medium ${d.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{DAY_LABELS[day]}</span>
+                          </label>
+                          {d.ativo && (
+                            <div className="flex items-center gap-2 ml-auto">
+                              <input type="time" value={d.inicio}
+                                onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, inicio: e.target.value } }))}
+                                className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                              <span className="text-slate-400 text-sm">ate</span>
+                              <input type="time" value={d.fim}
+                                onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, fim: e.target.value } }))}
+                                className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button onClick={handleSaveHorarios} disabled={savingHorarios}
+                    className="w-full btn-pill btn-primary justify-center">
+                    {savingHorarios ? 'Salvando...' : 'Salvar Horarios'}
+                  </button>
+                </>
+              )}
+
+              {/* Tab: Repasse */}
+              {editTab === 'repasse' && (
+                <>
                   <h3 className="text-sm font-semibold text-slate-800 mb-1">Repasse por tipo de procedimento</h3>
                   <p className="text-xs text-slate-500 mb-3">Percentual do valor do procedimento repassado ao medico.</p>
                   {loadingRepasse ? (
                     <div className="text-xs text-slate-400">Carregando repasses...</div>
                   ) : repasseTypes.length === 0 ? (
-                    <div className="text-xs text-slate-400">Nenhum tipo de repasse cadastrado. Configure em Configurações {'>'} Repasse.</div>
+                    <div className="text-xs text-slate-400">Nenhum tipo de repasse cadastrado. Configure em Configuracoes {'>'} Repasse.</div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
                       {repasseTypes.map((t) => (
@@ -428,26 +535,20 @@ export function TeamPage() {
                           <label className="block text-xs font-medium text-slate-600 mb-1">
                             {t.name.charAt(0) + t.name.slice(1).toLowerCase()} %
                           </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
+                          <input type="number" min="0" max="100" step="0.01"
                             value={repasse[t.name] ?? 0}
                             onChange={e => setRepasse(r => ({ ...r, [t.name]: Number(e.target.value) }))}
-                            className={inputCls}
-                          />
+                            className={inputCls} />
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
+                  <button onClick={handleUpdate} disabled={submitting}
+                    className="w-full btn-pill btn-primary justify-center">
+                    {submitting ? 'Salvando...' : 'Salvar Repasse'}
+                  </button>
+                </>
               )}
-
-              <button onClick={handleUpdate} disabled={submitting}
-                className="w-full btn-pill btn-primary justify-center">
-                {submitting ? 'Salvando...' : 'Salvar'}
-              </button>
             </div>
           </div>
         </div>
