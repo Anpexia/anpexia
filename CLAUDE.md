@@ -53,9 +53,9 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 
 | Servico | Plataforma | URL |
 |---------|-----------|-----|
-| Backend API | Railway | https://anpexia-production.up.railway.app |
-| Frontend app | Vercel | https://anpexia-app.vercel.app |
-| Admin painel | Vercel | https://admin-nine-pied.vercel.app |
+| Backend API | Railway | https://api.anpexia.com.br (Railway: backend-production-e9a8.up.railway.app) |
+| Frontend app | Vercel | https://app.anpexia.com.br (anpexia-app.vercel.app) |
+| Admin painel | Vercel | https://admin.anpexia.com.br (anpexia-admin.vercel.app) |
 | Landing page | Vercel | https://anpexia-landing.vercel.app |
 | Banco de dados | Neon PostgreSQL | us-east-1 |
 | WhatsApp API | Evolution API v2.2.3 (Railway) | https://evolution-api-production-4209.up.railway.app |
@@ -105,11 +105,12 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 
 ### Credenciais
 
-- **SUPER_ADMIN**: `anpexia@hotmail.com` / `4nP3x1a0321@!`
-- **Clinica teste**: `ricardo@clinicasaudetotal.com.br` / `Clinica@2026`
-- **Tenant SUPER_ADMIN**: Anpexia Teste (ID: `cmnjhqv8u0000n6g8kdwqgvb1`)
-- **Tenant Clinica**: Clinica Saude Total (ID: `cmnjmu0jm0001o30p9jaqj4ys`, segment: CLINICA_OFTALMOLOGICA)
-- **Paciente teste**: Maria Silva Teste (ID: `cmnjmubd90003n678al6ckavg`)
+- **SUPER_ADMIN**: `anpexia@hotmail.com` / `4nP3x1a0321@!` (admin panel)
+- **SUPER_ADMIN**: `angelolarocca10@gmail.com` / `4nP3x1a0321@!` (admin panel)
+- **Clinica teste**: `ricardo@clinicasaudetotal.com.br` / `Clinica@2026` (app login)
+- **Tenant Anpexia Teste**: ID `cmo7qunfg0000n6o8za2v7n0r`, segment OUTROS
+- **Tenant Clinica Saude Total**: ID `cmo7quo360003n6o8kiegujgq`, segment CLINICA_OFTALMOLOGICA
+- **Paciente teste**: Maria Silva Teste (ID: `cmo7quovn0007n6o8fsyeh8rv`)
 
 ### Deploy do backend (Railway)
 
@@ -117,7 +118,7 @@ Railway nao tem auto-deploy configurado (GitHub App nao instalado no org Anpexia
 Para fazer deploy manual, usar `serviceInstanceDeployV2` via GraphQL com o commit SHA:
 
 ```graphql
-mutation { serviceInstanceDeployV2(serviceId: "7e31155f-ad65-4257-891b-8c2c301e72d4", environmentId: "3e6ea3dc-dd1c-4901-99fa-9e87a019cf5a", commitSha: "<COMMIT_SHA>") }
+mutation { serviceInstanceDeployV2(serviceId: "78ef4ba8-e6f2-425f-997a-e77364f81adf", environmentId: "ae12ef59-4769-41f0-9e02-7bf5761c02e4", commitSha: "<COMMIT_SHA>") }
 ```
 
 ### Pendencias

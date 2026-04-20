@@ -4,6 +4,7 @@ import { createTenantSchema, updateTenantSchema } from './tenant.validators';
 import { success, created } from '../../shared/utils/response';
 import { authenticate, requireRole } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
+import { authService } from '../auth/auth.service';
 
 export const tenantRouter = Router();
 
@@ -63,6 +64,34 @@ tenantRouter.patch('/:id/toggle', async (req: Request, res: Response, next: Next
   try {
     const tenant = await tenantService.toggleActive(req.params.id as string);
     return success(res, tenant);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tenantRouter.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await tenantService.remove(req.params.id as string);
+    return success(res, result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tenantRouter.post('/:id/invite', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { name, email, role } = req.body;
+    if (!name || !email) {
+      return res.status(400).json({ success: false, error: { message: 'Nome e email são obrigatórios' } });
+    }
+    const tenant = await tenantService.getById(req.params.id as string);
+    const user = await authService.createInvite({
+      tenantId: tenant.id,
+      name,
+      email,
+      role: role || 'OWNER',
+    });
+    return created(res, { ...user, invited: true });
   } catch (err) {
     next(err);
   }

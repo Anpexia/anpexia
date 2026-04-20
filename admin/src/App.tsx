@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap, FileSearch, UserCog, Settings as SettingsIcon, Calendar } from 'lucide-react';
+import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap, FileSearch, UserCog, Settings as SettingsIcon, Calendar, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import api from './services/api';
 import { getDeviceId } from './utils/device';
@@ -179,8 +179,8 @@ function TenantsPage() {
   const [showUserForm, setShowUserForm] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({ name: '', segment: 'OUTROS' as string, phone: '', email: '', plan: 'STARTER' as string });
-  const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'OWNER' as string });
+  const [formData, setFormData] = useState({ name: '', segment: 'OUTROS' as string, phone: '', email: '', plan: 'STARTER' as string, ownerName: '', ownerEmail: '' });
+  const [userForm, setUserForm] = useState({ name: '', email: '', role: 'OWNER' as string });
 
   const fetchTenants = useCallback(async () => {
     try {
@@ -199,7 +199,7 @@ function TenantsPage() {
     try {
       await api.post('/tenants', formData);
       setShowForm(false);
-      setFormData({ name: '', segment: 'OUTROS', phone: '', email: '', plan: 'STARTER' });
+      setFormData({ name: '', segment: 'OUTROS', phone: '', email: '', plan: 'STARTER', ownerName: '', ownerEmail: '' });
       fetchTenants();
     } catch {} finally {
       setSaving(false);
@@ -210,9 +210,10 @@ function TenantsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post('/auth/register', { ...userForm, tenantId: showUserForm });
+      await api.post(`/tenants/${showUserForm}/invite`, userForm);
       setShowUserForm(null);
-      setUserForm({ name: '', email: '', password: '', role: 'OWNER' });
+      setUserForm({ name: '', email: '', role: 'OWNER' });
+      alert('Convite enviado! O usuario recebera um email para definir a senha.');
       fetchTenants();
     } catch (err: any) {
       alert(err.response?.data?.error?.message || 'Erro ao criar usuario');
@@ -226,6 +227,17 @@ function TenantsPage() {
       await api.patch(`/tenants/${id}/toggle`);
       fetchTenants();
     } catch {}
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Tem certeza que deseja EXCLUIR a empresa "${name}"?\n\nTodos os dados (usuarios, clientes, agendamentos, etc.) serao removidos permanentemente.`)) return;
+    try {
+      await api.delete(`/tenants/${id}`);
+      fetchTenants();
+      setShowDetail(null);
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Erro ao excluir empresa');
+    }
   };
 
   const viewDetail = async (id: string) => {
@@ -290,6 +302,19 @@ function TenantsPage() {
                   <option value="BUSINESS">Business — R$3.000/mes</option>
                 </select>
               </div>
+              <div className="border-t border-gray-200 pt-4 mt-2">
+                <p className="text-xs text-gray-500 mb-3">Responsavel (recebera email para criar senha e acessar o app)</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome do responsavel</label>
+                    <input type="text" value={formData.ownerName} onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Ex: Dr. Ricardo" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">E-mail do responsavel</label>
+                    <input type="email" value={formData.ownerEmail} onChange={(e) => setFormData({ ...formData, ownerEmail: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="email@empresa.com" />
+                  </div>
+                </div>
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 btn-pill btn-secondary justify-center">Cancelar</button>
                 <button type="submit" disabled={saving} className="flex-1 btn-pill btn-primary justify-center">{saving ? 'Criando...' : 'Criar empresa'}</button>
@@ -317,20 +342,23 @@ function TenantsPage() {
                 <input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
-                <input type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required minLength={6} />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Papel</label>
                 <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                   <option value="OWNER">Dono</option>
                   <option value="MANAGER">Gerente</option>
+                  <option value="DOCTOR">Medico</option>
+                  <option value="RECEPTIONIST">Recepcionista</option>
+                  <option value="FINANCIAL">Financeiro</option>
+                  <option value="STOCK">Estoque</option>
                   <option value="EMPLOYEE">Funcionario</option>
                 </select>
               </div>
+              <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded p-2">
+                O usuario recebera um email com link para definir sua senha de acesso.
+              </p>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowUserForm(null)} className="flex-1 btn-pill btn-secondary justify-center">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 btn-pill btn-primary justify-center">{saving ? 'Criando...' : 'Criar usuario'}</button>
+                <button type="submit" disabled={saving} className="flex-1 btn-pill btn-primary justify-center">{saving ? 'Enviando...' : 'Enviar convite'}</button>
               </div>
             </form>
           </div>
@@ -438,6 +466,7 @@ function TenantsPage() {
                       <button onClick={() => handleToggle(t.id)} className="text-gray-400 hover:text-gray-600" title={t.isActive ? 'Desativar' : 'Ativar'}>
                         {t.isActive ? <ToggleRight size={16} className="text-green-500" /> : <ToggleLeft size={16} />}
                       </button>
+                      <button onClick={() => handleDelete(t.id, t.name)} className="text-red-400 hover:text-red-600" title="Excluir empresa"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>

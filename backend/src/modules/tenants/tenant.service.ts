@@ -2,6 +2,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
 import { Module, TenantSegment } from '@prisma/client';
 import { evolutionApi } from '../messaging/evolution.client';
+import { authService } from '../auth/auth.service';
 
 function generateSlug(name: string): string {
   return name
@@ -21,6 +22,8 @@ interface CreateTenantData {
   email?: string;
   address?: string;
   plan?: 'STARTER' | 'PRO' | 'BUSINESS';
+  ownerName?: string;
+  ownerEmail?: string;
 }
 
 export const tenantService = {
@@ -107,6 +110,20 @@ export const tenantService = {
       },
     });
 
+    if (data.ownerName && data.ownerEmail) {
+      try {
+        await authService.createInvite({
+          tenantId: tenant.id,
+          name: data.ownerName,
+          email: data.ownerEmail,
+          role: 'OWNER',
+        });
+        console.log(`[TENANT] Owner invite sent to ${data.ownerEmail} for tenant ${tenant.id}`);
+      } catch (err: any) {
+        console.error(`[TENANT] Failed to create owner invite:`, err.message);
+      }
+    }
+
     return tenant;
   },
 
@@ -142,5 +159,62 @@ export const tenantService = {
       where: { id },
       data: { isActive: !tenant.isActive },
     });
+  },
+
+  async remove(id: string) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id },
+      include: { _count: { select: { users: true, customers: true } } },
+    });
+    if (!tenant) {
+      throw new AppError(404, 'TENANT_NOT_FOUND', 'Empresa não encontrada');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.chatbotConfig.deleteMany({ where: { tenantId: id } });
+      await tx.chatbotFaq.deleteMany({ where: { tenantId: id } });
+      await tx.chatMessage.deleteMany({ where: { tenantId: id } });
+      await tx.messageSent.deleteMany({ where: { tenantId: id } });
+      await tx.messageTemplate.deleteMany({ where: { tenantId: id } });
+      await tx.scheduledCall.deleteMany({ where: { tenantId: id } });
+      await tx.patientEvolution.deleteMany({ where: { tenantId: id } });
+      await tx.anamnesis.deleteMany({ where: { tenantId: id } });
+      await tx.medicalCertificate.deleteMany({ where: { tenantId: id } });
+      await tx.prescription.deleteMany({ where: { tenantId: id } });
+      await tx.doctorSignature.deleteMany({ where: { tenantId: id } });
+      await tx.financialTransaction.deleteMany({ where: { tenantId: id } });
+      await tx.financialCategory.deleteMany({ where: { tenantId: id } });
+      await tx.inventoryMovement.deleteMany({ where: { tenantId: id } });
+      await tx.supplierProduct.deleteMany({ where: { tenantId: id } });
+      await tx.purchaseOrder.deleteMany({ where: { tenantId: id } });
+      await tx.supplier.deleteMany({ where: { tenantId: id } });
+      await tx.product.deleteMany({ where: { tenantId: id } });
+      await tx.productCategory.deleteMany({ where: { tenantId: id } });
+      await tx.customerTag.deleteMany({ where: { tenantId: id } });
+      await tx.customer.deleteMany({ where: { tenantId: id } });
+      await tx.scriptCategory.deleteMany({ where: { tenantId: id } });
+      await tx.script.deleteMany({ where: { tenantId: id } });
+      await tx.autorizacao.deleteMany({ where: { tenantId: id } });
+      await tx.convenio.deleteMany({ where: { tenantId: id } });
+      await tx.tussProcedure.deleteMany({ where: { tenantId: id } });
+      await tx.doctorRepasse.deleteMany({ where: { tenantId: id } });
+      await tx.procedureTemplate.deleteMany({ where: { tenantId: id } });
+      await tx.repasseType.deleteMany({ where: { tenantId: id } });
+      await tx.privateProcedure.deleteMany({ where: { tenantId: id } });
+      await tx.tenantModule.deleteMany({ where: { tenantId: id } });
+      await tx.tenantSettings.deleteMany({ where: { tenantId: id } });
+      await tx.auditLog.deleteMany({ where: { tenantId: id } });
+      const users = await tx.user.findMany({ where: { tenantId: id }, select: { id: true } });
+      const userIds = users.map((u) => u.id);
+      if (userIds.length > 0) {
+        await tx.trustedDevice.deleteMany({ where: { userId: { in: userIds } } });
+        await tx.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+      }
+      await tx.user.deleteMany({ where: { tenantId: id } });
+      await tx.lead.deleteMany({ where: { convertedTenantId: id } });
+      await tx.tenant.delete({ where: { id } });
+    });
+
+    return { id, removed: true };
   },
 };
