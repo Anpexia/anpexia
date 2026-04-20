@@ -74,6 +74,10 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
 }
 
 export function requireTenant(req: Request, _res: Response, next: NextFunction) {
+  const role = req.auth?.role;
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+    return next();
+  }
   if (!req.auth?.tenantId) {
     throw new AppError(403, 'NO_TENANT', 'Acesso requer vínculo com uma empresa');
   }
