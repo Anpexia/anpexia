@@ -6,6 +6,7 @@ import { authenticate, requireTenant, requireRole } from '../../shared/middlewar
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
 import { createAuditLog } from '../../shared/middleware/audit';
 import { evolutionApi } from '../messaging/evolution.client';
+import prisma from '../../config/database';
 
 export const chatbotRouter = Router();
 
@@ -215,11 +216,19 @@ chatbotRouter.get('/whatsapp/status', async (req: Request, res: Response, next: 
 
 chatbotRouter.post('/whatsapp/connect', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const config = await chatbotService.getConfig(req.auth!.tenantId!);
+    const tenantId = req.auth!.tenantId!;
+    let config = await chatbotService.getConfig(tenantId);
+
+    // Auto-create instance if not configured
     if (!config.instanceName) {
-      return res.status(400).json({ success: false, error: { message: 'Instancia WhatsApp nao configurada' } });
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } });
+      if (!tenant) return res.status(404).json({ success: false, error: { message: 'Tenant nao encontrado' } });
+      const instanceName = `tenant-${tenant.slug}`;
+      await chatbotService.updateConfig(tenantId, { instanceName });
+      config = await chatbotService.getConfig(tenantId);
     }
-    const result = await evolutionApi.resetInstance(config.instanceName);
+
+    const result = await evolutionApi.resetInstance(config.instanceName!);
     const qrBase64 = result?.qrcode?.base64 || null;
     return success(res, { qrcode: qrBase64, instanceName: config.instanceName });
   } catch (err) {

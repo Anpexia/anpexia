@@ -7,6 +7,7 @@ import { handleConversationFlow, FlowResponse } from './conversation-flow';
 import { startCollection, getMissingFields } from './data-collection.service';
 
 interface UpdateConfigData {
+  instanceName?: string;
   isActive?: boolean;
   businessName?: string;
   businessDescription?: string;
