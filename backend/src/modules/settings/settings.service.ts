@@ -74,6 +74,22 @@ export const settingsService = {
     });
   },
 
+  async getRolePermissions(tenantId: string) {
+    const settings = await prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { rolePermissions: true },
+    });
+    return (settings?.rolePermissions as Record<string, string[]> | null) || null;
+  },
+
+  async updateRolePermissions(tenantId: string, rolePermissions: Record<string, string[]>) {
+    return prisma.tenantSettings.upsert({
+      where: { tenantId },
+      create: { tenantId, rolePermissions },
+      update: { rolePermissions },
+    });
+  },
+
   async testEmail(tenantId: string, to: string) {
     const { sendEmail } = await import('../../services/email.service');
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });

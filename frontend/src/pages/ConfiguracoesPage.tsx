@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X, List } from 'lucide-react';
+import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X, List, Lock } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
-type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'repasse' | 'procedimentos' | 'seguranca';
+type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'repasse' | 'procedimentos' | 'permissoes' | 'seguranca';
 
 interface PrivateProcedureItem {
   id: string;
@@ -74,6 +74,7 @@ export function ConfiguracoesPage() {
     ...(canManageTuss ? [{ key: 'procedimentos' as Tab, label: 'Procedimentos', icon: List }] : []),
     ...(canManageTuss ? [{ key: 'repasse' as Tab, label: 'Repasse', icon: Percent }] : []),
     { key: 'horarios', label: 'Horarios', icon: Clock },
+    ...(canManageTuss ? [{ key: 'permissoes' as Tab, label: 'Permissoes', icon: Lock }] : []),
     { key: 'whatsapp', label: 'WhatsApp', icon: Wifi },
     { key: 'email', label: 'Email', icon: Mail },
     { key: 'seguranca', label: 'Segurança', icon: ShieldCheck },
@@ -218,6 +219,68 @@ export function ConfiguracoesPage() {
     name: '', description: '', value: '', duration: '30', isActive: true,
   });
 
+  // Role permissions
+  const MENU_ITEMS = [
+    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/pacientes', label: 'Pacientes' },
+    { path: '/estoque', label: 'Estoque' },
+    { path: '/financeiro', label: 'Financeiro' },
+    { path: '/mensagens', label: 'Mensagens' },
+    { path: '/agendamentos', label: 'Agendamentos' },
+    { path: '/scripts', label: 'Scripts' },
+    { path: '/assinatura', label: 'Assinatura' },
+    { path: '/equipe', label: 'Equipe' },
+    { path: '/configuracoes', label: 'Configuracoes' },
+  ];
+
+  const CONFIGURABLE_ROLES = [
+    { key: 'DOCTOR', label: 'Medico' },
+    { key: 'RECEPTIONIST', label: 'Secretaria' },
+    { key: 'FINANCIAL', label: 'Financeiro' },
+    { key: 'EMPLOYEE', label: 'Funcionario' },
+  ];
+
+  const DEFAULT_ROLE_PERMS: Record<string, string[]> = {
+    DOCTOR: ['/pacientes', '/mensagens', '/agendamentos', '/scripts'],
+    RECEPTIONIST: ['/pacientes', '/agendamentos', '/scripts'],
+    FINANCIAL: ['/financeiro'],
+    EMPLOYEE: ['/estoque'],
+  };
+
+  const [rolePerms, setRolePerms] = useState<Record<string, string[]>>(DEFAULT_ROLE_PERMS);
+  const [savingPerms, setSavingPerms] = useState(false);
+
+  const loadRolePermissions = useCallback(async () => {
+    try {
+      const { data } = await api.get('/settings/role-permissions');
+      if (data.data) {
+        setRolePerms({ ...DEFAULT_ROLE_PERMS, ...data.data });
+      }
+    } catch {}
+  }, []);
+
+  const toggleRolePath = (role: string, path: string) => {
+    setRolePerms(prev => {
+      const current = prev[role] || [];
+      const next = current.includes(path)
+        ? current.filter(p => p !== path)
+        : [...current, path];
+      return { ...prev, [role]: next };
+    });
+  };
+
+  const saveRolePermissions = async () => {
+    setSavingPerms(true);
+    try {
+      await api.put('/settings/role-permissions', { rolePermissions: rolePerms });
+      flash('Permissoes salvas!');
+    } catch {
+      flash('Erro ao salvar permissoes');
+    } finally {
+      setSavingPerms(false);
+    }
+  };
+
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
@@ -289,6 +352,7 @@ export function ConfiguracoesPage() {
   useEffect(() => { if (tab === 'tuss') loadTuss(); }, [tab, loadTuss]);
   useEffect(() => { if (tab === 'repasse') loadRepasseTypes(); }, [tab, loadRepasseTypes]);
   useEffect(() => { if (tab === 'procedimentos') loadPrivateProcedures(); }, [tab, loadPrivateProcedures]);
+  useEffect(() => { if (tab === 'permissoes') loadRolePermissions(); }, [tab, loadRolePermissions]);
 
   const addRepasseType = async () => {
     const name = newRepasseType.trim();
@@ -1126,6 +1190,58 @@ export function ConfiguracoesPage() {
           <div className="flex justify-end pt-2">
             <button onClick={saveEmail} disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
               {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PERMISSOES TAB */}
+      {tab === 'permissoes' && canManageTuss && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-800">Permissoes de Menu</h2>
+            <p className="text-sm text-gray-500 mt-1">Defina quais itens do menu cada cargo pode acessar. Dono e Gerente sempre tem acesso total.</p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Menu</th>
+                  {CONFIGURABLE_ROLES.map(r => (
+                    <th key={r.key} className="px-4 py-3 text-center font-medium text-gray-600">{r.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {MENU_ITEMS.map(item => (
+                  <tr key={item.path} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-800">{item.label}</td>
+                    {CONFIGURABLE_ROLES.map(r => (
+                      <td key={r.key} className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={(rolePerms[r.key] || []).includes(item.path)}
+                          onChange={() => toggleRolePath(r.key, item.path)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-xs text-gray-400 mt-4">O item "Meu Perfil" esta sempre visivel para todos os cargos.</p>
+
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={saveRolePermissions}
+              disabled={savingPerms}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {savingPerms ? 'Salvando...' : 'Salvar permissoes'}
             </button>
           </div>
         </div>

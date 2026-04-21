@@ -20,14 +20,14 @@ const allNavItems = [
   { path: '/perfil', label: 'Meu Perfil', icon: UserCircle },
 ];
 
-const roleAllowedPaths: Record<string, string[]> = {
+const defaultRoleAllowedPaths: Record<string, string[]> = {
   SUPER_ADMIN: allNavItems.map(i => i.path),
   OWNER: allNavItems.map(i => i.path),
   MANAGER: allNavItems.map(i => i.path),
-  DOCTOR: ['/dashboard', '/pacientes', '/mensagens', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/perfil'],
-  RECEPTIONIST: ['/dashboard', '/pacientes', '/mensagens', '/agendamentos', '/scripts', '/perfil'],
-  FINANCIAL: ['/dashboard', '/financeiro', '/perfil'],
-  EMPLOYEE: ['/dashboard', '/pacientes', '/agendamentos', '/perfil'],
+  DOCTOR: ['/pacientes', '/mensagens', '/agendamentos', '/scripts', '/perfil'],
+  RECEPTIONIST: ['/pacientes', '/agendamentos', '/scripts', '/perfil'],
+  FINANCIAL: ['/financeiro', '/perfil'],
+  EMPLOYEE: ['/estoque', '/perfil'],
 };
 
 export function Layout() {
@@ -35,6 +35,14 @@ export function Layout() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { showWarning, dismissWarning } = useInactivityLogout();
+  const [customPerms, setCustomPerms] = useState<Record<string, string[]> | null>(null);
+
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    api.get('/settings/role-permissions')
+      .then(({ data }) => { if (data.data) setCustomPerms(data.data); })
+      .catch(() => {});
+  }, [user?.tenantId]);
 
   // 2FA banner state
   const [twoFAEnabled, setTwoFAEnabled] = useState<boolean | null>(
@@ -67,7 +75,9 @@ export function Layout() {
   };
 
   const navItems = allNavItems.filter(item => {
-    const allowed = roleAllowedPaths[user?.role || 'EMPLOYEE'] || roleAllowedPaths.EMPLOYEE;
+    const role = user?.role || 'EMPLOYEE';
+    const defaults = defaultRoleAllowedPaths[role] || defaultRoleAllowedPaths.EMPLOYEE;
+    const allowed = customPerms?.[role] || defaults;
     return allowed.includes(item.path);
   });
 
