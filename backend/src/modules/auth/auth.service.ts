@@ -48,17 +48,49 @@ async function cleanupExpiredBlacklist(): Promise<void> {
 }
 
 export const authService = {
-  async login(email: string, password: string, deviceId: string | undefined, ipAddress: string, context: 'admin' | 'app' = 'app') {
+  async login(email: string, password: string, deviceId: string | undefined, ipAddress: string, context: 'admin' | 'app' = 'app', tenantId?: string) {
     // Fire-and-forget cleanup
     cleanupExpiredBlacklist();
     email = email.trim().toLowerCase();
 
-    const user = await prisma.user.findFirst({
-      where: context === 'admin'
-        ? { email, OR: [{ tenantId: null }, { role: 'SUPER_ADMIN' }] }
-        : { email, tenantId: { not: null } },
-      include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
-    });
+    let user;
+
+    if (context === 'admin') {
+      user = await prisma.user.findFirst({
+        where: { email, OR: [{ tenantId: null }, { role: 'SUPER_ADMIN' }] },
+        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
+      });
+    } else if (tenantId) {
+      user = await prisma.user.findFirst({
+        where: { email, tenantId },
+        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
+      });
+    } else {
+      const users = await prisma.user.findMany({
+        where: { email, tenantId: { not: null }, isActive: true },
+        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
+      });
+
+      if (users.length > 1) {
+        // Verify password before showing tenant list (don't leak tenant info without valid credentials)
+        const anyValid = await Promise.all(users.map(u => bcrypt.compare(password, u.passwordHash)));
+        if (!anyValid.some(v => v)) {
+          throw new AppError(401, 'INVALID_CREDENTIALS', 'E-mail ou senha incorretos');
+        }
+
+        const tenants = users
+          .filter((_, i) => anyValid[i])
+          .map(u => ({
+            id: u.tenant!.id,
+            name: u.tenant!.name,
+            role: u.role,
+          }));
+
+        throw new AppError(409, 'TENANT_SELECTION_REQUIRED', 'Selecione a clínica para acessar', { tenants });
+      }
+
+      user = users[0] || null;
+    }
 
     if (!user || !user.isActive) {
       await logAction({

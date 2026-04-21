@@ -38,11 +38,11 @@ export function Layout() {
   const [customPerms, setCustomPerms] = useState<Record<string, string[]> | null>(null);
 
   useEffect(() => {
-    if (!user?.tenantId) return;
+    if (!user?.tenant?.id) return;
     api.get('/settings/role-permissions')
       .then(({ data }) => { if (data.data) setCustomPerms(data.data); })
       .catch(() => {});
-  }, [user?.tenantId]);
+  }, [user?.tenant?.id]);
 
   // 2FA banner state
   const [twoFAEnabled, setTwoFAEnabled] = useState<boolean | null>(

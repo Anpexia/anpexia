@@ -21,27 +21,29 @@ export function useAuth() {
 
   const isAuthenticated = !!sessionStorage.getItem('accessToken');
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, tenantId?: string) => {
     setLoading(true);
     setError('');
     try {
       const deviceId = getDeviceId();
-      const { data } = await api.post('/auth/login', { email, password, deviceId });
+      const { data } = await api.post('/auth/login', { email, password, deviceId, tenantId });
       sessionStorage.setItem('accessToken', data.data.accessToken);
       sessionStorage.setItem('user', JSON.stringify(data.data.user));
       setUser(data.data.user);
-      return { needs2FA: false, user: data.data.user };
+      return { needs2FA: false, needsTenantSelection: false, tenants: [] as any[], user: data.data.user };
     } catch (err: any) {
       const code = err.response?.data?.error?.code;
       const details = err.response?.data?.error?.details;
       if (code === 'DEVICE_NOT_TRUSTED') {
-        // Not a login error — just needs 2FA
         sessionStorage.setItem('pending2FA', JSON.stringify({
           userId: details?.userId,
           email: details?.email,
           twoFactorEnabled: !!details?.twoFactorEnabled,
         }));
-        return { needs2FA: true, user: null };
+        return { needs2FA: true, needsTenantSelection: false, tenants: [] as any[], user: null };
+      }
+      if (code === 'TENANT_SELECTION_REQUIRED') {
+        return { needs2FA: false, needsTenantSelection: true, tenants: details?.tenants || [], user: null };
       }
       const msg = err.response?.data?.error?.message || 'Erro ao fazer login';
       setError(msg);

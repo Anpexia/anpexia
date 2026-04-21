@@ -25,7 +25,7 @@ authRouter.post('/login', publicRateLimit, async (req: Request, res: Response, n
     const data = loginSchema.parse(req.body);
     const deviceId = (req.body?.deviceId as string | undefined) || (req.headers['x-device-id'] as string | undefined);
     const ip = getClientIp(req);
-    const result = await authService.login(data.email, data.password, deviceId, ip, 'app');
+    const result = await authService.login(data.email, data.password, deviceId, ip, 'app', data.tenantId);
 
     res.cookie('refreshToken', result.refreshToken, refreshCookieOptions());
 
