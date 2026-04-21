@@ -229,14 +229,58 @@ function TenantsPage() {
     } catch {}
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Tem certeza que deseja EXCLUIR a empresa "${name}"?\n\nTodos os dados (usuarios, clientes, agendamentos, etc.) serao removidos permanentemente.`)) return;
+  // 3-step delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteStep, setDeleteStep] = useState(1);
+  const [deleteTyped, setDeleteTyped] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const openDeleteFlow = (id: string, name: string) => {
+    setDeleteTarget({ id, name });
+    setDeleteStep(1);
+    setDeleteTyped('');
+    setDeletePassword('');
+    setDeleteError('');
+  };
+
+  const closeDeleteFlow = () => {
+    setDeleteTarget(null);
+    setDeleteStep(1);
+    setDeleteTyped('');
+    setDeletePassword('');
+    setDeleteError('');
+  };
+
+  const handleDeleteFinal = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError('');
     try {
-      await api.delete(`/tenants/${id}`);
+      const adminUser = JSON.parse(sessionStorage.getItem('adminUser') || '{}');
+      const deviceId = localStorage.getItem('anpexia_device_id') || 'admin-panel';
+      await api.post('/auth/admin/login', {
+        email: adminUser.email,
+        password: deletePassword,
+        deviceId,
+      });
+      await api.delete(`/tenants/${deleteTarget.id}`);
       fetchTenants();
       setShowDetail(null);
+      closeDeleteFlow();
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Erro ao excluir empresa');
+      const code = err.response?.data?.error?.code || '';
+      const msg = err.response?.data?.error?.message || '';
+      if (code === 'INVALID_CREDENTIALS' || msg.includes('Senha') || msg.includes('senha') || msg.includes('credenciais') || err.response?.status === 401) {
+        setDeleteError('Senha incorreta. Tente novamente.');
+      } else if (code === 'DEVICE_NOT_TRUSTED') {
+        setDeleteError('Senha incorreta. Tente novamente.');
+      } else {
+        setDeleteError(msg || 'Erro ao excluir empresa.');
+      }
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -466,7 +510,7 @@ function TenantsPage() {
                       <button onClick={() => handleToggle(t.id)} className="text-gray-400 hover:text-gray-600" title={t.isActive ? 'Desativar' : 'Ativar'}>
                         {t.isActive ? <ToggleRight size={16} className="text-green-500" /> : <ToggleLeft size={16} />}
                       </button>
-                      <button onClick={() => handleDelete(t.id, t.name)} className="text-red-400 hover:text-red-600" title="Excluir empresa"><Trash2 size={16} /></button>
+                      <button onClick={() => openDeleteFlow(t.id, t.name)} className="text-red-400 hover:text-red-600" title="Excluir empresa"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -475,6 +519,97 @@ function TenantsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* 3-step delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-xl">
+            {/* Step 1: Initial warning */}
+            {deleteStep === 1 && (
+              <>
+                <h3 className="text-lg font-bold text-red-700 mb-3">Excluir empresa</h3>
+                <p className="text-sm text-gray-700 mb-2">
+                  Voce esta prestes a excluir a empresa <strong>"{deleteTarget.name}"</strong>.
+                </p>
+                <p className="text-sm text-red-600 mb-4">
+                  Todos os dados serao removidos permanentemente: pacientes, agendamentos, mensagens, estoque, financeiro, usuarios e configuracoes.
+                </p>
+                <p className="text-xs text-gray-500 mb-6">Esta acao nao pode ser desfeita.</p>
+                <div className="flex justify-end gap-2">
+                  <button onClick={closeDeleteFlow} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Cancelar
+                  </button>
+                  <button onClick={() => setDeleteStep(2)} className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700">
+                    Continuar exclusao
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 2: Type "deletar conta" */}
+            {deleteStep === 2 && (
+              <>
+                <h3 className="text-lg font-bold text-red-700 mb-3">Confirmar exclusao</h3>
+                <p className="text-sm text-gray-700 mb-4">
+                  Para confirmar, digite <strong className="text-red-700">deletar conta</strong> no campo abaixo:
+                </p>
+                <input
+                  type="text"
+                  value={deleteTyped}
+                  onChange={(e) => setDeleteTyped(e.target.value)}
+                  placeholder="Digite: deletar conta"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={closeDeleteFlow} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => { setDeleteError(''); setDeleteStep(3); }}
+                    disabled={deleteTyped.trim().toLowerCase() !== 'deletar conta'}
+                    className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Proximo
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 3: Admin password */}
+            {deleteStep === 3 && (
+              <>
+                <h3 className="text-lg font-bold text-red-700 mb-3">Verificacao final</h3>
+                <p className="text-sm text-gray-700 mb-4">
+                  Digite sua senha de administrador para confirmar a exclusao de <strong>"{deleteTarget.name}"</strong>:
+                </p>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Senha do admin"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 mb-2"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter' && deletePassword.length > 0) handleDeleteFinal(); }}
+                />
+                {deleteError && <p className="text-xs text-red-600 mb-2">{deleteError}</p>}
+                <div className="flex justify-end gap-2 mt-4">
+                  <button onClick={closeDeleteFlow} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleDeleteFinal}
+                    disabled={deleting || deletePassword.length === 0}
+                    className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {deleting ? 'Excluindo...' : 'Excluir permanentemente'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
