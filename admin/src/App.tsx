@@ -433,22 +433,6 @@ function TenantsPage() {
               </div>
 
               <div>
-                <h4 className="font-medium text-gray-800 mb-2">Usuarios ({showDetail.users?.length || 0})</h4>
-                {showDetail.users?.length === 0 ? (
-                  <p className="text-sm text-gray-500">Nenhum usuario. Crie um para o cliente poder acessar.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {showDetail.users?.map((u: any) => (
-                      <div key={u.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                        <span>{u.name} ({u.email})</span>
-                        <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{u.role}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
                 <h4 className="font-medium text-gray-800 mb-2">Modulos ativos</h4>
                 <div className="flex flex-wrap gap-2">
                   {showDetail.modules?.filter((m: any) => m.isActive).map((m: any) => (
@@ -460,9 +444,9 @@ function TenantsPage() {
               <div>
                 <h4 className="font-medium text-gray-800 mb-2">Estatisticas</h4>
                 <div className="grid grid-cols-3 gap-3 text-sm text-center">
+                  <div className="p-3 bg-gray-50 rounded"><span className="block text-lg font-bold">{showDetail.users?.length || 0}</span>Usuarios</div>
                   <div className="p-3 bg-gray-50 rounded"><span className="block text-lg font-bold">{showDetail._count?.customers || 0}</span>Pacientes</div>
                   <div className="p-3 bg-gray-50 rounded"><span className="block text-lg font-bold">{showDetail._count?.products || 0}</span>Produtos</div>
-                  <div className="p-3 bg-gray-50 rounded"><span className="block text-lg font-bold">{showDetail._count?.messagesSent || 0}</span>Mensagens</div>
                 </div>
               </div>
             </div>
