@@ -80,34 +80,26 @@ export const evolutionApi = {
 
   async resetInstance(instanceName: string) {
     await this.deleteInstance(instanceName);
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 1000));
 
+    let result: any;
     try {
-      await this.createInstance(instanceName);
+      result = await this.createInstance(instanceName);
     } catch (err: any) {
       if (err.response?.status === 403) {
         console.log(`[EVOLUTION] Instance "${instanceName}" still cached, retrying delete+create...`);
         await this.deleteInstance(instanceName);
         await new Promise(r => setTimeout(r, 3000));
-        await this.createInstance(instanceName);
+        result = await this.createInstance(instanceName);
       } else throw err;
     }
 
+    console.log(`[EVOLUTION] createInstance response:`, JSON.stringify(result).slice(0, 500));
+
     await this.setWebhook(instanceName);
 
-    for (let i = 0; i < 8; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      try {
-        const qr = await this.getQrCode(instanceName);
-        if (qr?.base64) return { qrcode: { base64: qr.base64 } };
-      } catch {}
-    }
-    return { qrcode: { base64: null } };
-  },
-
-  async getQrCode(instanceName: string) {
-    const { data } = await api.get(`/instance/connect/${instanceName}`);
-    return data;
+    const qrBase64 = result?.qrcode?.base64 || null;
+    return { qrcode: { base64: qrBase64 } };
   },
 
   async getConnectionState(instanceName: string) {

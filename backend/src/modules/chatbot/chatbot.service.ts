@@ -84,39 +84,16 @@ async function sendFlowResponse(
 
   let sentText = response.text;
 
-  try {
-    if (response.type === 'buttons' && response.buttons) {
-      await evolutionApi.sendButtons(
-        instanceName, sendTo, response.text, response.buttons,
-        response.title, response.footer,
-      );
-    } else if (response.type === 'list' && response.listSections) {
-      await evolutionApi.sendList(
-        instanceName, sendTo, response.text,
-        response.listButtonText || 'Ver opcoes',
-        response.listSections,
-        response.title, response.footer,
-      );
-    } else {
-      await evolutionApi.sendText(instanceName, sendTo, response.text);
-    }
-  } catch (err) {
-    // Fallback: send as plain text with options listed
-    console.error('[CHATBOT] Interactive message failed, falling back to text:', err);
-    let fallback = response.text;
-    if (response.buttons) {
-      fallback += '\n\n' + response.buttons.map((b, i) => `*${i + 1}* - ${b.text}`).join('\n');
-    }
-    if (response.listSections) {
-      for (const section of response.listSections) {
-        fallback += '\n\n' + section.rows.map((r, i) => `*${i + 1}* - ${r.title}${r.description ? ` (${r.description})` : ''}`).join('\n');
-      }
-    }
-    sentText = fallback;
-    try {
-      await evolutionApi.sendText(instanceName, sendTo, fallback);
-    } catch {}
+  if (response.buttons) {
+    sentText += '\n\n' + response.buttons.map((b, i) => `*${i + 1}* - ${b.text}`).join('\n');
   }
+  if (response.listSections) {
+    for (const section of response.listSections) {
+      sentText += '\n\n' + section.rows.map((r, i) => `*${i + 1}* - ${r.title}${r.description ? ` (${r.description})` : ''}`).join('\n');
+    }
+  }
+
+  await evolutionApi.sendText(instanceName, sendTo, sentText);
 
   await prisma.chatMessage.create({
     data: {
