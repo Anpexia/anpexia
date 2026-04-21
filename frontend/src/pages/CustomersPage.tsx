@@ -890,15 +890,15 @@ export function CustomersPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Alergias</label>
-                            <input type="text" value={medForm.allergies} onChange={(e) => setMedForm({ ...medForm, allergies: e.target.value })} className={inputCls} placeholder="Ex: Dipirona, Latex..." />
+                            <DictationTextarea value={medForm.allergies} onChange={(v) => setMedForm({ ...medForm, allergies: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Dipirona, Latex..." />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Medicamentos em uso</label>
-                            <input type="text" value={medForm.medications} onChange={(e) => setMedForm({ ...medForm, medications: e.target.value })} className={inputCls} placeholder="Ex: Losartana 50mg..." />
+                            <DictationTextarea value={medForm.medications} onChange={(v) => setMedForm({ ...medForm, medications: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Losartana 50mg..." />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Doencas cronicas</label>
-                            <input type="text" value={medForm.chronicDiseases} onChange={(e) => setMedForm({ ...medForm, chronicDiseases: e.target.value })} className={inputCls} placeholder="Ex: Hipertensao, Diabetes..." />
+                            <DictationTextarea value={medForm.chronicDiseases} onChange={(v) => setMedForm({ ...medForm, chronicDiseases: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Hipertensao, Diabetes..." />
                           </div>
                           <div className="md:col-span-2">
                             <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes clinicas</label>
