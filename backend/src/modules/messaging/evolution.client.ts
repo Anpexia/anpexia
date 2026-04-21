@@ -42,36 +42,55 @@ export const evolutionApi = {
     else instanceCache.clear();
   },
 
-  /**
-   * Create a new WhatsApp instance with webhook pre-configured.
-   * Used when onboarding a new tenant.
-   */
-  async createInstance(instanceName: string) {
-    const webhookUrl = env.nodeEnv === 'production'
+  getWebhookUrl(): string {
+    return env.nodeEnv === 'production'
       ? 'https://api.anpexia.com.br/api/v1/chatbot/webhook'
       : `http://localhost:${env.port}/api/v1/chatbot/webhook`;
+  },
 
+  async deleteInstance(instanceName: string) {
+    try {
+      await api.delete(`/instance/delete/${instanceName}`);
+    } catch {
+      // 404 is expected if instance doesn't exist
+    }
+  },
+
+  async createInstance(instanceName: string) {
     const { data } = await api.post('/instance/create', {
       instanceName,
+      integration: 'WHATSAPP-BAILEYS',
       qrcode: true,
-      webhook: webhookUrl,
-      webhookByEvents: true,
-      events: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE', 'QRCODE_UPDATED'],
     });
     return data;
   },
 
-  /**
-   * Get QR Code to connect WhatsApp
-   */
+  async setWebhook(instanceName: string) {
+    const { data } = await api.post(`/webhook/set/${instanceName}`, {
+      webhook: {
+        enabled: true,
+        url: this.getWebhookUrl(),
+        webhookByEvents: false,
+        webhookBase64: false,
+        events: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'CONNECTION_UPDATE', 'QRCODE_UPDATED'],
+      },
+    });
+    return data;
+  },
+
+  async resetInstance(instanceName: string) {
+    await this.deleteInstance(instanceName);
+    await new Promise(r => setTimeout(r, 1000));
+    const result = await this.createInstance(instanceName);
+    await this.setWebhook(instanceName);
+    return result;
+  },
+
   async getQrCode(instanceName: string) {
     const { data } = await api.get(`/instance/connect/${instanceName}`);
     return data;
   },
 
-  /**
-   * Check connection status
-   */
   async getConnectionState(instanceName: string) {
     const { data } = await api.get(`/instance/connectionState/${instanceName}`);
     return data;
@@ -93,7 +112,7 @@ export const evolutionApi = {
   async sendText(instanceName: string, phone: string, text: string) {
     const { data } = await api.post(`/message/sendText/${instanceName}`, {
       number: this.formatPhone(phone),
-      textMessage: { text },
+      text,
     });
     return data;
   },

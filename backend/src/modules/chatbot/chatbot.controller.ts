@@ -183,7 +183,6 @@ chatbotRouter.get('/stats', async (req: Request, res: Response, next: NextFuncti
 // WhatsApp instance management
 // ==========================================
 
-// Get QR code to connect WhatsApp for this tenant
 chatbotRouter.get('/whatsapp/qrcode', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const config = await chatbotService.getConfig(req.auth!.tenantId!);
@@ -197,15 +196,45 @@ chatbotRouter.get('/whatsapp/qrcode', async (req: Request, res: Response, next: 
   }
 });
 
-// Get WhatsApp connection status for this tenant
 chatbotRouter.get('/whatsapp/status', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const config = await chatbotService.getConfig(req.auth!.tenantId!);
     if (!config.instanceName) {
       return success(res, { state: 'not_configured', instanceName: null });
     }
-    const state = await evolutionApi.getConnectionState(config.instanceName);
-    return success(res, { ...state, instanceName: config.instanceName });
+    try {
+      const state = await evolutionApi.getConnectionState(config.instanceName);
+      return success(res, { ...state, instanceName: config.instanceName });
+    } catch {
+      return success(res, { state: 'disconnected', instanceName: config.instanceName });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+chatbotRouter.post('/whatsapp/connect', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const config = await chatbotService.getConfig(req.auth!.tenantId!);
+    if (!config.instanceName) {
+      return res.status(400).json({ success: false, error: { message: 'Instancia WhatsApp nao configurada' } });
+    }
+    const result = await evolutionApi.resetInstance(config.instanceName);
+    const qrBase64 = result?.qrcode?.base64 || null;
+    return success(res, { qrcode: qrBase64, instanceName: config.instanceName });
+  } catch (err) {
+    next(err);
+  }
+});
+
+chatbotRouter.post('/whatsapp/disconnect', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const config = await chatbotService.getConfig(req.auth!.tenantId!);
+    if (!config.instanceName) {
+      return res.status(400).json({ success: false, error: { message: 'Instancia WhatsApp nao configurada' } });
+    }
+    await evolutionApi.disconnect(config.instanceName);
+    return success(res, { message: 'WhatsApp desconectado' });
   } catch (err) {
     next(err);
   }

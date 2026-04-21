@@ -93,6 +93,7 @@ export const tenantService = {
     const instanceName = `tenant-${slug}`;
     try {
       await evolutionApi.createInstance(instanceName);
+      await evolutionApi.setWebhook(instanceName);
       console.log(`[TENANT] WhatsApp instance "${instanceName}" created for tenant ${tenant.id}`);
     } catch (err: any) {
       // Non-blocking: tenant is created even if Evolution API is down

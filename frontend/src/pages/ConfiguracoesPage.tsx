@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X, List, Lock } from 'lucide-react';
+import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X, List, Lock, CheckCircle, XCircle, RefreshCw, Loader2, QrCode, Unplug } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -62,6 +62,193 @@ const DEFAULT_HORARIOS: Record<string, { ativo: boolean; inicio: string; fim: st
   sab: { ativo: false, inicio: '08:00', fim: '12:00' },
   dom: { ativo: false, inicio: '', fim: '' },
 };
+
+function WhatsAppTab() {
+  const [status, setStatus] = useState<string>('loading');
+  const [instanceName, setInstanceName] = useState<string | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [polling, setPolling] = useState(false);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const { data } = await api.get('/chatbot/whatsapp/status');
+      const s = data.data;
+      setInstanceName(s.instanceName);
+      const state = s.instance?.state || s.state || 'disconnected';
+      setStatus(state === 'open' ? 'connected' : state);
+      if (state === 'open') {
+        setQrCode(null);
+        setPolling(false);
+      }
+    } catch {
+      setStatus('error');
+    }
+  }, []);
+
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  useEffect(() => {
+    if (!polling) return;
+    const interval = setInterval(fetchStatus, 4000);
+    return () => clearInterval(interval);
+  }, [polling, fetchStatus]);
+
+  const handleConnect = async () => {
+    setLoading(true);
+    setError('');
+    setQrCode(null);
+    try {
+      const { data } = await api.post('/chatbot/whatsapp/connect');
+      const qr = data.data?.qrcode;
+      if (qr) {
+        setQrCode(qr);
+        setStatus('waiting_qr');
+        setPolling(true);
+      } else {
+        setError('QR Code nao retornado. Tente novamente.');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Erro ao conectar WhatsApp');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await api.post('/chatbot/whatsapp/disconnect');
+      setStatus('disconnected');
+      setQrCode(null);
+      setPolling(false);
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Erro ao desconectar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isConnected = status === 'connected';
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+          <Wifi size={20} />
+          Conexao WhatsApp
+        </h2>
+
+        {/* Status Card */}
+        <div className={`rounded-lg border p-4 mb-6 ${isConnected ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {status === 'loading' ? (
+                <Loader2 size={20} className="text-gray-400 animate-spin" />
+              ) : isConnected ? (
+                <CheckCircle size={20} className="text-green-600" />
+              ) : (
+                <XCircle size={20} className="text-gray-400" />
+              )}
+              <div>
+                <p className={`font-medium ${isConnected ? 'text-green-800' : 'text-gray-700'}`}>
+                  {status === 'loading' ? 'Verificando...' :
+                   isConnected ? 'WhatsApp Conectado' :
+                   status === 'waiting_qr' ? 'Aguardando leitura do QR Code...' :
+                   status === 'error' ? 'Erro ao verificar' :
+                   'WhatsApp Desconectado'}
+                </p>
+                {instanceName && (
+                  <p className="text-xs text-gray-500 mt-0.5">Instancia: {instanceName}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {isConnected ? (
+                <button
+                  onClick={handleDisconnect}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  <Unplug size={14} />
+                  Desconectar
+                </button>
+              ) : (
+                <button
+                  onClick={handleConnect}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {loading ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={14} />}
+                  {loading ? 'Gerando QR Code...' : 'Conectar WhatsApp'}
+                </button>
+              )}
+              {!loading && (
+                <button
+                  onClick={fetchStatus}
+                  className="flex items-center gap-1 px-2 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  title="Atualizar status"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
+
+        {/* QR Code */}
+        {qrCode && !isConnected && (
+          <div className="flex flex-col items-center py-6">
+            <div className="bg-white p-4 rounded-xl border-2 border-gray-200 shadow-sm">
+              <img src={qrCode} alt="QR Code WhatsApp" className="w-64 h-64" />
+            </div>
+            <p className="text-sm text-gray-600 mt-4 text-center max-w-sm">
+              Abra o WhatsApp no celular, va em <strong>Dispositivos conectados</strong> e escaneie o QR Code acima.
+            </p>
+            {polling && (
+              <div className="flex items-center gap-2 mt-3 text-xs text-blue-600">
+                <Loader2 size={12} className="animate-spin" />
+                Verificando conexao automaticamente...
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Instructions */}
+        {!isConnected && !qrCode && status !== 'loading' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">Como conectar</h3>
+            <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+              <li>Clique em <strong>Conectar WhatsApp</strong> acima</li>
+              <li>Um QR Code sera exibido na tela</li>
+              <li>Abra o WhatsApp no celular</li>
+              <li>Va em <strong>Configuracoes → Dispositivos conectados → Conectar dispositivo</strong></li>
+              <li>Escaneie o QR Code com a camera</li>
+              <li>Aguarde a conexao ser confirmada</li>
+            </ol>
+          </div>
+        )}
+
+        {isConnected && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-sm text-green-800">
+              Seu WhatsApp esta conectado e pronto para receber e enviar mensagens automaticas.
+              O chatbot com IA ira responder automaticamente as mensagens recebidas.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function ConfiguracoesPage() {
   const { user } = useAuth();
@@ -754,16 +941,7 @@ export function ConfiguracoesPage() {
       )}
 
       {/* WHATSAPP TAB */}
-      {tab === 'whatsapp' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">WhatsApp</h2>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm text-yellow-800">
-              A configuracao do WhatsApp e gerenciada pela equipe Anpexia. Entre em contato caso precise vincular ou alterar sua instancia.
-            </p>
-          </div>
-        </div>
-      )}
+      {tab === 'whatsapp' && <WhatsAppTab />}
 
       {/* TUSS TAB */}
       {tab === 'tuss' && canManageTuss && (
