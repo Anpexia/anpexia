@@ -152,7 +152,7 @@ supplierRouter.patch('/:id/products/:productId/primary', async (req: Request, re
 // Unlink product from supplier
 supplierRouter.delete('/:id/products/:productId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await supplierService.unlinkProduct(req.params.id as string, req.params.productId as string);
+    await supplierService.unlinkProduct(req.auth!.tenantId!, req.params.id as string, req.params.productId as string);
 
     await createAuditLog({
       req,

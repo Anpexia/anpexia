@@ -188,11 +188,11 @@ export const supplierService = {
     });
   },
 
-  async unlinkProduct(supplierId: string, productId: string) {
+  async unlinkProduct(tenantId: string, supplierId: string, productId: string) {
     const existing = await prisma.supplierProduct.findUnique({
       where: { supplierId_productId: { supplierId, productId } },
     });
-    if (!existing) {
+    if (!existing || existing.tenantId !== tenantId) {
       throw new AppError(404, 'NOT_FOUND', 'Vinculo nao encontrado');
     }
 

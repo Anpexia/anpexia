@@ -13,7 +13,7 @@ async function checkLowStockEmail(productId: string, tenantId: string, quantity:
     }
 
     const product = await prisma.product.findFirst({
-      where: { id: productId },
+      where: { id: productId, tenantId },
       select: { id: true, name: true, sku: true, unit: true, lastLowStockEmailAt: true },
     });
     if (!product) {
