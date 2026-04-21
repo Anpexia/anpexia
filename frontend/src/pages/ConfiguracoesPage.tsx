@@ -81,6 +81,8 @@ function WhatsAppTab() {
       if (state === 'open') {
         setQrCode(null);
         setPolling(false);
+      } else if (s.qrcode) {
+        setQrCode(s.qrcode);
       }
     } catch {
       setStatus('error');
@@ -91,7 +93,7 @@ function WhatsAppTab() {
 
   useEffect(() => {
     if (!polling) return;
-    const interval = setInterval(fetchStatus, 4000);
+    const interval = setInterval(fetchStatus, 3000);
     return () => clearInterval(interval);
   }, [polling, fetchStatus]);
 

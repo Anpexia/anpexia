@@ -107,6 +107,11 @@ export const evolutionApi = {
     return data;
   },
 
+  async getConnectQr(instanceName: string) {
+    const { data } = await api.get(`/instance/connect/${instanceName}`);
+    return data;
+  },
+
   // ============================================================
   // Helper: format phone number
   // ============================================================

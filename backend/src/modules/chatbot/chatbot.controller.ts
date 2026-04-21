@@ -205,6 +205,18 @@ chatbotRouter.get('/whatsapp/status', async (req: Request, res: Response, next: 
     }
     try {
       const state = await evolutionApi.getConnectionState(config.instanceName);
+      const connState = state?.instance?.state || 'disconnected';
+
+      if (connState === 'connecting' || connState === 'close') {
+        try {
+          const fresh = await evolutionApi.getConnectQr(config.instanceName);
+          const qrBase64 = fresh?.base64 || null;
+          return success(res, { ...state, instanceName: config.instanceName, qrcode: qrBase64 });
+        } catch {
+          return success(res, { ...state, instanceName: config.instanceName });
+        }
+      }
+
       return success(res, { ...state, instanceName: config.instanceName });
     } catch {
       return success(res, { state: 'disconnected', instanceName: config.instanceName });
