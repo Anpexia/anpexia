@@ -88,7 +88,9 @@ export const customerService = {
         (a) => a.date >= now && (a.status === 'scheduled' || a.status === 'confirmed'),
       );
       const lastAppointment = past.length > 0 ? past[0].date : null;
-      const nextAppointment = future.length > 0 ? future[future.length - 1].date : null;
+      const nextAppointment = future.length > 0
+        ? future.reduce((earliest, a) => (a.date < earliest.date ? a : earliest)).date
+        : null;
       const totalAppointments = completed.length;
 
       const { scheduledCalls: _, ...rest } = c;
@@ -146,7 +148,9 @@ export const customerService = {
       (a) => a.date >= now && (a.status === 'scheduled' || a.status === 'confirmed'),
     );
     const lastAppointment = pastCalls.length > 0 ? pastCalls[0].date : null;
-    const nextAppointment = futureCalls.length > 0 ? futureCalls[futureCalls.length - 1].date : null;
+    const nextAppointment = futureCalls.length > 0
+      ? futureCalls.reduce((earliest, a) => (a.date < earliest.date ? a : earliest)).date
+      : null;
     const totalAppointments = completedCalls.length;
 
     // Days since last contact (message or chat)
