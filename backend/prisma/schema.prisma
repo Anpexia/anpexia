@@ -435,6 +435,8 @@ model SupplierProduct {
   supplierId String   @map("supplier_id")
   productId  String   @map("product_id")
   isPrimary  Boolean  @default(false) @map("is_primary")
+  costPrice  Float?   @map("cost_price")
+  gtin       String?
   createdAt  DateTime @default(now()) @map("created_at")
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

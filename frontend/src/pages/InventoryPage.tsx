@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, AlertTriangle, X, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Eye, Clock, Barcode, Link2Off, Zap, Keyboard, Sparkles, Loader2, Star } from 'lucide-react';
+import { Plus, Search, AlertTriangle, X, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Eye, Clock, Barcode, Link2Off, Zap, Keyboard, Sparkles, Loader2, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '../services/api';
 import { SuppliersTab } from './SuppliersTab';
@@ -69,8 +69,23 @@ interface ProductSupplierLink {
   supplierId: string;
   productId: string;
   isPrimary: boolean;
+  costPrice: number | null;
+  gtin: string | null;
   supplier: { id: string; name: string };
 }
+
+interface LinkedSupplierEntry {
+  supplierId: string;
+  name: string;
+  costPrice: string;
+  gtin: string;
+}
+
+const emptySupplierForm = {
+  name: '', contactName: '', email: '', phone: '', whatsapp: '',
+  notificationMethod: 'WHATSAPP' as 'EMAIL' | 'WHATSAPP' | 'BOTH',
+  autoDispatch: false,
+};
 
 type ModalMode = 'closed' | 'create' | 'edit' | 'detail' | 'movement';
 
@@ -124,11 +139,20 @@ export function InventoryPage() {
   // Tab state
   const [activeTab, setActiveTab] = useState<'products' | 'suppliers' | 'orders' | 'templates'>('products');
 
-  // Supplier linking state (for product edit modal)
+  // Supplier linking state
   const [allSuppliers, setAllSuppliers] = useState<SupplierOption[]>([]);
   const [productSuppliers, setProductSuppliers] = useState<ProductSupplierLink[]>([]);
   const [supplierSearch, setSupplierSearch] = useState('');
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+
+  // Supplier step popup (before product creation)
+  const [supplierStepOpen, setSupplierStepOpen] = useState(false);
+  const [supplierStepMode, setSupplierStepMode] = useState<'select' | 'create'>('select');
+  const [supplierForm, setSupplierForm] = useState(emptySupplierForm);
+  const [savingSupplier, setSavingSupplier] = useState(false);
+
+  // Linked suppliers for product create/edit (local state before saving)
+  const [linkedSuppliers, setLinkedSuppliers] = useState<LinkedSupplierEntry[]>([]);
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -231,7 +255,7 @@ export function InventoryPage() {
         setScanSource('local');
         setScanDuplicateProduct(result.product);
       } else if (!result.found && result.source === 'cosmos' && result.product) {
-        // CASE 2: Found in Cosmos → pre-fill create modal
+        // CASE 2: Found in Cosmos → supplier step then pre-fill create modal
         setScanSource('cosmos');
         setFormData({
           ...emptyForm,
@@ -239,14 +263,23 @@ export function InventoryPage() {
           name: result.product.description || '',
           supplier: result.product.brand || '',
           costPrice: result.product.avgPrice ? String(result.product.avgPrice) : '',
-          // category will need to be matched or left empty
         });
-        setModalMode('create');
+        setLinkedSuppliers([]);
+        setSupplierForm(emptySupplierForm);
+        setSupplierStepMode('select');
+        setSupplierSearch('');
+        try { const { data: s } = await api.get('/suppliers', { params: { active: 'true' } }); setAllSuppliers(s.data); } catch { setAllSuppliers([]); }
+        setSupplierStepOpen(true);
       } else {
-        // CASE 3: Not found anywhere → empty create modal with SKU
+        // CASE 3: Not found anywhere → supplier step then empty create modal with SKU
         setScanSource(null);
         setFormData({ ...emptyForm, sku: code });
-        setModalMode('create');
+        setLinkedSuppliers([]);
+        setSupplierForm(emptySupplierForm);
+        setSupplierStepMode('select');
+        setSupplierSearch('');
+        try { const { data: s } = await api.get('/suppliers', { params: { active: 'true' } }); setAllSuppliers(s.data); } catch { setAllSuppliers([]); }
+        setSupplierStepOpen(true);
       }
     } catch {
       setScanSource(null);
@@ -441,7 +474,19 @@ export function InventoryPage() {
     });
   }, []);
 
-  const openCreate = () => { setFormData(emptyForm); setModalMode('create'); };
+  const openCreate = async () => {
+    setFormData(emptyForm);
+    setLinkedSuppliers([]);
+    setSupplierForm(emptySupplierForm);
+    setSupplierStepMode('select');
+    setSupplierSearch('');
+    setShowSupplierDropdown(false);
+    try {
+      const { data } = await api.get('/suppliers', { params: { active: 'true' } });
+      setAllSuppliers(data.data);
+    } catch { setAllSuppliers([]); }
+    setSupplierStepOpen(true);
+  };
 
   const openEdit = async (p: Product) => {
     setFormData({
@@ -454,7 +499,6 @@ export function InventoryPage() {
     setModalMode('edit');
     setSupplierSearch('');
     setShowSupplierDropdown(false);
-    // Fetch all active suppliers and product's linked suppliers
     try {
       const [suppRes, linkRes] = await Promise.all([
         api.get('/suppliers', { params: { active: 'true' } }).catch(() => ({ data: { data: [] } })),
@@ -462,9 +506,16 @@ export function InventoryPage() {
       ]);
       setAllSuppliers(suppRes.data.data);
       setProductSuppliers(linkRes.data.data);
+      setLinkedSuppliers(linkRes.data.data.map((ps: ProductSupplierLink) => ({
+        supplierId: ps.supplierId,
+        name: ps.supplier.name,
+        costPrice: ps.costPrice?.toString() || '',
+        gtin: ps.gtin || '',
+      })));
     } catch {
       setAllSuppliers([]);
       setProductSuppliers([]);
+      setLinkedSuppliers([]);
     }
   };
 
@@ -484,6 +535,50 @@ export function InventoryPage() {
     setModalMode('movement');
   };
 
+  // Supplier step: select existing supplier and proceed to product form
+  const handleSelectSupplierAndProceed = (s: SupplierOption) => {
+    setLinkedSuppliers([{ supplierId: s.id, name: s.name, costPrice: '', gtin: '' }]);
+    setSupplierStepOpen(false);
+    setModalMode('create');
+  };
+
+  // Supplier step: create new supplier then proceed
+  const handleCreateSupplierAndProceed = async () => {
+    if (!supplierForm.name.trim()) return;
+    setSavingSupplier(true);
+    try {
+      const { data } = await api.post('/suppliers', supplierForm);
+      const newSupplier = data.data;
+      setAllSuppliers((prev) => [newSupplier, ...prev]);
+      setLinkedSuppliers([{ supplierId: newSupplier.id, name: newSupplier.name, costPrice: '', gtin: '' }]);
+      setSupplierStepOpen(false);
+      setModalMode('create');
+    } catch {} finally { setSavingSupplier(false); }
+  };
+
+  // Supplier step: skip and go directly to product form
+  const handleSkipSupplierStep = () => {
+    setLinkedSuppliers([]);
+    setSupplierStepOpen(false);
+    setModalMode('create');
+  };
+
+  // Add a supplier to the linked list in product form
+  const handleAddLinkedSupplier = (s: SupplierOption) => {
+    if (linkedSuppliers.some((ls) => ls.supplierId === s.id)) return;
+    setLinkedSuppliers((prev) => [...prev, { supplierId: s.id, name: s.name, costPrice: '', gtin: '' }]);
+    setSupplierSearch('');
+    setShowSupplierDropdown(false);
+  };
+
+  const handleRemoveLinkedSupplier = (supplierId: string) => {
+    setLinkedSuppliers((prev) => prev.filter((ls) => ls.supplierId !== supplierId));
+  };
+
+  const handleUpdateLinkedSupplier = (supplierId: string, field: 'costPrice' | 'gtin', value: string) => {
+    setLinkedSuppliers((prev) => prev.map((ls) => ls.supplierId === supplierId ? { ...ls, [field]: value } : ls));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -499,13 +594,47 @@ export function InventoryPage() {
         batch: formData.batch || undefined,
       };
       if (modalMode === 'create') {
-        await api.post('/inventory/products', payload);
+        const { data: created } = await api.post('/inventory/products', payload);
+        const newProductId = created.data?.id;
+        if (newProductId && linkedSuppliers.length > 0) {
+          for (let i = 0; i < linkedSuppliers.length; i++) {
+            const ls = linkedSuppliers[i];
+            try {
+              await api.post(`/suppliers/${ls.supplierId}/products`, {
+                productId: newProductId,
+                isPrimary: i === 0,
+                costPrice: ls.costPrice ? Number(ls.costPrice) : undefined,
+                gtin: ls.gtin || undefined,
+              });
+            } catch {}
+          }
+        }
         if (scannedCode) {
           setToast({ message: `Produto "${formData.name}" criado com sucesso!`, type: 'success' });
           setScannedCode('');
         }
       } else {
         await api.put(`/inventory/products/${selectedProduct!.id}`, payload);
+        // Sync linked suppliers for edit mode
+        if (selectedProduct) {
+          const existingIds = productSuppliers.map((ps) => ps.supplierId);
+          const newIds = linkedSuppliers.map((ls) => ls.supplierId);
+          // Unlink removed suppliers
+          for (const ps of productSuppliers) {
+            if (!newIds.includes(ps.supplierId)) {
+              try { await api.delete(`/suppliers/${ps.supplierId}/products/${selectedProduct.id}`); } catch {}
+            }
+          }
+          // Link new suppliers and update existing
+          for (let i = 0; i < linkedSuppliers.length; i++) {
+            const ls = linkedSuppliers[i];
+            if (existingIds.includes(ls.supplierId)) {
+              try { await api.patch(`/suppliers/${ls.supplierId}/products/${selectedProduct.id}`, { costPrice: ls.costPrice ? Number(ls.costPrice) : null, gtin: ls.gtin || null }); } catch {}
+            } else {
+              try { await api.post(`/suppliers/${ls.supplierId}/products`, { productId: selectedProduct.id, isPrimary: i === 0 && productSuppliers.length === 0, costPrice: ls.costPrice ? Number(ls.costPrice) : undefined, gtin: ls.gtin || undefined }); } catch {}
+            }
+          }
+        }
       }
       setModalMode('closed');
       fetchProducts();
@@ -543,37 +672,7 @@ export function InventoryPage() {
     } finally { setSaving(false); }
   };
 
-  const handleLinkSupplier = async (supplierId: string) => {
-    if (!selectedProduct) return;
-    try {
-      await api.post(`/suppliers/${supplierId}/products`, { productId: selectedProduct.id });
-      const { data } = await api.get(`/inventory/products/${selectedProduct.id}/suppliers`).catch(() => ({ data: { data: [] } }));
-      setProductSuppliers(data.data);
-      setSupplierSearch('');
-      setShowSupplierDropdown(false);
-    } catch {}
-  };
 
-  const handleUnlinkSupplier = async (supplierId: string, productId: string) => {
-    try {
-      await api.delete(`/suppliers/${supplierId}/products/${productId}`);
-      setProductSuppliers((prev) => prev.filter((ps) => ps.supplierId !== supplierId));
-    } catch {}
-  };
-
-  const handleSetPrimary = async (supplierId: string, productId: string) => {
-    try {
-      await api.patch(`/suppliers/${supplierId}/products/${productId}/primary`);
-      setProductSuppliers((prev) => prev.map((ps) => ({ ...ps, isPrimary: ps.supplierId === supplierId })));
-    } catch {}
-  };
-
-  const filteredSupplierOptions = allSuppliers.filter(
-    (s) =>
-      !productSuppliers.some((ps) => ps.supplierId === s.id) &&
-      (s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
-        (s.contactName && s.contactName.toLowerCase().includes(supplierSearch.toLowerCase())))
-  );
 
   const margin = (cost: number | null, sale: number | null) => {
     if (!cost || !sale || cost === 0) return '-';
@@ -856,10 +955,6 @@ export function InventoryPage() {
                   <input type="text" value={formData.batch} onChange={(e) => setFormData({ ...formData, batch: e.target.value })} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Preco de custo</label>
-                  <input type="number" step="0.01" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })} className={inputCls} />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Preco de venda</label>
                   <input type="number" step="0.01" value={formData.salePrice} onChange={(e) => setFormData({ ...formData, salePrice: e.target.value })} className={inputCls} />
                 </div>
@@ -867,91 +962,158 @@ export function InventoryPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Validade</label>
                   <input type="date" value={formData.expiresAt} onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })} className={inputCls} />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Fornecedor</label>
-                  <input type="text" value={formData.supplier} onChange={(e) => setFormData({ ...formData, supplier: e.target.value })} className={inputCls} />
-                </div>
               </div>
 
-              {/* Supplier linking section (edit mode only) */}
-              {modalMode === 'edit' && selectedProduct && (
-                <div className="border-t border-slate-200 pt-4">
-                  <h4 className="text-sm font-medium text-slate-700 mb-3">Fornecedores vinculados</h4>
-                  {productSuppliers.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      {productSuppliers.map((ps) => (
-                        <div key={ps.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-slate-800">{ps.supplier.name}</span>
-                            {ps.isPrimary && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-[#EFF6FF] text-[#1E3A5F]">Principal</span>
-                            )}
+              {/* Fornecedores vinculados */}
+              <div className="border-t border-slate-200 pt-4">
+                <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2"><Truck size={16} /> Fornecedores vinculados</h4>
+                {linkedSuppliers.length > 0 && (
+                  <div className="space-y-3 mb-3">
+                    {linkedSuppliers.map((ls) => (
+                      <div key={ls.supplierId} className="p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-slate-800">{ls.name}</span>
+                          <button type="button" onClick={() => handleRemoveLinkedSupplier(ls.supplierId)} className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500" title="Remover"><Link2Off size={14} /></button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-0.5">Preco de custo</label>
+                            <input type="number" step="0.01" value={ls.costPrice} onChange={(e) => handleUpdateLinkedSupplier(ls.supplierId, 'costPrice', e.target.value)} className={inputCls + ' text-xs'} placeholder="R$ 0,00" />
                           </div>
-                          <div className="flex items-center gap-1">
-                            {!ps.isPrimary && (
-                              <button
-                                type="button"
-                                onClick={() => handleSetPrimary(ps.supplierId, ps.productId)}
-                                className="p-1 rounded hover:bg-amber-50 text-slate-400 hover:text-amber-500"
-                                title="Definir como principal"
-                              >
-                                <Star size={14} />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleUnlinkSupplier(ps.supplierId, ps.productId)}
-                              className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
-                              title="Desvincular"
-                            >
-                              <Link2Off size={14} />
-                            </button>
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-0.5">GTIN (opcional)</label>
+                            <input type="text" value={ls.gtin} onChange={(e) => handleUpdateLinkedSupplier(ls.supplierId, 'gtin', e.target.value)} className={inputCls + ' text-xs'} placeholder="Codigo GTIN" />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  {productSuppliers.length === 0 && (
-                    <p className="text-sm text-slate-400 mb-3">Nenhum fornecedor vinculado.</p>
-                  )}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={supplierSearch}
-                      onChange={(e) => { setSupplierSearch(e.target.value); setShowSupplierDropdown(true); }}
-                      onFocus={() => setShowSupplierDropdown(true)}
-                      placeholder="Buscar fornecedor para vincular..."
-                      className={inputCls}
-                    />
-                    {showSupplierDropdown && supplierSearch.length > 0 && filteredSupplierOptions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                        {filteredSupplierOptions.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => handleLinkSupplier(s.id)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-[#EFF6FF] hover:text-[#1E3A5F]"
-                          >
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {linkedSuppliers.length === 0 && (
+                  <p className="text-sm text-slate-400 mb-3">Nenhum fornecedor vinculado.</p>
+                )}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={supplierSearch}
+                    onChange={(e) => { setSupplierSearch(e.target.value); setShowSupplierDropdown(true); }}
+                    onFocus={() => setShowSupplierDropdown(true)}
+                    placeholder="Buscar fornecedor para adicionar..."
+                    className={inputCls}
+                  />
+                  {showSupplierDropdown && supplierSearch.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {allSuppliers
+                        .filter((s) => !linkedSuppliers.some((ls) => ls.supplierId === s.id) && (s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.contactName && s.contactName.toLowerCase().includes(supplierSearch.toLowerCase()))))
+                        .map((s) => (
+                          <button key={s.id} type="button" onClick={() => handleAddLinkedSupplier(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-[#EFF6FF] hover:text-[#1E3A5F]">
                             {s.name}
                             {s.contactName && <span className="text-xs text-slate-400 ml-2">({s.contactName})</span>}
                           </button>
-                        ))}
-                      </div>
-                    )}
-                    {showSupplierDropdown && supplierSearch.length > 0 && filteredSupplierOptions.length === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-sm text-slate-400">
-                        Nenhum fornecedor encontrado.
-                      </div>
-                    )}
-                  </div>
+                        ))
+                      }
+                      {allSuppliers.filter((s) => !linkedSuppliers.some((ls) => ls.supplierId === s.id) && s.name.toLowerCase().includes(supplierSearch.toLowerCase())).length === 0 && (
+                        <div className="p-3 text-sm text-slate-400">Nenhum fornecedor encontrado.</div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Supplier Step Popup */}
+      {supplierStepOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 my-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Truck size={18} /> Configurar fornecedor</h3>
+              <button onClick={() => { setSupplierStepOpen(false); setScannedCode(''); }} className="text-slate-400 hover:text-slate-500"><X size={20} /></button>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">Selecione um fornecedor existente ou cadastre um novo antes de adicionar o produto.</p>
+
+            {supplierStepMode === 'select' ? (
+              <>
+                <div className="relative mb-3">
+                  <input
+                    type="text"
+                    value={supplierSearch}
+                    onChange={(e) => setSupplierSearch(e.target.value)}
+                    placeholder="Buscar fornecedor..."
+                    className={inputCls}
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg mb-4">
+                  {allSuppliers
+                    .filter((s) => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.contactName && s.contactName.toLowerCase().includes(supplierSearch.toLowerCase())))
+                    .map((s) => (
+                      <button key={s.id} type="button" onClick={() => handleSelectSupplierAndProceed(s)} className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#EFF6FF] hover:text-[#1E3A5F] border-b border-slate-100 last:border-0">
+                        <span className="font-medium">{s.name}</span>
+                        {s.contactName && <span className="text-xs text-slate-400 ml-2">({s.contactName})</span>}
+                      </button>
+                    ))
+                  }
+                  {allSuppliers.filter((s) => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase())).length === 0 && (
+                    <div className="p-3 text-sm text-slate-400 text-center">Nenhum fornecedor encontrado.</div>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={handleSkipSupplierStep} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Pular</button>
+                  <button type="button" onClick={() => { setSupplierStepMode('create'); setSupplierForm(emptySupplierForm); }} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] flex items-center justify-center gap-1.5"><Plus size={14} /> Novo fornecedor</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nome do fornecedor *</label>
+                    <input type="text" value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} className={inputCls} required autoFocus />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nome do contato</label>
+                    <input type="text" value={supplierForm.contactName} onChange={(e) => setSupplierForm({ ...supplierForm, contactName: e.target.value })} className={inputCls} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+                      <input type="email" value={supplierForm.email} onChange={(e) => setSupplierForm({ ...supplierForm, email: e.target.value })} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+                      <input type="tel" value={supplierForm.phone} onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })} className={inputCls} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">WhatsApp</label>
+                    <input type="tel" value={supplierForm.whatsapp} onChange={(e) => setSupplierForm({ ...supplierForm, whatsapp: e.target.value })} className={inputCls} placeholder="5511999999999" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Metodo de notificacao</label>
+                    <select value={supplierForm.notificationMethod} onChange={(e) => setSupplierForm({ ...supplierForm, notificationMethod: e.target.value as any })} className={inputCls}>
+                      <option value="EMAIL">E-mail</option>
+                      <option value="WHATSAPP">WhatsApp</option>
+                      <option value="BOTH">Ambos</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={supplierForm.autoDispatch} onChange={(e) => setSupplierForm({ ...supplierForm, autoDispatch: e.target.checked })} className="rounded border-slate-300 text-[#1E3A5F] focus:ring-[#2563EB]" />
+                    <span className="text-sm text-slate-700">Enviar cotacao automatica quando estoque baixo ou vencido</span>
+                  </label>
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <button type="button" onClick={() => setSupplierStepMode('select')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Voltar</button>
+                  <button type="button" onClick={handleCreateSupplierAndProceed} disabled={savingSupplier || !supplierForm.name.trim()} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{savingSupplier ? 'Salvando...' : 'Criar e continuar'}</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

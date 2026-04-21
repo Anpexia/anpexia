@@ -102,7 +102,7 @@ supplierRouter.get('/:id/products', async (req: Request, res: Response, next: Ne
 // Link product to supplier
 supplierRouter.post('/:id/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { productId, isPrimary } = req.body;
+    const { productId, isPrimary, costPrice, gtin } = req.body;
     if (!productId) {
       throw new AppError(400, 'VALIDATION_ERROR', 'productId e obrigatorio');
     }
@@ -112,6 +112,8 @@ supplierRouter.post('/:id/products', async (req: Request, res: Response, next: N
       req.params.id as string,
       productId,
       isPrimary || false,
+      costPrice != null ? Number(costPrice) : undefined,
+      gtin || undefined,
     );
 
     await createAuditLog({
@@ -143,6 +145,25 @@ supplierRouter.patch('/:id/products/:productId/primary', async (req: Request, re
       entityId: link.id,
     });
 
+    return success(res, link);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Update supplier-product link (costPrice, gtin)
+supplierRouter.patch('/:id/products/:productId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { costPrice, gtin } = req.body;
+    const link = await supplierService.updateLink(
+      req.auth!.tenantId!,
+      req.params.id as string,
+      req.params.productId as string,
+      {
+        costPrice: costPrice != null ? Number(costPrice) : undefined,
+        gtin: gtin !== undefined ? gtin : undefined,
+      },
+    );
     return success(res, link);
   } catch (err) {
     next(err);

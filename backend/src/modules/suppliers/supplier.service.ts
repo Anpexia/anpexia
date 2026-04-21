@@ -140,7 +140,7 @@ export const supplierService = {
     });
   },
 
-  async linkProduct(tenantId: string, supplierId: string, productId: string, isPrimary = false) {
+  async linkProduct(tenantId: string, supplierId: string, productId: string, isPrimary = false, costPrice?: number, gtin?: string) {
     // Validate supplier belongs to tenant
     const supplier = await prisma.supplier.findFirst({ where: { id: supplierId, tenantId } });
     if (!supplier) {
@@ -181,6 +181,8 @@ export const supplierService = {
         supplierId,
         productId,
         isPrimary,
+        costPrice: costPrice ?? undefined,
+        gtin: gtin ?? undefined,
       },
       include: {
         product: { select: { id: true, name: true, sku: true } },
@@ -220,6 +222,23 @@ export const supplierService = {
       where: { supplierId_productId: { supplierId, productId } },
       data: { isPrimary: true },
       include: { supplier: { select: { id: true, name: true } } },
+    });
+  },
+
+  async updateLink(tenantId: string, supplierId: string, productId: string, data: { costPrice?: number; gtin?: string }) {
+    const existing = await prisma.supplierProduct.findUnique({
+      where: { supplierId_productId: { supplierId, productId } },
+    });
+    if (!existing || existing.tenantId !== tenantId) {
+      throw new AppError(404, 'NOT_FOUND', 'Vinculo nao encontrado');
+    }
+
+    return prisma.supplierProduct.update({
+      where: { supplierId_productId: { supplierId, productId } },
+      data: {
+        costPrice: data.costPrice ?? undefined,
+        gtin: data.gtin ?? undefined,
+      },
     });
   },
 
