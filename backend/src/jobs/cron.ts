@@ -117,6 +117,7 @@ async function sendAppointmentReminders() {
         phone: call.phone,
         date: call.date,
         leadId: call.leadId,
+        tenantId: call.tenantId,
       });
       await prisma.scheduledCall.update({
         where: { id: call.id },
@@ -157,6 +158,7 @@ async function sendAppointmentReminders() {
         phone: call.phone,
         date: call.date,
         leadId: call.leadId,
+        tenantId: call.tenantId,
       });
       await prisma.scheduledCall.update({
         where: { id: call.id },
@@ -209,6 +211,7 @@ async function sendPostConsultationFollowUp() {
         name: call.name,
         phone: call.phone,
         leadId: call.leadId,
+        tenantId: call.tenantId,
       });
     }
 
@@ -576,23 +579,25 @@ async function sendReturnReminders() {
       where: {
         date: { gte: thirtyOneDaysAgo, lt: thirtyDaysAgo },
         status: 'completed',
+        tenantId: { not: null },
       },
     });
 
     for (const call of oldAppointments) {
-      // Check if there's a newer appointment for this phone
+      // Check if there's a newer appointment for this phone within the same tenant
       const newerAppointment = await prisma.scheduledCall.findFirst({
         where: {
           phone: { contains: call.phone.slice(-8) },
+          tenantId: call.tenantId,
           date: { gt: call.date },
           status: { in: ['scheduled', 'confirmed', 'completed'] },
         },
       });
       if (newerAppointment) continue;
 
-      // Find customer for tenant context
+      // Find customer for tenant context (scoped by tenant)
       const customer = await prisma.customer.findFirst({
-        where: { phone: { contains: call.phone.slice(-8) }, isActive: true },
+        where: { tenantId: call.tenantId!, phone: { contains: call.phone.slice(-8) }, isActive: true },
       });
       if (!customer || !customer.optInWhatsApp) continue;
 

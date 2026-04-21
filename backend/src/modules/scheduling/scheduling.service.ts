@@ -193,7 +193,7 @@ async function updateConfig(data: UpdateConfigInput) {
 // Generate time slots for a given date.
 // doctorId: when provided, only conflicts with calls for that doctor count as "booked".
 // This allows multiple doctors to have consults in the same slot without interfering.
-async function getAvailableSlots(date: string, doctorId?: string | null) {
+async function getAvailableSlots(date: string, doctorId?: string | null, tenantId?: string | null) {
   const config = await getConfig();
   const dayOfWeek = new Date(`${date}T12:00:00${SP_OFFSET}`).getDay();
 
@@ -225,6 +225,7 @@ async function getAvailableSlots(date: string, doctorId?: string | null) {
     date: { gte: startOfDay, lte: endOfDay },
     status: { notIn: ['cancelled'] },
   };
+  if (tenantId) where.tenantId = tenantId;
   if (doctorId) where.doctorId = doctorId;
 
   const bookedCalls = await prisma.scheduledCall.findMany({
@@ -260,7 +261,7 @@ async function getAvailableSlots(date: string, doctorId?: string | null) {
 }
 
 // Return next N available dates (optimized: single DB query for all booked calls)
-async function getAvailableDates() {
+async function getAvailableDates(tenantId?: string | null) {
   const config = await getConfig();
   const dates: { date: string; dayOfWeek: number; availableSlots: number }[] = [];
   const todaySP = toSP(new Date()).dateStr;
@@ -271,12 +272,15 @@ async function getAvailableDates() {
   const endDate = new Date(`${todaySP}T23:59:59${SP_OFFSET}`);
   endDate.setDate(endDate.getDate() + config.maxDaysAhead);
 
-  // Single query: fetch ALL booked calls in the range
+  // Single query: fetch booked calls in the range for this tenant
+  const bookedWhere: any = {
+    date: { gte: startDate, lte: endDate },
+    status: { notIn: ['cancelled'] },
+  };
+  if (tenantId) bookedWhere.tenantId = tenantId;
+
   const bookedCalls = await prisma.scheduledCall.findMany({
-    where: {
-      date: { gte: startDate, lte: endDate },
-      status: { notIn: ['cancelled'] },
-    },
+    where: bookedWhere,
     select: { date: true },
   });
 
@@ -328,7 +332,7 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
   // If no time specified, pick the first available pre-generated slot for UI compat
   let time = data.time;
   if (!time) {
-    const slots = await getAvailableSlots(data.date, data.doctorId);
+    const slots = await getAvailableSlots(data.date, data.doctorId, tenantId);
     const firstAvailable = slots.find((s) => s.available);
     if (!firstAvailable) {
       throw new AppError(400, 'NO_SLOTS', 'Não há horários disponíveis nesta data');
@@ -352,13 +356,14 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     where: { phone: data.phone },
   });
 
-  // Auto-link to customer by phone (last 8 digits match)
+  // Auto-link to customer by phone (last 8 digits match) — scoped to tenant
   const phoneSuffix = data.phone.replace(/\D/g, '').slice(-8);
+  const customerWhere: any = { phone: { contains: phoneSuffix } };
+  if (tenantId) customerWhere.tenantId = tenantId;
+
   let customer = data.customerId
-    ? await prisma.customer.findFirst({ where: { id: data.customerId } })
-    : await prisma.customer.findFirst({
-        where: { phone: { contains: phoneSuffix } },
-      });
+    ? await prisma.customer.findFirst({ where: { id: data.customerId, ...(tenantId ? { tenantId } : {}) } })
+    : await prisma.customer.findFirst({ where: customerWhere });
 
   const call = await prisma.$transaction(async (tx) => {
     // Create the scheduled call
@@ -415,6 +420,7 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     date: callDate,
     duration: durationMin,
     leadId: lead?.id,
+    tenantId: call.tenantId,
   }).catch((err) => console.error('[SCHEDULING] Confirmation send failed:', err));
 
   return call;
@@ -799,9 +805,28 @@ async function cancelCall(id: string, tenantId?: string) {
     phone: call.phone,
     date: call.date,
     leadId: call.leadId,
+    tenantId: call.tenantId,
   }).catch((err) => console.error('[SCHEDULING] Cancellation notice failed:', err));
 
   return updated;
+}
+
+async function hardDeleteCall(id: string, tenantId?: string) {
+  const call = await prisma.scheduledCall.findUnique({ where: { id } });
+  if (!call || (tenantId && call.tenantId !== tenantId)) {
+    throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (call.tenantId) {
+      await revertFinancialsForCall(tx, id, call.tenantId);
+    }
+    await tx.scheduledCallProcedure.deleteMany({ where: { scheduledCallId: id } });
+    await tx.privateProcedureCall.deleteMany({ where: { scheduledCallId: id } });
+    await tx.scheduledCall.delete({ where: { id } });
+  });
+
+  return { id, deleted: true };
 }
 
 // ============================================================
@@ -909,6 +934,7 @@ export const schedulingService = {
   getTodayAppointments,
   updateCallStatus,
   cancelCall,
+  hardDeleteCall,
   linkProcedures,
   replaceProcedures,
   updateCallDoctor,

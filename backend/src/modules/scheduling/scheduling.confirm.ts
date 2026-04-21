@@ -3,7 +3,16 @@ import { AppError } from '../../shared/middleware/error-handler';
 import { evolutionApi } from '../messaging/evolution.client';
 import { env } from '../../config/env';
 
-const SALES_INSTANCE = 'anpexia';
+async function resolveInstance(tenantId?: string | null): Promise<string | null> {
+  if (tenantId) {
+    const config = await prisma.chatbotConfig.findFirst({
+      where: { tenantId },
+      select: { instanceName: true },
+    });
+    if (config?.instanceName) return config.instanceName;
+  }
+  return 'anpexia';
+}
 
 function isWhatsAppConfigured(): boolean {
   return !!(env.evolutionApiUrl && env.evolutionApiKey && !env.evolutionApiUrl.includes('localhost'));
@@ -34,6 +43,7 @@ export async function handleConfirmResponse(
     throw new AppError(404, 'NOT_FOUND', 'Agendamento nao encontrado');
   }
 
+  const instance = await resolveInstance(call.tenantId);
   const dateStr = formatDate(call.date);
   const timeStr = formatTime(call.date);
 
@@ -48,7 +58,7 @@ export async function handleConfirmResponse(
 
       if (isWhatsAppConfigured()) {
         try {
-          await evolutionApi.sendText(SALES_INSTANCE, call.phone, msg);
+          await evolutionApi.sendText(instance!, call.phone, msg);
         } catch (err) {
           console.error('[CONFIRM] Failed to send confirmation:', err);
         }
@@ -67,7 +77,7 @@ export async function handleConfirmResponse(
 
       if (isWhatsAppConfigured()) {
         try {
-          await evolutionApi.sendButtons(SALES_INSTANCE, call.phone, msg, [
+          await evolutionApi.sendButtons(instance!, call.phone, msg, [
             { id: 'btn_cancel_yes', text: 'Sim, cancelar consulta' },
             { id: 'btn_cancel_no', text: 'Nao, manter consulta' },
           ], 'Confirmar cancelamento');
@@ -89,7 +99,7 @@ export async function handleConfirmResponse(
 
       if (isWhatsAppConfigured()) {
         try {
-          await evolutionApi.sendText(SALES_INSTANCE, call.phone, patientMsg);
+          await evolutionApi.sendText(instance!, call.phone, patientMsg);
         } catch (err) {
           console.error('[CONFIRM] Failed to send cancel notice to patient:', err);
         }
@@ -99,7 +109,7 @@ export async function handleConfirmResponse(
         if (clinicPhone) {
           const clinicMsg = `⚠️ O paciente ${call.name} cancelou a consulta do dia ${dateStr} as ${timeStr}.`;
           try {
-            await evolutionApi.sendText(SALES_INSTANCE, clinicPhone, clinicMsg);
+            await evolutionApi.sendText(instance!, clinicPhone, clinicMsg);
           } catch (err) {
             console.error('[CONFIRM] Failed to notify clinic:', err);
           }
@@ -119,7 +129,7 @@ export async function handleConfirmResponse(
 
       if (isWhatsAppConfigured()) {
         try {
-          await evolutionApi.sendText(SALES_INSTANCE, call.phone, msg);
+          await evolutionApi.sendText(instance!, call.phone, msg);
         } catch (err) {
           console.error('[CONFIRM] Failed to send keep notice:', err);
         }

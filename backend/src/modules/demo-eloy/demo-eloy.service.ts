@@ -116,7 +116,7 @@ function insuranceLabel(value: string): string {
 // Fetch available dates from scheduling module (max 6)
 async function fetchAvailableDates(): Promise<Array<{ date: string; label: string }>> {
   try {
-    const dates = await schedulingService.getAvailableDates();
+    const dates = await schedulingService.getAvailableDates(ELOY_TENANT_ID);
     return dates.slice(0, 6).map(d => {
       const dayName = DAY_NAMES[d.dayOfWeek];
       const formatted = `${d.date.slice(8, 10)}/${d.date.slice(5, 7)}`;
@@ -131,7 +131,7 @@ async function fetchAvailableDates(): Promise<Array<{ date: string; label: strin
 // Fetch available slots for a date from scheduling module
 async function fetchAvailableSlots(date: string): Promise<string[]> {
   try {
-    const slots = await schedulingService.getAvailableSlots(date);
+    const slots = await schedulingService.getAvailableSlots(date, null, ELOY_TENANT_ID);
     return slots.filter(s => s.available).map(s => s.time);
   } catch (err: any) {
     console.error('[DEMO-ELOY] Failed to fetch slots for', date, ':', err.message);

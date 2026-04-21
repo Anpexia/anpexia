@@ -33,15 +33,16 @@ function auditCtx(req: Request) {
 // PUBLIC ROUTES (no auth)
 // ==========================================
 
-// GET /available-dates
-router.get('/available-dates', async (_req: Request, res: Response, next) => {
+// GET /available-dates?tenantId=...
+router.get('/available-dates', async (req: Request, res: Response, next) => {
   try {
-    const dates = await schedulingService.getAvailableDates();
+    const tenantId = (req.query.tenantId as string) || null;
+    const dates = await schedulingService.getAvailableDates(tenantId);
     return success(res, dates);
   } catch (err) { next(err); }
 });
 
-// GET /available-slots/:date?doctorId=...
+// GET /available-slots/:date?doctorId=...&tenantId=...
 router.get('/available-slots/:date', async (req: Request, res: Response, next) => {
   try {
     const date = req.params.date as string;
@@ -49,7 +50,8 @@ router.get('/available-slots/:date', async (req: Request, res: Response, next) =
       throw new AppError(400, 'INVALID_DATE', 'Data deve estar no formato YYYY-MM-DD');
     }
     const doctorId = (req.query.doctorId as string) || null;
-    const slots = await schedulingService.getAvailableSlots(date, doctorId);
+    const tenantId = (req.query.tenantId as string) || null;
+    const slots = await schedulingService.getAvailableSlots(date, doctorId, tenantId);
     return success(res, slots);
   } catch (err) { next(err); }
 });
@@ -250,6 +252,15 @@ router.delete('/calls/:id', authenticate, requireTenant, async (req: Request, re
   }
 
   return success(res, call);
+});
+
+// DELETE /calls/:id/permanent — hard delete (OWNER, MANAGER, SUPER_ADMIN)
+router.delete('/calls/:id/permanent', authenticate, requireTenant, requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req: Request, res: Response, next) => {
+  try {
+    const result = await schedulingService.hardDeleteCall(req.params.id as string, req.auth!.tenantId!);
+    await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'APPOINTMENT', entityId: req.params.id as string, metadata: { permanent: true } });
+    return success(res, result);
+  } catch (err) { next(err); }
 });
 
 export default router;

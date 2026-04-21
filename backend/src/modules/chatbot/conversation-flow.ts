@@ -243,7 +243,7 @@ async function handleMenu(tenantId: string, phone: string, text: string, textLow
 
 async function startBookingFlow(tenantId: string, phone: string): Promise<FlowResponse> {
   try {
-    const dates = await schedulingService.getAvailableDates();
+    const dates = await schedulingService.getAvailableDates(tenantId);
 
     if (dates.length === 0) {
       setState(tenantId, phone, 'MENU', {});
@@ -312,7 +312,7 @@ async function handleBookDate(tenantId: string, phone: string, text: string): Pr
   const selectedDate = dates[index];
 
   try {
-    const slots = await schedulingService.getAvailableSlots(selectedDate.date);
+    const slots = await schedulingService.getAvailableSlots(selectedDate.date, null, tenantId);
     const available = slots.filter(s => s.available);
 
     if (available.length === 0) {
@@ -464,6 +464,7 @@ async function showAppointments(tenantId: string, phone: string): Promise<FlowRe
   const now = new Date();
   const appointments = await prisma.scheduledCall.findMany({
     where: {
+      tenantId,
       phone: { contains: phone.slice(-8) },
       date: { gte: now },
       status: { in: ['scheduled', 'confirmed'] },
@@ -527,6 +528,7 @@ async function startCancelFlow(tenantId: string, phone: string): Promise<FlowRes
   const now = new Date();
   const appointments = await prisma.scheduledCall.findMany({
     where: {
+      tenantId,
       phone: { contains: phone.slice(-8) },
       date: { gte: now },
       status: { in: ['scheduled', 'confirmed'] },

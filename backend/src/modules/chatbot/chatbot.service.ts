@@ -213,7 +213,7 @@ export const chatbotService = {
     console.log(`[CHATBOT] ➡️ Sem flow response, seguindo para AI...`);
 
     // --- Appointment reply handler (SIM, CANCELAR, button IDs from notifications) ---
-    const appointmentReply = await handleAppointmentReply(phone, messageText);
+    const appointmentReply = await handleAppointmentReply(phone, messageText, tenantId);
     if (appointmentReply) {
       if (appointmentReply === '__HANDOFF__') {
         await sendFlowResponse(instanceName, phoneForSend, { type: 'handoff', text: '' }, tenantId, config, phone);
@@ -361,7 +361,7 @@ export const chatbotService = {
     }
 
     // --- Appointment reply handler ---
-    const appointmentReply = await handleAppointmentReply(phone, messageText);
+    const appointmentReply = await handleAppointmentReply(phone, messageText, tenantId);
     if (appointmentReply) {
       debug.source = 'appointment_reply';
       if (appointmentReply === '__HANDOFF__') {
