@@ -194,7 +194,46 @@ export const financialService = {
     };
   },
 
+  async seedDefaultCategories(tenantId: string) {
+    const defaults: { name: string; type: 'INCOME' | 'EXPENSE'; subtype: string | null }[] = [
+      { name: 'Consultas Particulares', type: 'INCOME', subtype: null },
+      { name: 'Convenios', type: 'INCOME', subtype: null },
+      { name: 'Outros', type: 'INCOME', subtype: null },
+      { name: 'Procedimentos', type: 'INCOME', subtype: null },
+      { name: 'Aluguel', type: 'EXPENSE', subtype: 'FIXA' },
+      { name: 'Contabilidade', type: 'EXPENSE', subtype: 'FIXA' },
+      { name: 'Energia Eletrica', type: 'EXPENSE', subtype: 'FIXA' },
+      { name: 'Folha de Pagamento', type: 'EXPENSE', subtype: 'FIXA' },
+      { name: 'Pro-labore', type: 'EXPENSE', subtype: 'FIXA' },
+      { name: 'Seguro', type: 'EXPENSE', subtype: 'FIXA' },
+      { name: 'Telefone/Internet', type: 'EXPENSE', subtype: 'FIXA' },
+      { name: 'Agua e Esgoto', type: 'EXPENSE', subtype: 'FIXA' },
+      { name: 'Manutencao de Equipamentos', type: 'EXPENSE', subtype: 'VARIAVEL' },
+      { name: 'Marketing', type: 'EXPENSE', subtype: 'VARIAVEL' },
+      { name: 'Materiais Medicos', type: 'EXPENSE', subtype: 'VARIAVEL' },
+      { name: 'Material de Escritorio', type: 'EXPENSE', subtype: 'VARIAVEL' },
+      { name: 'Medicamentos', type: 'EXPENSE', subtype: 'VARIAVEL' },
+      { name: 'Honorarios Juridicos', type: 'EXPENSE', subtype: 'ADMINISTRATIVA' },
+      { name: 'Impostos', type: 'EXPENSE', subtype: 'ADMINISTRATIVA' },
+      { name: 'Taxas Bancarias', type: 'EXPENSE', subtype: 'ADMINISTRATIVA' },
+      { name: 'Treinamentos e Cursos', type: 'EXPENSE', subtype: 'ADMINISTRATIVA' },
+    ];
+
+    for (const cat of defaults) {
+      try {
+        await prisma.financialCategory.create({
+          data: { tenantId, name: cat.name, type: cat.type, subtype: cat.subtype },
+        });
+      } catch {}
+    }
+  },
+
   async listCategories(tenantId: string, type?: string) {
+    const count = await prisma.financialCategory.count({ where: { tenantId } });
+    if (count === 0) {
+      await this.seedDefaultCategories(tenantId);
+    }
+
     const where: any = { tenantId };
     if (type) {
       where.type = type;
