@@ -18,7 +18,7 @@ export function CriarSenhaPage() {
 
   useEffect(() => {
     if (!token) { setValidationError('Token ausente'); setLoadingValidate(false); return; }
-    api.get(`/auth/validate-invite?token=${encodeURIComponent(token)}`)
+    api.post('/auth/validate-invite', { token })
       .then(({ data }) => setInvite(data.data))
       .catch((err) => setValidationError(err.response?.data?.error?.message || 'Convite inválido ou expirado'))
       .finally(() => setLoadingValidate(false));

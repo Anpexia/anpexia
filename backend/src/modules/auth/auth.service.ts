@@ -107,8 +107,22 @@ export const authService = {
       throw new AppError(403, 'PASSWORD_NOT_DEFINED', 'Defina sua senha antes de fazer login. Verifique seu email.');
     }
 
+    // Account lockout: 5 failed attempts → 15 min lock
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_MINUTES = 15;
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+      throw new AppError(423, 'ACCOUNT_LOCKED', `Conta bloqueada por excesso de tentativas. Tente novamente em ${minutesLeft} minuto(s).`);
+    }
+
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
+      const attempts = (user.failedLoginAttempts || 0) + 1;
+      const lockData: any = { failedLoginAttempts: attempts };
+      if (attempts >= MAX_ATTEMPTS) {
+        lockData.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+      }
+      await prisma.user.update({ where: { id: user.id }, data: lockData });
       await logAction({
         userId: user.id,
         userEmail: user.email,
@@ -118,9 +132,17 @@ export const authService = {
         entity: 'USER',
         entityId: user.id,
         ipAddress,
-        metadata: { reason: 'credenciais inválidas', detail: 'wrong_password' },
+        metadata: { reason: 'credenciais inválidas', detail: 'wrong_password', attempt: attempts },
       });
+      if (attempts >= MAX_ATTEMPTS) {
+        throw new AppError(423, 'ACCOUNT_LOCKED', `Conta bloqueada após ${MAX_ATTEMPTS} tentativas falhas. Tente novamente em ${LOCKOUT_MINUTES} minutos.`);
+      }
       throw new AppError(401, 'INVALID_CREDENTIALS', 'E-mail ou senha incorretos');
+    }
+
+    // Reset failed attempts on successful password
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
     }
 
     // Trusted-device check (2FA layer)
@@ -135,7 +157,7 @@ export const authService = {
     if (!trusted) {
       // Send email code, require 2FA challenge
       const code = generateEmailCode();
-      storeEmailCode(user.id, code);
+      await storeEmailCode(user.id, code);
       try {
         await sendEmailCode(user.email, user.name, code);
       } catch (err) {
@@ -213,7 +235,7 @@ export const authService = {
       if (!user.twoFactorSecret) throw new AppError(400, 'TOTP_NOT_CONFIGURED', '2FA por app não configurado');
       ok = verifyTOTPCode(user.twoFactorSecret, code);
     } else {
-      ok = verifyEmailCodeSvc(user.id, code);
+      ok = await verifyEmailCodeSvc(user.id, code);
     }
 
     if (!ok) {
@@ -277,7 +299,7 @@ export const authService = {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return; // silent — don't reveal if user exists
     const code = generateEmailCode();
-    storeEmailCode(user.id, code);
+    await storeEmailCode(user.id, code);
     await sendEmailCode(user.email, user.name, code);
   },
 

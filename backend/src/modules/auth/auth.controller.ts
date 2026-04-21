@@ -192,9 +192,9 @@ authRouter.delete('/2fa/devices', authenticate, async (req: Request, res: Respon
 
 // ========== Invite / Define password ==========
 
-authRouter.get('/validate-invite', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/validate-invite', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const token = String(req.query.token || '');
+    const token = String(req.body.token || '');
     const result = await authService.validateInvite(token);
     return success(res, result);
   } catch (err) {
