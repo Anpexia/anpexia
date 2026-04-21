@@ -190,8 +190,8 @@ chatbotRouter.get('/whatsapp/qrcode', async (req: Request, res: Response, next: 
     if (!config.instanceName) {
       return res.status(400).json({ success: false, error: { message: 'Instancia WhatsApp nao configurada' } });
     }
-    const qr = await evolutionApi.getQrCode(config.instanceName);
-    return success(res, qr);
+    const state = await evolutionApi.getConnectionState(config.instanceName);
+    return success(res, state);
   } catch (err) {
     next(err);
   }
