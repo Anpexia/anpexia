@@ -983,16 +983,9 @@ export function CustomersPage() {
                             { key: 'historiaSocial', label: 'Historico Social', field: 'historicoSocial', placeholder: 'Tabagismo, etilismo, atividade fisica, profissao, moradia...' },
                             { key: 'observacoes', label: 'Observacoes', field: 'observacoesAnamnese', placeholder: 'Observacoes adicionais...' },
                           ].map(section => (
-                            <div key={section.key} className="border border-slate-200 rounded-lg overflow-hidden">
-                              <button onClick={() => setAnamneseOpen({ ...anamneseOpen, [section.key]: !anamneseOpen[section.key] })} className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors">
-                                <span className="text-sm font-medium text-slate-800">{section.label}</span>
-                                {anamneseOpen[section.key] ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
-                              </button>
-                              {anamneseOpen[section.key] && (
-                                <div className="p-4">
-                                  <textarea value={anamneseData[section.field] || ''} onChange={(e) => setAnamneseData({ ...anamneseData, [section.field]: e.target.value })} className={inputCls + ' h-24 resize-none'} placeholder={section.placeholder} />
-                                </div>
-                              )}
+                            <div key={section.key}>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">{section.label}</label>
+                              <textarea value={anamneseData[section.field] || ''} onChange={(e) => setAnamneseData({ ...anamneseData, [section.field]: e.target.value })} className={inputCls + ' h-24 resize-none'} placeholder={section.placeholder} />
                             </div>
                           ))}
 
