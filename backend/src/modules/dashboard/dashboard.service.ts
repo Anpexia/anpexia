@@ -73,9 +73,9 @@ export const dashboardService = {
       // Consultas de hoje
       prisma.scheduledCall.findMany({
         where: {
+          tenantId,
           date: { gte: today, lt: tomorrow },
           status: { notIn: ['cancelled'] },
-          customer: { tenantId },
         },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
@@ -86,6 +86,7 @@ export const dashboardService = {
       // Total de consultas do mês
       prisma.scheduledCall.count({
         where: {
+          tenantId,
           date: { gte: monthAgo },
           status: { notIn: ['cancelled'] },
         },
