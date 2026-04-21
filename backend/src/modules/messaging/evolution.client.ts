@@ -80,10 +80,19 @@ export const evolutionApi = {
 
   async resetInstance(instanceName: string) {
     await this.deleteInstance(instanceName);
-    await new Promise(r => setTimeout(r, 1000));
-    const result = await this.createInstance(instanceName);
+    await new Promise(r => setTimeout(r, 1500));
+    await this.createInstance(instanceName);
     await this.setWebhook(instanceName);
-    return result;
+    // createInstance doesn't return QR base64 in v2.2.3 — fetch it separately
+    // Retry a few times since QR generation takes a moment after instance creation
+    for (let i = 0; i < 5; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const qr = await this.getQrCode(instanceName);
+        if (qr?.base64) return { qrcode: { base64: qr.base64 } };
+      } catch {}
+    }
+    return { qrcode: { base64: null } };
   },
 
   async getQrCode(instanceName: string) {
