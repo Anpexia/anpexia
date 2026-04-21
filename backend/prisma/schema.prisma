@@ -1096,8 +1096,10 @@ model PatientEvolution {
   appointmentId String?  @map("appointment_id")
   subjective    String
   objective     String
-  assessment    String
-  plan          String
+  assessment    String?
+  plan          String?
+  exams         String?
+  returnDate    String?  @map("return_date")
   iop_od        Decimal? @map("iop_od")
   iop_oe        Decimal? @map("iop_oe")
   acuity_od     String?  @map("acuity_od")

@@ -6,8 +6,10 @@ interface CreateEvolutionData {
   appointmentId?: string;
   subjective: string;
   objective: string;
-  assessment: string;
-  plan: string;
+  assessment?: string;
+  plan?: string;
+  exams?: string;
+  returnDate?: string;
   iop_od?: number;
   iop_oe?: number;
   acuity_od?: string;
@@ -36,6 +38,8 @@ export const evolutionsService = {
         objective: data.objective,
         assessment: data.assessment,
         plan: data.plan,
+        exams: data.exams,
+        returnDate: data.returnDate,
         iop_od: data.iop_od,
         iop_oe: data.iop_oe,
         acuity_od: data.acuity_od,

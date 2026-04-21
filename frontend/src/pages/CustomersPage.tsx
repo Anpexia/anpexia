@@ -3,7 +3,6 @@ import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, C
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
-import { isOftalmologia } from '../utils/segment';
 import { useAuth } from '../hooks/useAuth';
 import { useCepLookup, formatarCep } from '../hooks/useCepLookup';
 
@@ -103,8 +102,7 @@ function populateForm(c: Customer) {
 }
 
 export function CustomersPage() {
-  const { user } = useAuth();
-  const tenant = user?.tenant;
+  useAuth();
   const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
   const numberInputRef = useCallback((node: HTMLInputElement | null) => { if (node) node.dataset.numberInput = 'true'; }, []);
 
@@ -152,13 +150,13 @@ export function CustomersPage() {
   const [anamneseData, setAnamneseData] = useState<any>({});
   const [loadingAnamnese, setLoadingAnamnese] = useState(false);
   const [savingAnamnese, setSavingAnamnese] = useState(false);
-  const [anamneseOpen, setAnamneseOpen] = useState<Record<string, boolean>>({ queixa: true, historiaOftalmo: false, historiaMedica: false, sintomas: false, habitos: false });
+  const [anamneseOpen, setAnamneseOpen] = useState<Record<string, boolean>>({ queixa: true, historiaDoenca: false, historicoPassado: false, medicamentos: false, alergias: false, historiaFamiliar: false, historiaSocial: false, observacoes: false });
 
   // Evolucao state
   const [evolucoes, setEvolucoes] = useState<any[]>([]);
   const [loadingEvolucoes, setLoadingEvolucoes] = useState(false);
   const [showNewEvolucao, setShowNewEvolucao] = useState(false);
-  const [evolucaoForm, setEvolucaoForm] = useState({ subjective: '', objective: '', assessment: '', plan: '', iop_od: '', iop_oe: '', acuity_od: '', acuity_oe: '', notes: '' });
+  const [evolucaoForm, setEvolucaoForm] = useState({ subjective: '', objective: '', exams: '', returnDate: '' });
   const [savingEvolucao, setSavingEvolucao] = useState(false);
 
   // Prescricoes state
@@ -366,7 +364,7 @@ export function CustomersPage() {
     setSavingEvolucao(true);
     try {
       await api.post(`/patient-evolution/${selectedCustomer.id}`, evolucaoForm);
-      setEvolucaoForm({ subjective: '', objective: '', assessment: '', plan: '', iop_od: '', iop_oe: '', acuity_od: '', acuity_oe: '', notes: '' });
+      setEvolucaoForm({ subjective: '', objective: '', exams: '', returnDate: '' });
       setShowNewEvolucao(false);
       await fetchEvolucoes(selectedCustomer.id);
       showToast('Evolucao registrada!');
@@ -866,8 +864,8 @@ export function CustomersPage() {
                   <div className="flex flex-wrap gap-2">
                     {[
                       { key: 'dados', label: 'Dados Clinicos', show: true },
-                      { key: 'anamnese', label: 'Anamnese', show: isOftalmologia(tenant) },
-                      { key: 'evolucao', label: 'Evolucao', show: isOftalmologia(tenant) },
+                      { key: 'anamnese', label: 'Anamnese', show: true },
+                      { key: 'evolucao', label: 'Evolucao', show: true },
                     ].filter(t => t.show).map(t => (
                       <button key={t.key} onClick={() => setProntuarioSection(t.key)}
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${prontuarioSection === t.key ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
@@ -975,218 +973,28 @@ export function CustomersPage() {
                         <p className="text-sm text-slate-500 text-center py-8">Carregando anamnese...</p>
                       ) : (
                         <>
-                          {/* Queixa Principal */}
-                          <div className="border border-slate-200 rounded-lg overflow-hidden">
-                            <button onClick={() => setAnamneseOpen({ ...anamneseOpen, queixa: !anamneseOpen.queixa })} className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors">
-                              <span className="text-sm font-medium text-slate-800">Queixa Principal</span>
-                              {anamneseOpen.queixa ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
-                            </button>
-                            {anamneseOpen.queixa && (
-                              <div className="p-4 space-y-3">
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Queixa principal</label>
-                                  <textarea value={anamneseData.queixaPrincipal || ''} onChange={(e) => setAnamneseData({ ...anamneseData, queixaPrincipal: e.target.value })} className={inputCls + ' h-20 resize-none'} placeholder="Descreva a queixa do paciente..." />
+                          {[
+                            { key: 'queixa', label: 'Queixas Principais', field: 'queixaPrincipal', placeholder: 'Descreva as queixas do paciente...' },
+                            { key: 'historiaDoenca', label: 'Historico de Doenca Atual', field: 'historiaDoencaAtual', placeholder: 'Descreva o historico da doenca atual, inicio, evolucao...' },
+                            { key: 'historicoPassado', label: 'Historico Medico Passado', field: 'historicoMedicoPassado', placeholder: 'Cirurgias, internacoes, doencas previas...' },
+                            { key: 'medicamentos', label: 'Medicamentos em Uso', field: 'medicamentos', placeholder: 'Liste os medicamentos, dosagens e frequencia...' },
+                            { key: 'alergias', label: 'Alergias', field: 'alergias', placeholder: 'Alergias a medicamentos, alimentos, substancias...' },
+                            { key: 'historiaFamiliar', label: 'Historico Familiar', field: 'historicoFamiliar', placeholder: 'Doencas na familia: diabetes, hipertensao, cancer, cardiopatias...' },
+                            { key: 'historiaSocial', label: 'Historico Social', field: 'historicoSocial', placeholder: 'Tabagismo, etilismo, atividade fisica, profissao, moradia...' },
+                            { key: 'observacoes', label: 'Observacoes', field: 'observacoesAnamnese', placeholder: 'Observacoes adicionais...' },
+                          ].map(section => (
+                            <div key={section.key} className="border border-slate-200 rounded-lg overflow-hidden">
+                              <button onClick={() => setAnamneseOpen({ ...anamneseOpen, [section.key]: !anamneseOpen[section.key] })} className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors">
+                                <span className="text-sm font-medium text-slate-800">{section.label}</span>
+                                {anamneseOpen[section.key] ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                              </button>
+                              {anamneseOpen[section.key] && (
+                                <div className="p-4">
+                                  <textarea value={anamneseData[section.field] || ''} onChange={(e) => setAnamneseData({ ...anamneseData, [section.field]: e.target.value })} className={inputCls + ' h-24 resize-none'} placeholder={section.placeholder} />
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Tempo de inicio</label>
-                                    <input type="text" value={anamneseData.tempoInicio || ''} onChange={(e) => setAnamneseData({ ...anamneseData, tempoInicio: e.target.value })} className={inputCls} placeholder="Ex: 3 meses" />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Olho afetado</label>
-                                    <select value={anamneseData.olhoAfetado || ''} onChange={(e) => setAnamneseData({ ...anamneseData, olhoAfetado: e.target.value })} className={inputCls}>
-                                      <option value="">Selecione</option>
-                                      <option value="Direito">Direito</option>
-                                      <option value="Esquerdo">Esquerdo</option>
-                                      <option value="Ambos">Ambos</option>
-                                    </select>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Historia Oftalmologica */}
-                          <div className="border border-slate-200 rounded-lg overflow-hidden">
-                            <button onClick={() => setAnamneseOpen({ ...anamneseOpen, historiaOftalmo: !anamneseOpen.historiaOftalmo })} className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors">
-                              <span className="text-sm font-medium text-slate-800">Historia Oftalmologica</span>
-                              {anamneseOpen.historiaOftalmo ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
-                            </button>
-                            {anamneseOpen.historiaOftalmo && (
-                              <div className="p-4 space-y-3">
-                                <div className="grid grid-cols-2 gap-3">
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.usaOculos || false} onChange={(e) => setAnamneseData({ ...anamneseData, usaOculos: e.target.checked })} className="rounded" />
-                                    Usa oculos
-                                  </label>
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.usaLenteContato || false} onChange={(e) => setAnamneseData({ ...anamneseData, usaLenteContato: e.target.checked })} className="rounded" />
-                                    Usa lente de contato
-                                  </label>
-                                </div>
-                                {anamneseData.usaOculos && (
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="block text-xs font-medium text-slate-600 mb-1">Tempo de uso</label>
-                                      <input type="text" value={anamneseData.tempoOculos || ''} onChange={(e) => setAnamneseData({ ...anamneseData, tempoOculos: e.target.value })} className={inputCls} placeholder="Ex: 5 anos" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-medium text-slate-600 mb-1">Grau atual</label>
-                                      <input type="text" value={anamneseData.grauAtual || ''} onChange={(e) => setAnamneseData({ ...anamneseData, grauAtual: e.target.value })} className={inputCls} />
-                                    </div>
-                                  </div>
-                                )}
-                                {anamneseData.usaLenteContato && (
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de lente</label>
-                                      <input type="text" value={anamneseData.tipoLente || ''} onChange={(e) => setAnamneseData({ ...anamneseData, tipoLente: e.target.value })} className={inputCls} />
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-medium text-slate-600 mb-1">Tempo de uso</label>
-                                      <input type="text" value={anamneseData.tempoLente || ''} onChange={(e) => setAnamneseData({ ...anamneseData, tempoLente: e.target.value })} className={inputCls} />
-                                    </div>
-                                  </div>
-                                )}
-                                <div className="space-y-2">
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.cirurgiasAnteriores || false} onChange={(e) => setAnamneseData({ ...anamneseData, cirurgiasAnteriores: e.target.checked })} className="rounded" />
-                                    Cirurgias anteriores
-                                  </label>
-                                  {anamneseData.cirurgiasAnteriores && (
-                                    <textarea value={anamneseData.cirurgiasDetalhes || ''} onChange={(e) => setAnamneseData({ ...anamneseData, cirurgiasDetalhes: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Descreva as cirurgias..." />
-                                  )}
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.traumaOcular || false} onChange={(e) => setAnamneseData({ ...anamneseData, traumaOcular: e.target.checked })} className="rounded" />
-                                    Trauma ocular
-                                  </label>
-                                  {anamneseData.traumaOcular && (
-                                    <textarea value={anamneseData.traumaDetalhes || ''} onChange={(e) => setAnamneseData({ ...anamneseData, traumaDetalhes: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Descreva o trauma..." />
-                                  )}
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Ultima consulta oftalmologica</label>
-                                  <input type="date" value={anamneseData.ultimaConsulta || ''} onChange={(e) => setAnamneseData({ ...anamneseData, ultimaConsulta: e.target.value })} className={inputCls} />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Historia Medica */}
-                          <div className="border border-slate-200 rounded-lg overflow-hidden">
-                            <button onClick={() => setAnamneseOpen({ ...anamneseOpen, historiaMedica: !anamneseOpen.historiaMedica })} className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors">
-                              <span className="text-sm font-medium text-slate-800">Historia Medica</span>
-                              {anamneseOpen.historiaMedica ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
-                            </button>
-                            {anamneseOpen.historiaMedica && (
-                              <div className="p-4 space-y-3">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.diabetes || false} onChange={(e) => setAnamneseData({ ...anamneseData, diabetes: e.target.checked })} className="rounded" />
-                                    Diabetes
-                                  </label>
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.hipertensao || false} onChange={(e) => setAnamneseData({ ...anamneseData, hipertensao: e.target.checked })} className="rounded" />
-                                    Hipertensao
-                                  </label>
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.doencasAutoimunes || false} onChange={(e) => setAnamneseData({ ...anamneseData, doencasAutoimunes: e.target.checked })} className="rounded" />
-                                    Doencas autoimunes
-                                  </label>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Outras doencas</label>
-                                  <input type="text" value={anamneseData.outrasDoencas || ''} onChange={(e) => setAnamneseData({ ...anamneseData, outrasDoencas: e.target.value })} className={inputCls} />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Medicamentos em uso</label>
-                                  <textarea value={anamneseData.medicamentos || ''} onChange={(e) => setAnamneseData({ ...anamneseData, medicamentos: e.target.value })} className={inputCls + ' h-16 resize-none'} />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Alergias</label>
-                                  <textarea value={anamneseData.alergias || ''} onChange={(e) => setAnamneseData({ ...anamneseData, alergias: e.target.value })} className={inputCls + ' h-16 resize-none'} />
-                                </div>
-                                <p className="text-xs font-medium text-slate-600 mt-2">Historico familiar</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.familiarGlaucoma || false} onChange={(e) => setAnamneseData({ ...anamneseData, familiarGlaucoma: e.target.checked })} className="rounded" />
-                                    Glaucoma
-                                  </label>
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.familiarCatarata || false} onChange={(e) => setAnamneseData({ ...anamneseData, familiarCatarata: e.target.checked })} className="rounded" />
-                                    Catarata
-                                  </label>
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.familiarDMRI || false} onChange={(e) => setAnamneseData({ ...anamneseData, familiarDMRI: e.target.checked })} className="rounded" />
-                                    DMRI
-                                  </label>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Outras (familiar)</label>
-                                  <input type="text" value={anamneseData.familiarOutras || ''} onChange={(e) => setAnamneseData({ ...anamneseData, familiarOutras: e.target.value })} className={inputCls} />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Sintomas Atuais */}
-                          <div className="border border-slate-200 rounded-lg overflow-hidden">
-                            <button onClick={() => setAnamneseOpen({ ...anamneseOpen, sintomas: !anamneseOpen.sintomas })} className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors">
-                              <span className="text-sm font-medium text-slate-800">Sintomas Atuais</span>
-                              {anamneseOpen.sintomas ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
-                            </button>
-                            {anamneseOpen.sintomas && (
-                              <div className="p-4">
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                  {[
-                                    { key: 'baixaVisao', label: 'Baixa visao' },
-                                    { key: 'visaoEmbacada', label: 'Visao embacada' },
-                                    { key: 'visaoDupla', label: 'Visao dupla' },
-                                    { key: 'moscasVolantes', label: 'Moscas volantes' },
-                                    { key: 'flashesLuz', label: 'Flashes de luz' },
-                                    { key: 'dorOcular', label: 'Dor ocular' },
-                                    { key: 'olhoVermelho', label: 'Olho vermelho' },
-                                    { key: 'lacrimejamento', label: 'Lacrimejamento' },
-                                    { key: 'fotofobia', label: 'Fotofobia' },
-                                    { key: 'ardencia', label: 'Ardencia' },
-                                    { key: 'coceira', label: 'Coceira' },
-                                    { key: 'secrecao', label: 'Secrecao' },
-                                  ].map(s => (
-                                    <label key={s.key} className="flex items-center gap-2 text-sm text-slate-700">
-                                      <input type="checkbox" checked={anamneseData[s.key] || false} onChange={(e) => setAnamneseData({ ...anamneseData, [s.key]: e.target.checked })} className="rounded" />
-                                      {s.label}
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Habitos */}
-                          <div className="border border-slate-200 rounded-lg overflow-hidden">
-                            <button onClick={() => setAnamneseOpen({ ...anamneseOpen, habitos: !anamneseOpen.habitos })} className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors">
-                              <span className="text-sm font-medium text-slate-800">Habitos</span>
-                              {anamneseOpen.habitos ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
-                            </button>
-                            {anamneseOpen.habitos && (
-                              <div className="p-4 space-y-3">
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Tempo de tela diario (horas)</label>
-                                  <input type="number" value={anamneseData.tempoTela || ''} onChange={(e) => setAnamneseData({ ...anamneseData, tempoTela: e.target.value })} className={inputCls} min="0" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.tabagismo || false} onChange={(e) => setAnamneseData({ ...anamneseData, tabagismo: e.target.checked })} className="rounded" />
-                                    Tabagismo
-                                  </label>
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={anamneseData.atividadeFisica || false} onChange={(e) => setAnamneseData({ ...anamneseData, atividadeFisica: e.target.checked })} className="rounded" />
-                                    Atividade fisica
-                                  </label>
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          ))}
 
                           <button onClick={handleSaveAnamnese} disabled={savingAnamnese} className="w-full py-2.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50 font-medium">
                             {savingAnamnese ? 'Salvando...' : 'Salvar anamnese'}
@@ -1208,45 +1016,21 @@ export function CustomersPage() {
 
                       {showNewEvolucao && (
                         <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Subjetivo</label>
-                              <textarea value={evolucaoForm.subjective} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, subjective: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Queixas do paciente..." />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Objetivo</label>
-                              <textarea value={evolucaoForm.objective} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, objective: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Achados do exame..." />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Avaliacao</label>
-                              <textarea value={evolucaoForm.assessment} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, assessment: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Diagnostico/impressao..." />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Plano</label>
-                              <textarea value={evolucaoForm.plan} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, plan: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Conduta..." />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">PIO OD</label>
-                              <input type="text" value={evolucaoForm.iop_od} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, iop_od: e.target.value })} className={inputCls} placeholder="mmHg" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">PIO OE</label>
-                              <input type="text" value={evolucaoForm.iop_oe} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, iop_oe: e.target.value })} className={inputCls} placeholder="mmHg" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Acuidade OD</label>
-                              <input type="text" value={evolucaoForm.acuity_od} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, acuity_od: e.target.value })} className={inputCls} placeholder="20/20" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Acuidade OE</label>
-                              <input type="text" value={evolucaoForm.acuity_oe} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, acuity_oe: e.target.value })} className={inputCls} placeholder="20/20" />
-                            </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Descricao / Subjetivo</label>
+                            <textarea value={evolucaoForm.subjective} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, subjective: e.target.value })} className={inputCls + ' h-24 resize-none'} placeholder="Queixas do paciente, relato, sintomas..." />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                            <textarea value={evolucaoForm.notes} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, notes: e.target.value })} className={inputCls + ' h-16 resize-none'} />
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Conduta / Objetivo</label>
+                            <textarea value={evolucaoForm.objective} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, objective: e.target.value })} className={inputCls + ' h-24 resize-none'} placeholder="Achados do exame, conduta adotada, tratamento..." />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Exames Solicitados</label>
+                            <textarea value={evolucaoForm.exams} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, exams: e.target.value })} className={inputCls + ' h-20 resize-none'} placeholder="Exames laboratoriais, imagem, outros..." />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Retorno Previsto</label>
+                            <textarea value={evolucaoForm.returnDate} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, returnDate: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Retorno em 30 dias, apos resultado dos exames..." />
                           </div>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setShowNewEvolucao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
@@ -1268,20 +1052,12 @@ export function CustomersPage() {
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs font-medium text-[#1E3A5F]">{format(new Date(ev.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                {ev.subjective && <div><span className="font-medium text-slate-600">S: </span><span className="text-slate-700">{ev.subjective}</span></div>}
-                                {ev.objective && <div><span className="font-medium text-slate-600">O: </span><span className="text-slate-700">{ev.objective}</span></div>}
-                                {ev.assessment && <div><span className="font-medium text-slate-600">A: </span><span className="text-slate-700">{ev.assessment}</span></div>}
-                                {ev.plan && <div><span className="font-medium text-slate-600">P: </span><span className="text-slate-700">{ev.plan}</span></div>}
+                              <div className="space-y-2 text-sm">
+                                {ev.subjective && <div><span className="font-medium text-slate-600">Descricao: </span><span className="text-slate-700">{ev.subjective}</span></div>}
+                                {ev.objective && <div><span className="font-medium text-slate-600">Conduta: </span><span className="text-slate-700">{ev.objective}</span></div>}
+                                {(ev.assessment || ev.exams) && <div><span className="font-medium text-slate-600">Exames: </span><span className="text-slate-700">{ev.exams || ev.assessment}</span></div>}
+                                {(ev.plan || ev.returnDate) && <div><span className="font-medium text-slate-600">Retorno: </span><span className="text-slate-700">{ev.returnDate || ev.plan}</span></div>}
                               </div>
-                              {(ev.iop_od || ev.iop_oe || ev.acuity_od || ev.acuity_oe) && (
-                                <div className="flex gap-4 mt-2 text-xs text-slate-500">
-                                  {ev.iop_od && <span>PIO OD: {ev.iop_od}</span>}
-                                  {ev.iop_oe && <span>PIO OE: {ev.iop_oe}</span>}
-                                  {ev.acuity_od && <span>AV OD: {ev.acuity_od}</span>}
-                                  {ev.acuity_oe && <span>AV OE: {ev.acuity_oe}</span>}
-                                </div>
-                              )}
                               {ev.notes && <p className="text-xs text-slate-400 mt-1">{ev.notes}</p>}
                             </div>
                           ))}
@@ -1312,8 +1088,6 @@ export function CustomersPage() {
                         <select value={prescricaoType} onChange={(e) => { setPrescricaoType(e.target.value); setPrescricaoItems([]); }} className={inputCls}>
                           <option value="MEDICAMENTO">Medicamento</option>
                           <option value="EXAME_EXTERNO">Exame Externo</option>
-                          {isOftalmologia(tenant) && <option value="OCULOS">Oculos</option>}
-                          {isOftalmologia(tenant) && <option value="EXAME_INTERNO">Exame Interno</option>}
                         </select>
                       </div>
 
