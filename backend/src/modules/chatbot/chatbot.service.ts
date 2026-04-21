@@ -164,13 +164,11 @@ export const chatbotService = {
     const senderPhone = remoteJid.replace(/@s\.whatsapp\.net$/, '').replace(/@lid$/, '');
     const senderName = data.data.pushName || 'Cliente';
 
-    // Evolution v1.8.2 sends 'sender' at top level BUT it's the instance owner, NOT the message sender.
-    // For LID remoteJid, we need to use the Evolution API to resolve it, or use the LID directly
-    // since Evolution API accepts sending to LID format.
-    // The 'sender' field = instance owner (557181449402@s.whatsapp.net), NOT useful for incoming messages.
-    // Solution: send responses using the original remoteJid (LID format) — Evolution API handles the mapping.
-    const phoneForSend = remoteJid; // Use full JID for sending (Evolution resolves LID internally)
-    const phoneForDb = data.sender?.replace(/@s\.whatsapp\.net$/, '') || senderPhone; // For DB/lookups
+    // Use remoteJid for both sending and DB — data.sender is the instance OWNER, not the message sender
+    const phoneForSend = remoteJid;
+    const phoneForDb = evolutionApi.ensureBrazilian9thDigit(
+      senderPhone.startsWith('55') ? senderPhone : `55${senderPhone}`
+    );
     console.log(`[CHATBOT] remoteJid=${remoteJid} phoneForSend=${phoneForSend} phoneForDb=${phoneForDb} fromMe=${data.data.key.fromMe}`);
 
     // Encontrar o tenant pela instância do WhatsApp

@@ -33,7 +33,7 @@ interface ConversationState {
   expiresAt: number;
 }
 
-const STATE_TTL = 30 * 60 * 1000; // 30 minutes
+const STATE_TTL = 10 * 60 * 1000; // 10 minutes — reset conversation after inactivity
 const conversations = new Map<string, ConversationState>();
 
 function key(tenantId: string, phone: string) {
@@ -46,6 +46,7 @@ function getState(tenantId: string, phone: string): ConversationState | null {
   if (!state) return null;
   if (Date.now() > state.expiresAt) {
     conversations.delete(k);
+    prisma.chatDataCollection.deleteMany({ where: { tenantId, phone } }).catch(() => {});
     return null;
   }
   return state;
@@ -68,11 +69,18 @@ function clearState(tenantId: string, phone: string) {
   conversations.delete(key(tenantId, phone));
 }
 
-// Clean expired entries periodically
-setInterval(() => {
+// Clean expired entries periodically + delete stale ChatDataCollection from DB
+setInterval(async () => {
   const now = Date.now();
   for (const [k, v] of conversations) {
-    if (now > v.expiresAt) conversations.delete(k);
+    if (now > v.expiresAt) {
+      conversations.delete(k);
+      try {
+        await prisma.chatDataCollection.deleteMany({
+          where: { tenantId: v.tenantId, phone: v.phone },
+        });
+      } catch {}
+    }
   }
 }, 5 * 60 * 1000);
 

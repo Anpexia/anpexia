@@ -224,8 +224,13 @@ chatbotRouter.post('/whatsapp/connect', async (req: Request, res: Response, next
       const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } });
       if (!tenant) return res.status(404).json({ success: false, error: { message: 'Tenant nao encontrado' } });
       const instanceName = `tenant-${tenant.slug}`;
-      await chatbotService.updateConfig(tenantId, { instanceName });
+      await chatbotService.updateConfig(tenantId, { instanceName, isActive: true });
       config = await chatbotService.getConfig(tenantId);
+    }
+
+    // Ensure chatbot is active when connecting
+    if (!config.isActive) {
+      await chatbotService.updateConfig(tenantId, { isActive: true });
     }
 
     const result = await evolutionApi.resetInstance(config.instanceName!);

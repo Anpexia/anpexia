@@ -100,10 +100,23 @@ export const evolutionApi = {
   // Helper: format phone number
   // ============================================================
   formatPhone(phone: string): string {
-    // If it's a full JID (contains @), pass it through as-is — Evolution API handles it
-    if (phone.includes('@')) return phone;
+    if (phone.includes('@')) {
+      const num = phone.split('@')[0].replace(/\D/g, '');
+      return this.ensureBrazilian9thDigit(num);
+    }
     const cleaned = phone.replace(/\D/g, '');
-    return cleaned.startsWith('55') ? cleaned : `55${cleaned}`;
+    const withCountry = cleaned.startsWith('55') ? cleaned : `55${cleaned}`;
+    return this.ensureBrazilian9thDigit(withCountry);
+  },
+
+  ensureBrazilian9thDigit(phone: string): string {
+    if (!phone.startsWith('55')) return phone;
+    // Brazilian mobile: 55 + 2-digit DDD + 9 + 8 digits = 13 digits
+    // If 12 digits (missing the 9), insert it after DDD
+    if (phone.length === 12) {
+      return phone.slice(0, 4) + '9' + phone.slice(4);
+    }
+    return phone;
   },
 
   // ============================================================
