@@ -36,7 +36,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       return next(new AppError(401, 'TOKEN_REVOKED', 'Sessão encerrada. Faça login novamente.'));
     }
 
-    const payload = jwt.verify(token, env.jwtSecret) as AuthPayload;
+    const payload = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] }) as AuthPayload;
     req.auth = { ...payload, token };
     next();
   } catch {
@@ -65,7 +65,7 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   if (!header?.startsWith('Bearer ')) return next();
 
   try {
-    const payload = jwt.verify(header.slice(7), env.jwtSecret) as AuthPayload;
+    const payload = jwt.verify(header.slice(7), env.jwtSecret, { algorithms: ['HS256'] }) as AuthPayload;
     req.auth = { ...payload, token: header.slice(7) };
   } catch {
     // Invalid token — just skip, don't block

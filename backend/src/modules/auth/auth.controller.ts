@@ -56,7 +56,7 @@ authRouter.post('/admin/login', publicRateLimit, async (req: Request, res: Respo
   }
 });
 
-authRouter.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/register', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerSchema.parse(req.body);
     const result = await authService.register(data);

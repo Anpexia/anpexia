@@ -239,7 +239,9 @@ export const customerService = {
     });
   },
 
-  async removeTag(customerId: string, tagId: string) {
+  async removeTag(tenantId: string, customerId: string, tagId: string) {
+    const customer = await prisma.customer.findFirst({ where: { id: customerId, tenantId } });
+    if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado');
     await prisma.customerTagAssignment.deleteMany({
       where: { customerId, tagId },
     });

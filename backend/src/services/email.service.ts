@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { env } from '../config/env';
+import { escapeHtml } from '../shared/utils/html';
 
 const resend = new Resend(env.resendApiKey);
 
@@ -56,17 +57,19 @@ export async function sendLowStockAlert(
     .map(
       (p) =>
         `<tr>
-          <td style="padding:8px;border:1px solid #ddd">${p.name}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.currentStock} ${p.unit}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.minStock} ${p.unit}</td>
+          <td style="padding:8px;border:1px solid #ddd">${escapeHtml(p.name)}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.currentStock} ${escapeHtml(p.unit)}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.minStock} ${escapeHtml(p.unit)}</td>
         </tr>`,
     )
     .join('');
 
+  const bn = escapeHtml(businessName);
+  const sn = escapeHtml(supplierName);
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
-      <h2 style="color:#e53e3e">Alerta de Estoque Baixo - ${businessName}</h2>
-      <p>Olá ${supplierName},</p>
+      <h2 style="color:#e53e3e">Alerta de Estoque Baixo - ${bn}</h2>
+      <p>Olá ${sn},</p>
       <p>Os seguintes produtos estão com estoque abaixo do mínimo:</p>
       <table style="width:100%;border-collapse:collapse;margin:16px 0">
         <thead>
@@ -79,7 +82,7 @@ export async function sendLowStockAlert(
         <tbody>${rows}</tbody>
       </table>
       <p>Poderia nos informar disponibilidade e prazo de entrega?</p>
-      <p>Obrigado!<br/>${businessName}</p>
+      <p>Obrigado!<br/>${bn}</p>
     </div>
   `;
 
@@ -109,18 +112,20 @@ export async function sendPurchaseOrder(
     .map(
       (p) =>
         `<tr>
-          <td style="padding:8px;border:1px solid #ddd">${p.productName}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.currentStock} ${p.unit}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.minStock} ${p.unit}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.quantity} ${p.unit}</td>
+          <td style="padding:8px;border:1px solid #ddd">${escapeHtml(p.productName)}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.currentStock} ${escapeHtml(p.unit)}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.minStock} ${escapeHtml(p.unit)}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center">${p.quantity} ${escapeHtml(p.unit)}</td>
         </tr>`,
     )
     .join('');
 
+  const bn = escapeHtml(businessName);
+  const sn = escapeHtml(supplierName);
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
-      <h2 style="color:#333">Pedido de Reposição - ${businessName}</h2>
-      <p>Olá ${supplierName},</p>
+      <h2 style="color:#333">Pedido de Reposição - ${bn}</h2>
+      <p>Olá ${sn},</p>
       <p>Precisamos repor os seguintes itens:</p>
       <table style="width:100%;border-collapse:collapse;margin:16px 0">
         <thead>
@@ -133,9 +138,9 @@ export async function sendPurchaseOrder(
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      ${message ? `<p><strong>Observações:</strong> ${message}</p>` : ''}
+      ${message ? `<p><strong>Observações:</strong> ${escapeHtml(message)}</p>` : ''}
       <p>Poderia nos informar prazo e disponibilidade?</p>
-      <p>Obrigado!<br/>${businessName}</p>
+      <p>Obrigado!<br/>${bn}</p>
     </div>
   `;
 

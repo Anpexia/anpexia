@@ -34,7 +34,7 @@ function signAccessToken(user: { id: string; tenantId: string | null; role: stri
     role: user.role,
     email: user.email,
   };
-  return jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as any });
+  return jwt.sign(payload, env.jwtSecret, { algorithm: 'HS256', expiresIn: env.jwtExpiresIn as any });
 }
 
 async function cleanupExpiredBlacklist(): Promise<void> {
@@ -275,7 +275,7 @@ export const authService = {
 
   async resend2FACode(userId: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuário não encontrado');
+    if (!user) return; // silent — don't reveal if user exists
     const code = generateEmailCode();
     storeEmailCode(user.id, code);
     await sendEmailCode(user.email, user.name, code);

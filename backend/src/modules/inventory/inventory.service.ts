@@ -1,5 +1,6 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
+import { escapeHtml } from '../../shared/utils/html';
 
 // Check if product is low stock and send email to linked supplier (non-blocking)
 async function checkLowStockEmail(productId: string, tenantId: string, quantity: number, minQuantity: number) {
@@ -50,32 +51,35 @@ async function checkLowStockEmail(productId: string, tenantId: string, quantity:
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, phone: true, email: true } });
     const { sendEmail } = await import('../../services/email.service');
 
+    const tn = escapeHtml(tenant?.name || 'Clinica');
+    const sn = escapeHtml(link.supplier.contactName || link.supplier.name);
+    const pn = escapeHtml(product.name);
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
-        <h2 style="color:#1E3A5F">Pedido de reposicao — ${tenant?.name || 'Clinica'}</h2>
-        <p>Ola ${link.supplier.contactName || link.supplier.name},</p>
+        <h2 style="color:#1E3A5F">Pedido de reposicao — ${tn}</h2>
+        <p>Ola ${sn},</p>
         <p>O produto abaixo atingiu o estoque minimo e precisamos de reposicao:</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0">
           <tr style="background:#f5f5f5">
             <td style="padding:10px;border:1px solid #ddd;font-weight:bold">Produto</td>
-            <td style="padding:10px;border:1px solid #ddd">${product.name}</td>
+            <td style="padding:10px;border:1px solid #ddd">${pn}</td>
           </tr>
-          ${product.sku ? `<tr><td style="padding:10px;border:1px solid #ddd;font-weight:bold">SKU</td><td style="padding:10px;border:1px solid #ddd">${product.sku}</td></tr>` : ''}
+          ${product.sku ? `<tr><td style="padding:10px;border:1px solid #ddd;font-weight:bold">SKU</td><td style="padding:10px;border:1px solid #ddd">${escapeHtml(product.sku)}</td></tr>` : ''}
           <tr>
             <td style="padding:10px;border:1px solid #ddd;font-weight:bold">Quantidade atual</td>
-            <td style="padding:10px;border:1px solid #ddd;color:#e53e3e;font-weight:bold">${quantity} ${product.unit || 'un'}</td>
+            <td style="padding:10px;border:1px solid #ddd;color:#e53e3e;font-weight:bold">${quantity} ${escapeHtml(product.unit || 'un')}</td>
           </tr>
           <tr>
             <td style="padding:10px;border:1px solid #ddd;font-weight:bold">Quantidade minima</td>
-            <td style="padding:10px;border:1px solid #ddd">${minQuantity} ${product.unit || 'un'}</td>
+            <td style="padding:10px;border:1px solid #ddd">${minQuantity} ${escapeHtml(product.unit || 'un')}</td>
           </tr>
         </table>
         <p>Solicitamos a reposicao do produto acima. Entre em contato para confirmar o pedido.</p>
         <hr style="border:none;border-top:1px solid #eee;margin:20px 0"/>
         <p style="color:#666;font-size:13px">
-          <strong>${tenant?.name || 'Clinica'}</strong><br/>
-          ${tenant?.phone ? `Tel: ${tenant.phone}<br/>` : ''}
-          ${tenant?.email ? `Email: ${tenant.email}` : ''}
+          <strong>${tn}</strong><br/>
+          ${tenant?.phone ? `Tel: ${escapeHtml(tenant.phone)}<br/>` : ''}
+          ${tenant?.email ? `Email: ${escapeHtml(tenant.email)}` : ''}
         </p>
       </div>
     `;
@@ -121,32 +125,35 @@ async function testLowStockEmailForProduct(productId: string, tenantId: string) 
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, phone: true, email: true } });
   const { sendEmail } = await import('../../services/email.service');
 
+  const tn2 = escapeHtml(tenant?.name || 'Clinica');
+  const sn2 = escapeHtml(link.supplier.contactName || link.supplier.name);
+  const pn2 = escapeHtml(product.name);
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
-      <h2 style="color:#1E3A5F">Pedido de reposicao — ${tenant?.name || 'Clinica'}</h2>
-      <p>Ola ${link.supplier.contactName || link.supplier.name},</p>
+      <h2 style="color:#1E3A5F">Pedido de reposicao — ${tn2}</h2>
+      <p>Ola ${sn2},</p>
       <p>O produto abaixo atingiu o estoque minimo e precisamos de reposicao:</p>
       <table style="width:100%;border-collapse:collapse;margin:16px 0">
         <tr style="background:#f5f5f5">
           <td style="padding:10px;border:1px solid #ddd;font-weight:bold">Produto</td>
-          <td style="padding:10px;border:1px solid #ddd">${product.name}</td>
+          <td style="padding:10px;border:1px solid #ddd">${pn2}</td>
         </tr>
-        ${product.sku ? `<tr><td style="padding:10px;border:1px solid #ddd;font-weight:bold">SKU</td><td style="padding:10px;border:1px solid #ddd">${product.sku}</td></tr>` : ''}
+        ${product.sku ? `<tr><td style="padding:10px;border:1px solid #ddd;font-weight:bold">SKU</td><td style="padding:10px;border:1px solid #ddd">${escapeHtml(product.sku)}</td></tr>` : ''}
         <tr>
           <td style="padding:10px;border:1px solid #ddd;font-weight:bold">Quantidade atual</td>
-          <td style="padding:10px;border:1px solid #ddd;color:#e53e3e;font-weight:bold">${product.quantity} ${product.unit || 'un'}</td>
+          <td style="padding:10px;border:1px solid #ddd;color:#e53e3e;font-weight:bold">${product.quantity} ${escapeHtml(product.unit || 'un')}</td>
         </tr>
         <tr>
           <td style="padding:10px;border:1px solid #ddd;font-weight:bold">Quantidade minima</td>
-          <td style="padding:10px;border:1px solid #ddd">${product.minQuantity} ${product.unit || 'un'}</td>
+          <td style="padding:10px;border:1px solid #ddd">${product.minQuantity} ${escapeHtml(product.unit || 'un')}</td>
         </tr>
       </table>
       <p>Solicitamos a reposicao do produto acima. Entre em contato para confirmar o pedido.</p>
       <hr style="border:none;border-top:1px solid #eee;margin:20px 0"/>
       <p style="color:#666;font-size:13px">
-        <strong>${tenant?.name || 'Clinica'}</strong><br/>
-        ${tenant?.phone ? `Tel: ${tenant.phone}<br/>` : ''}
-        ${tenant?.email ? `Email: ${tenant.email}` : ''}
+        <strong>${tn2}</strong><br/>
+        ${tenant?.phone ? `Tel: ${escapeHtml(tenant.phone)}<br/>` : ''}
+        ${tenant?.email ? `Email: ${escapeHtml(tenant.email)}` : ''}
       </p>
     </div>
   `;

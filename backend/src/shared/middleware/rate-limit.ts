@@ -17,3 +17,17 @@ export const publicRateLimit = rateLimit({
     },
   },
 });
+
+export const apiRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Limite de requisições excedido. Tente novamente em alguns minutos.',
+    },
+  },
+});

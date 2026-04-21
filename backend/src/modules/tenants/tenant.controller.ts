@@ -10,7 +10,7 @@ export const tenantRouter = Router();
 
 // Todas as rotas requerem autenticação de super admin
 tenantRouter.use(authenticate);
-tenantRouter.use(requireRole('SUPER_ADMIN', 'ADMIN', 'GERENTE'));
+tenantRouter.use(requireRole('SUPER_ADMIN', 'ADMIN'));
 
 tenantRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {

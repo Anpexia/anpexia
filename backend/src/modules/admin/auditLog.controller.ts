@@ -25,8 +25,8 @@ function buildWhere(req: Request) {
     }
   }
 
-  // OWNERs may only read their own tenant's logs
-  if (req.auth?.role === 'OWNER' && req.auth.tenantId) {
+  // OWNERs and GERENTEs may only read their own tenant's logs
+  if ((req.auth?.role === 'OWNER' || req.auth?.role === 'GERENTE') && req.auth.tenantId) {
     where.tenantId = req.auth.tenantId;
   }
   return where;
@@ -34,7 +34,7 @@ function buildWhere(req: Request) {
 
 auditLogRouter.get('/audit-log/tenants', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (req.auth?.role === 'OWNER' && req.auth.tenantId) {
+    if ((req.auth?.role === 'OWNER' || req.auth?.role === 'GERENTE') && req.auth.tenantId) {
       const t = await prisma.tenant.findUnique({
         where: { id: req.auth.tenantId },
         select: { id: true, name: true },

@@ -46,10 +46,9 @@ export function errorHandler(
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     console.error('[PRISMA] Known error:', err.code, err.message);
     if (err.code === 'P2002') {
-      const target = (err.meta?.target as string[])?.join(', ') || 'campo';
       return res.status(409).json({
         success: false,
-        error: { code: 'DUPLICATE', message: `Registro duplicado no campo: ${target}` },
+        error: { code: 'DUPLICATE', message: 'Registro duplicado. Verifique os dados e tente novamente.' },
       });
     }
     if (err.code === 'P2025') {

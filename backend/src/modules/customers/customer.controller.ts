@@ -107,7 +107,7 @@ customerRouter.post('/:id/tags', async (req: Request, res: Response, next: NextF
 
 customerRouter.delete('/:id/tags/:tagId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await customerService.removeTag(req.params.id as string, req.params.tagId as string);
+    await customerService.removeTag(req.auth!.tenantId!, req.params.id as string, req.params.tagId as string);
     return noContent(res);
   } catch (err) {
     next(err);

@@ -62,8 +62,8 @@ const corsOptions: cors.CorsOptions = {
     }
 
     console.log('CORS blocked:', origin, '| Allowed:', allowedOrigins);
-    // Allow Vercel preview deployments
-    if (normalizedOrigin.includes('vercel.app') || normalizedOrigin.includes('anpexia')) {
+    // Allow Vercel preview deployments only from known project prefixes
+    if (/^https:\/\/(anpexia-app|admin-nine-pied|anpexia-landing|anpexia-admin)[\w-]*\.vercel\.app$/.test(normalizedOrigin)) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
@@ -114,7 +114,6 @@ async function loadRoutes() {
     const { messagingRouter } = await import('./modules/messaging/messaging.controller');
     const { dashboardRouter } = await import('./modules/dashboard/dashboard.controller');
     const { chatbotRouter } = await import('./modules/chatbot/chatbot.controller');
-    const { chatbotService } = await import('./modules/chatbot/chatbot.service');
     const schedulingRouter = (await import('./modules/scheduling/scheduling.controller')).default;
     const salesRouter = (await import('./modules/sales/sales.controller')).default;
     const { adminCrmRouter, publicLeadsRouter } = await import('./modules/sales/crm.controller');
@@ -143,6 +142,9 @@ async function loadRoutes() {
     const { adminUsersRouter } = await import('./modules/admin/adminUsers.controller');
     const { autoAudit } = await import('./shared/middleware/autoAudit');
     const { googleRouter } = await import('./routes/google.routes');
+    const { apiRateLimit } = await import('./shared/middleware/rate-limit');
+
+    app.use('/api/v1', apiRateLimit);
 
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/tenants', tenantRouter);
@@ -156,39 +158,7 @@ async function loadRoutes() {
       next();
     });
 
-    // Test endpoint — no auth, registered before chatbot router
-    app.post('/api/v1/chatbot/test-message', async (req, res) => {
-      try {
-        const { phone, message } = req.body;
-        if (!phone || !message) {
-          return res.status(400).json({ success: false, error: 'Missing phone or message in body' });
-        }
-        const result = await chatbotService.handleTestMessage(phone, message);
-        return res.json({ success: true, ...result });
-      } catch (err: any) {
-        console.error('[TEST-MESSAGE] Error:', err.message);
-        return res.status(500).json({ success: false, error: err.message });
-      }
-    });
     app.use('/api/v1/chatbot', chatbotRouter);
-
-    // Test email endpoint — no auth
-    app.post('/api/v1/test/email', async (req, res) => {
-      try {
-        const { sendEmail } = await import('./services/email.service');
-        const result = await sendEmail({
-          to: 'angelolarocca10@gmail.com',
-          subject: 'Teste Resend Anpexia',
-          html: '<h2>Teste Resend Anpexia</h2><p>Configuração de email funcionando com sucesso! ✅</p>',
-          text: 'Configuração de email funcionando com sucesso!',
-        });
-        console.log('[TEST-EMAIL] Sent:', result.id);
-        return res.json({ success: true, emailId: result.id });
-      } catch (err: any) {
-        console.error('[TEST-EMAIL] Error:', err.message);
-        return res.status(500).json({ success: false, error: err.message });
-      }
-    });
     app.use('/api/v1/demo-eloy', demoEloyRouter);
 
     app.use('/api/v1/scheduling', schedulingRouter);
