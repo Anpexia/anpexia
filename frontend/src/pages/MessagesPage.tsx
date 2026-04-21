@@ -456,7 +456,7 @@ export function MessagesPage() {
                     <Plus size={16} />Nova FAQ
                   </button>
                 </div>
-                <p className="text-sm text-slate-500 mb-4">O chatbot usa essas perguntas e respostas para responder seus clientes automaticamente.</p>
+                <p className="text-sm text-slate-500 mb-4">O chatbot usa essas perguntas e respostas para responder seus pacientes automaticamente.</p>
                 {faqs.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-4">Nenhuma FAQ cadastrada.</p>
                 ) : (
@@ -494,10 +494,10 @@ export function MessagesPage() {
             </div>
             <form onSubmit={handleSendMessage} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Paciente</label>
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" value={customerSearch} onChange={(e) => { setCustomerSearch(e.target.value); setSendCustomerId(''); }} className={inputCls + ' pl-9'} placeholder="Buscar cliente..." />
+                  <input type="text" value={customerSearch} onChange={(e) => { setCustomerSearch(e.target.value); setSendCustomerId(''); }} className={inputCls + ' pl-9'} placeholder="Buscar paciente..." />
                 </div>
                 {customerSearch && !sendCustomerId && customers.length > 0 && (
                   <div className="mt-1 border border-slate-200 rounded-lg max-h-32 overflow-y-auto">

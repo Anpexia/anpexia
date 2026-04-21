@@ -285,15 +285,15 @@ export function CustomersPage() {
       };
       await api.post('/customers', payload);
       setModalMode('closed'); setFormData(emptyForm); fetchCustomers();
-      showToast('Cliente criado com sucesso!');
+      showToast('Paciente criado com sucesso!');
     } catch (err: any) {
-      const msg = err?.response?.data?.error?.message || 'Erro ao criar cliente. Tente novamente.';
+      const msg = err?.response?.data?.error?.message || 'Erro ao criar paciente. Tente novamente.';
       showToast(msg);
     } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
-    try { await api.delete(`/customers/${id}`); setDeleteConfirm(null); setModalMode('closed'); fetchCustomers(); showToast('Cliente removido.'); } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao remover cliente.'); }
+    try { await api.delete(`/customers/${id}`); setDeleteConfirm(null); setModalMode('closed'); fetchCustomers(); showToast('Paciente removido.'); } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao remover paciente.'); }
   };
 
   const handleSaveMedical = async () => {
@@ -493,11 +493,11 @@ export function CustomersPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Clientes</h2>
-          <p className="text-slate-500 mt-1">Gerencie seus clientes e contatos</p>
+          <h2 className="text-2xl font-bold text-slate-800">Pacientes</h2>
+          <p className="text-slate-500 mt-1">Gerencie seus pacientes</p>
         </div>
         <button onClick={openCreate} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
-          <Plus size={18} /> Novo cliente
+          <Plus size={18} /> Novo paciente
         </button>
       </div>
 
@@ -526,7 +526,7 @@ export function CustomersPage() {
             {loading ? (
               <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-500">Carregando...</td></tr>
             ) : customers.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-500">Nenhum cliente cadastrado ainda.</td></tr>
+              <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-500">Nenhum paciente cadastrado ainda.</td></tr>
             ) : (
               customers.map((c) => (
                 <tr key={c.id} className="border-b border-slate-100 hover:bg-blue-50/50 even:bg-slate-50/50 cursor-pointer" onClick={() => openDetail(c)}>
@@ -566,7 +566,7 @@ export function CustomersPage() {
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-sm p-6">
-            <h3 className="font-semibold text-slate-800 mb-2">Excluir cliente?</h3>
+            <h3 className="font-semibold text-slate-800 mb-2">Excluir paciente?</h3>
             <p className="text-sm text-slate-500 mb-6">Esta acao nao pode ser desfeita.</p>
             <div className="flex gap-3">
               <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
@@ -581,7 +581,7 @@ export function CustomersPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-800">Novo cliente</h3>
+              <h3 className="font-semibold text-slate-800">Novo paciente</h3>
               <button onClick={() => setModalMode('closed')} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
             <form onSubmit={handleCreateCustomer} className="space-y-4">
@@ -646,7 +646,7 @@ export function CustomersPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Criar cliente'}</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Criar paciente'}</button>
               </div>
             </form>
           </div>

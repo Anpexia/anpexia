@@ -411,7 +411,7 @@ function TenantsPage() {
               <div>
                 <h4 className="font-medium text-gray-800 mb-2">Estatisticas</h4>
                 <div className="grid grid-cols-3 gap-3 text-sm text-center">
-                  <div className="p-3 bg-gray-50 rounded"><span className="block text-lg font-bold">{showDetail._count?.customers || 0}</span>Clientes</div>
+                  <div className="p-3 bg-gray-50 rounded"><span className="block text-lg font-bold">{showDetail._count?.customers || 0}</span>Pacientes</div>
                   <div className="p-3 bg-gray-50 rounded"><span className="block text-lg font-bold">{showDetail._count?.products || 0}</span>Produtos</div>
                   <div className="p-3 bg-gray-50 rounded"><span className="block text-lg font-bold">{showDetail._count?.messagesSent || 0}</span>Mensagens</div>
                 </div>
@@ -431,7 +431,7 @@ function TenantsPage() {
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Plano</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Status</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Usuarios</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Clientes</th>
+              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Pacientes</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Acoes</th>
             </tr>
           </thead>

@@ -8,7 +8,7 @@ import { useInactivityLogout } from '../hooks/useInactivityLogout';
 
 const allNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/clientes', label: 'Clientes', icon: Users },
+  { path: '/pacientes', label: 'Pacientes', icon: Users },
   { path: '/estoque', label: 'Estoque', icon: Package },
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { path: '/mensagens', label: 'Mensagens', icon: MessageSquare },
@@ -24,10 +24,10 @@ const roleAllowedPaths: Record<string, string[]> = {
   SUPER_ADMIN: allNavItems.map(i => i.path),
   OWNER: allNavItems.map(i => i.path),
   MANAGER: allNavItems.map(i => i.path),
-  DOCTOR: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/perfil'],
-  RECEPTIONIST: ['/dashboard', '/clientes', '/mensagens', '/agendamentos', '/scripts', '/perfil'],
+  DOCTOR: ['/dashboard', '/pacientes', '/mensagens', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/perfil'],
+  RECEPTIONIST: ['/dashboard', '/pacientes', '/mensagens', '/agendamentos', '/scripts', '/perfil'],
   FINANCIAL: ['/dashboard', '/financeiro', '/perfil'],
-  EMPLOYEE: ['/dashboard', '/clientes', '/agendamentos', '/perfil'],
+  EMPLOYEE: ['/dashboard', '/pacientes', '/agendamentos', '/perfil'],
 };
 
 export function Layout() {

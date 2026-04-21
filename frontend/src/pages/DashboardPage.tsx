@@ -120,7 +120,7 @@ export function DashboardPage() {
   };
 
   const overviewChartData = [
-    { name: 'Clientes', value: d.customers.total, color: '#4F46E5' },
+    { name: 'Pacientes', value: d.customers.total, color: '#4F46E5' },
     { name: 'Produtos', value: d.inventory.totalProducts, color: '#10B981' },
     { name: 'Msg hoje', value: d.messages.sentToday, color: '#8B5CF6' },
     { name: 'Msg semana', value: d.messages.sentThisWeek, color: '#93C5FD' },
@@ -151,12 +151,12 @@ export function DashboardPage() {
           {/* KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <StatCard
-              title="Total de clientes"
+              title="Total de pacientes"
               value={d.customers.total}
               subtitle={`${d.customers.newThisWeek} novos esta semana`}
               icon={Users}
               color="blue"
-              onClick={() => navigate('/clientes')}
+              onClick={() => navigate('/pacientes')}
             />
             <StatCard
               title="Produtos em estoque"
@@ -286,10 +286,10 @@ export function DashboardPage() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
                 <UserPlus size={18} className="text-slate-500" />
-                <h3 className="font-semibold text-slate-800">Resumo de clientes</h3>
+                <h3 className="font-semibold text-slate-800">Resumo de pacientes</h3>
               </div>
               {d.customers.total === 0 ? (
-                <p className="text-sm text-slate-500">Nenhum cliente cadastrado ainda.</p>
+                <p className="text-sm text-slate-500">Nenhum paciente cadastrado ainda.</p>
               ) : (
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">

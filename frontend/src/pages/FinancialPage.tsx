@@ -1157,12 +1157,12 @@ export function FinancialPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">ID do Cliente (opcional)</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">ID do Paciente (opcional)</label>
                 <input
                   type="text"
                   value={txForm.customerId}
                   onChange={e => setTxForm({ ...txForm, customerId: e.target.value })}
-                  placeholder="ID do cliente vinculado"
+                  placeholder="ID do paciente vinculado"
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 />
               </div>
