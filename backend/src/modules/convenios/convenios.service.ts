@@ -48,7 +48,10 @@ export const conveniosService = {
 
   // ---- Patient Convenio ----
 
-  async getPatientConvenio(patientId: string) {
+  async getPatientConvenio(tenantId: string, patientId: string) {
+    const patient = await prisma.customer.findFirst({ where: { id: patientId, tenantId } });
+    if (!patient) throw new AppError(404, 'NOT_FOUND', 'Paciente nao encontrado');
+
     return prisma.patientConvenio.findFirst({
       where: { patientId },
       include: {
@@ -58,17 +61,22 @@ export const conveniosService = {
     });
   },
 
-  async upsertPatientConvenio(patientId: string, data: {
+  async upsertPatientConvenio(tenantId: string, patientId: string, data: {
     convenioId: string;
     numeroCarteirinha: string;
     validade?: string | null;
     titular?: string;
     nomeTitular?: string | null;
   }) {
+    const patient = await prisma.customer.findFirst({ where: { id: patientId, tenantId } });
+    if (!patient) throw new AppError(404, 'NOT_FOUND', 'Paciente nao encontrado');
+
+    const convenio = await prisma.convenio.findFirst({ where: { id: data.convenioId, tenantId } });
+    if (!convenio) throw new AppError(404, 'NOT_FOUND', 'Convenio nao encontrado');
+
     const existing = await prisma.patientConvenio.findFirst({ where: { patientId } });
 
     if (existing) {
-      // If changing convenio, delete old and create new
       if (existing.convenioId !== data.convenioId) {
         await prisma.patientConvenio.delete({ where: { id: existing.id } });
         return prisma.patientConvenio.create({
@@ -110,7 +118,10 @@ export const conveniosService = {
 
   // ---- Autorizacoes ----
 
-  async listAutorizacoes(patientId: string) {
+  async listAutorizacoes(tenantId: string, patientId: string) {
+    const patient = await prisma.customer.findFirst({ where: { id: patientId, tenantId } });
+    if (!patient) throw new AppError(404, 'NOT_FOUND', 'Paciente nao encontrado');
+
     const pc = await prisma.patientConvenio.findFirst({ where: { patientId } });
     if (!pc) return [];
     return prisma.autorizacao.findMany({
@@ -125,6 +136,9 @@ export const conveniosService = {
     observacoes?: string;
     criadoPor?: string;
   }) {
+    const patient = await prisma.customer.findFirst({ where: { id: patientId, tenantId } });
+    if (!patient) throw new AppError(404, 'NOT_FOUND', 'Paciente nao encontrado');
+
     const pc = await prisma.patientConvenio.findFirst({ where: { patientId } });
     if (!pc) throw new AppError(400, 'NO_CONVENIO', 'Paciente nao possui convenio cadastrado');
     return prisma.autorizacao.create({

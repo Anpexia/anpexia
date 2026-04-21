@@ -50,14 +50,14 @@ conveniosRouter.delete('/:id', async (req: Request, res: Response, next: NextFun
 
 conveniosRouter.get('/patients/:patientId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await conveniosService.getPatientConvenio(req.params.patientId as string);
+    const data = await conveniosService.getPatientConvenio(req.auth!.tenantId!, req.params.patientId as string);
     return success(res, data);
   } catch (err) { next(err); }
 });
 
 conveniosRouter.post('/patients/:patientId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await conveniosService.upsertPatientConvenio(req.params.patientId as string, req.body);
+    const data = await conveniosService.upsertPatientConvenio(req.auth!.tenantId!, req.params.patientId as string, req.body);
     return success(res, data);
   } catch (err) { next(err); }
 });
@@ -66,7 +66,7 @@ conveniosRouter.post('/patients/:patientId', async (req: Request, res: Response,
 
 conveniosRouter.get('/patients/:patientId/autorizacoes', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await conveniosService.listAutorizacoes(req.params.patientId as string);
+    const data = await conveniosService.listAutorizacoes(req.auth!.tenantId!, req.params.patientId as string);
     return success(res, data);
   } catch (err) { next(err); }
 });
