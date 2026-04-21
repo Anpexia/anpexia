@@ -198,11 +198,11 @@ mutation { serviceInstanceDeployV2(serviceId: "78ef4ba8-e6f2-425f-997a-e77364f81
 
 ## Modelo de negocio
 
-Servico premium de automacao. Planos:
-- **Essencial**: R$2.000/mes (ate 4 automacoes)
-- **Profissional**: R$3.500/mes (ate 7 automacoes)
-- **Enterprise**: R$6.000/mes (automacoes ilimitadas)
-- **Avulsa**: R$400-600/mes por automacao extra
+Cobranca por usuario:
+- **Base**: R$1.200/mes (ate 10 usuarios inclusos)
+- **Usuario adicional**: R$120/mes por usuario alem dos 10
+- **Limite de pacientes**: a definir (com cobranca adicional ao ultrapassar)
+- Exemplo: 15 usuarios = R$1.200 + (5 x R$120) = R$1.800/mes
 
 ## Modulos do MVP
 

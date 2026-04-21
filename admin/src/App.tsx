@@ -138,8 +138,12 @@ function OverviewPage() {
     api.get('/tenants?limit=100').then(({ data }) => {
       const tenants = data.data;
       const active = tenants.filter((t: any) => t.isActive).length;
-      const planPrices: Record<string, number> = { STARTER: 1200, PRO: 2000, BUSINESS: 3000 };
-      const mrr = tenants.filter((t: any) => t.isActive).reduce((sum: number, t: any) => sum + (planPrices[t.plan] || 0), 0);
+      const calcMonthly = (userCount: number) => {
+        const base = 1200;
+        const extra = Math.max(0, userCount - 10) * 120;
+        return base + extra;
+      };
+      const mrr = tenants.filter((t: any) => t.isActive).reduce((sum: number, t: any) => sum + calcMonthly(t._count?.users || 0), 0);
       const users = tenants.reduce((sum: number, t: any) => sum + (t._count?.users || 0), 0);
       setStats({
         total: tenants.length,
@@ -179,7 +183,7 @@ function TenantsPage() {
   const [showUserForm, setShowUserForm] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({ name: '', segment: 'OUTROS' as string, phone: '', email: '', plan: 'STARTER' as string, ownerName: '', ownerEmail: '' });
+  const [formData, setFormData] = useState({ name: '', segment: 'OUTROS' as string, phone: '', email: '', ownerName: '', ownerEmail: '' });
   const [userForm, setUserForm] = useState({ name: '', email: '', role: 'OWNER' as string });
 
   const fetchTenants = useCallback(async () => {
@@ -199,7 +203,7 @@ function TenantsPage() {
     try {
       await api.post('/tenants', formData);
       setShowForm(false);
-      setFormData({ name: '', segment: 'OUTROS', phone: '', email: '', plan: 'STARTER', ownerName: '', ownerEmail: '' });
+      setFormData({ name: '', segment: 'OUTROS', phone: '', email: '', ownerName: '', ownerEmail: '' });
       fetchTenants();
     } catch {} finally {
       setSaving(false);
@@ -291,7 +295,12 @@ function TenantsPage() {
     } catch {}
   };
 
-  const planLabel: Record<string, string> = { STARTER: 'Starter', PRO: 'Pro', BUSINESS: 'Business' };
+  const calcMonthly = (userCount: number) => {
+    const base = 1200;
+    const extra = Math.max(0, userCount - 10) * 120;
+    return base + extra;
+  };
+  const formatBRL = (v: number) => `R$ ${v.toLocaleString('pt-BR')}`;
 
   return (
     <div>
@@ -338,13 +347,9 @@ function TenantsPage() {
                   <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Plano</label>
-                <select value={formData.plan} onChange={(e) => setFormData({ ...formData, plan: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                  <option value="STARTER">Starter — R$1.200/mes</option>
-                  <option value="PRO">Pro — R$2.000/mes</option>
-                  <option value="BUSINESS">Business — R$3.000/mes</option>
-                </select>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-blue-800">Cobranca</p>
+                <p className="text-xs text-blue-600 mt-1">R$ 1.200/mes (ate 10 usuarios) + R$ 120 por usuario adicional</p>
               </div>
               <div className="border-t border-gray-200 pt-4 mt-2">
                 <p className="text-xs text-gray-500 mb-3">Responsavel (recebera email para criar senha e acessar o app)</p>
@@ -420,7 +425,7 @@ function TenantsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-gray-500">Segmento:</span> <select value={showDetail.segment || 'OUTROS'} onChange={async (e) => { try { await api.put(`/tenants/${showDetail.id}`, { segment: e.target.value }); setShowDetail({ ...showDetail, segment: e.target.value }); } catch {} }} className="ml-1 text-sm border border-gray-300 rounded px-1 py-0.5"><option value="OUTROS">Outros</option><option value="CLINICA_OFTALMOLOGICA">Oftalmológica</option><option value="CLINICA_GERAL">Clínica Geral</option><option value="SALAO_BELEZA">Salão de Beleza</option></select></div>
-                <div><span className="text-gray-500">Plano:</span> <span className="ml-1">{planLabel[showDetail.plan]}</span></div>
+                <div><span className="text-gray-500">Mensalidade:</span> <span className="ml-1 font-medium text-green-700">{formatBRL(calcMonthly(showDetail.users?.length || 0))}/mes</span>{(showDetail.users?.length || 0) > 10 && <span className="text-xs text-gray-400 ml-1">({showDetail.users.length} usuarios)</span>}</div>
                 <div><span className="text-gray-500">Telefone:</span> <span className="ml-1">{showDetail.phone || '-'}</span></div>
                 <div><span className="text-gray-500">E-mail:</span> <span className="ml-1">{showDetail.email || '-'}</span></div>
                 <div><span className="text-gray-500">Status:</span> <span className={`ml-1 ${showDetail.isActive ? 'text-green-600' : 'text-red-600'}`}>{showDetail.isActive ? 'Ativo' : 'Inativo'}</span></div>
@@ -472,7 +477,7 @@ function TenantsPage() {
             <tr className="border-b border-gray-200">
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Empresa</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Segmento</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Plano</th>
+              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Mensalidade</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Status</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Usuarios</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Pacientes</th>
@@ -490,11 +495,9 @@ function TenantsPage() {
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{t.name}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{t.segment || '-'}</td>
                   <td className="px-6 py-4 text-sm">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      t.plan === 'BUSINESS' ? 'bg-purple-100 text-purple-700' :
-                      t.plan === 'PRO' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>{planLabel[t.plan]}</span>
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                      {formatBRL(calcMonthly(t._count?.users || 0))}/mes
+                    </span>
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${t.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>

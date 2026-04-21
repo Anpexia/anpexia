@@ -158,25 +158,31 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* 2. Planos e Preços */}
+      {/* 2. Modelo de Cobrança */}
       <section className="bg-white rounded-lg shadow-sm p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Planos e Preços</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { name: 'Starter', price: 'R$ 1.200' },
-            { name: 'Pro', price: 'R$ 2.000' },
-            { name: 'Business', price: 'R$ 3.000' },
-          ].map((p) => (
-            <div key={p.name} className="border border-gray-200 rounded-lg p-5 text-center">
-              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">{p.name}</p>
-              <p className="mt-2">
-                <span className="text-3xl font-bold" style={{ color: '#1E3A5F' }}>
-                  {p.price}
-                </span>
-                <span className="text-sm text-gray-500">/mês</span>
-              </p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Modelo de Cobranca</h3>
+        <div className="border border-gray-200 rounded-lg p-6">
+          <div className="flex items-baseline gap-2 mb-4">
+            <span className="text-3xl font-bold" style={{ color: '#1E3A5F' }}>R$ 1.200</span>
+            <span className="text-sm text-gray-500">/mes (ate 10 usuarios)</span>
+          </div>
+          <div className="space-y-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+              <span>Inclui ate 10 usuarios (medicos, recepcionistas, etc.)</span>
             </div>
-          ))}
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+              <span>Cada usuario adicional: <strong>R$ 120/mes</strong></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+              <span className="text-gray-400">Limite de pacientes: a definir</span>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs text-gray-400">Exemplo: 15 usuarios = R$ 1.200 + (5 x R$ 120) = R$ 1.800/mes</p>
+          </div>
         </div>
       </section>
 
