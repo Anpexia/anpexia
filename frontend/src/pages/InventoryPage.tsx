@@ -265,10 +265,25 @@ export function InventoryPage() {
           costPrice: result.product.avgPrice ? String(result.product.avgPrice) : '',
         });
         setLinkedSuppliers([]);
-        setSupplierForm(emptySupplierForm);
-        setSupplierStepMode('select');
-        setSupplierSearch('');
-        try { const { data: s } = await api.get('/suppliers', { params: { active: 'true' } }); setAllSuppliers(s.data); } catch { setAllSuppliers([]); }
+        const cosmosBrand = (result.product.brand || '').trim();
+        let fetchedSuppliers: any[] = [];
+        try { const { data: s } = await api.get('/suppliers', { params: { active: 'true' } }); fetchedSuppliers = s.data; setAllSuppliers(fetchedSuppliers); } catch { setAllSuppliers([]); }
+        if (cosmosBrand) {
+          const match = fetchedSuppliers.find((s: any) => s.name.toLowerCase() === cosmosBrand.toLowerCase());
+          if (match) {
+            setSupplierStepMode('select');
+            setSupplierSearch(cosmosBrand);
+            setSupplierForm(emptySupplierForm);
+          } else {
+            setSupplierStepMode('create');
+            setSupplierForm({ ...emptySupplierForm, name: cosmosBrand });
+            setSupplierSearch('');
+          }
+        } else {
+          setSupplierForm(emptySupplierForm);
+          setSupplierStepMode('select');
+          setSupplierSearch('');
+        }
         setSupplierStepOpen(true);
       } else {
         // CASE 3: Not found anywhere → supplier step then empty create modal with SKU
