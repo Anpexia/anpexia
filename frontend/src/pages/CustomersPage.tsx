@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, ChevronDown, ChevronUp, Download, FileText, Shield } from 'lucide-react';
+import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { DictationTextarea } from '../components/DictationTextarea';
 import { useCepLookup, formatarCep } from '../hooks/useCepLookup';
 
 interface ScheduledCall {
@@ -150,7 +151,7 @@ export function CustomersPage() {
   const [anamneseData, setAnamneseData] = useState<any>({});
   const [loadingAnamnese, setLoadingAnamnese] = useState(false);
   const [savingAnamnese, setSavingAnamnese] = useState(false);
-  const [anamneseOpen, setAnamneseOpen] = useState<Record<string, boolean>>({ queixa: true, historiaDoenca: false, historicoPassado: false, medicamentos: false, alergias: false, historiaFamiliar: false, historiaSocial: false, observacoes: false });
+
 
   // Evolucao state
   const [evolucoes, setEvolucoes] = useState<any[]>([]);
@@ -901,7 +902,7 @@ export function CustomersPage() {
                           </div>
                           <div className="md:col-span-2">
                             <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes clinicas</label>
-                            <textarea value={medForm.clinicalNotes} onChange={(e) => setMedForm({ ...medForm, clinicalNotes: e.target.value })} className={inputCls + ' h-20 resize-none'} placeholder="Anotacoes gerais do medico..." />
+                            <DictationTextarea value={medForm.clinicalNotes} onChange={(v) => setMedForm({ ...medForm, clinicalNotes: v })} className={inputCls + ' h-20 resize-none'} placeholder="Anotacoes gerais do medico..." />
                           </div>
                         </div>
                         <button onClick={handleSaveMedical} disabled={savingMed} className="mt-3 px-4 py-2 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
@@ -928,7 +929,7 @@ export function CustomersPage() {
                                 <option value="exam">Exame</option>
                               </select>
                             </div>
-                            <textarea value={entryForm.content} onChange={(e) => setEntryForm({ ...entryForm, content: e.target.value })} className={inputCls + ' h-24 resize-none mb-3'} placeholder="Descreva o procedimento, anotacao ou observacao..." required />
+                            <DictationTextarea value={entryForm.content} onChange={(v) => setEntryForm({ ...entryForm, content: v })} className={inputCls + ' h-24 resize-none mb-3'} placeholder="Descreva o procedimento, anotacao ou observacao..." required />
                             <div className="flex gap-2">
                               <button type="button" onClick={() => setShowNewEntry(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
                               <button type="submit" disabled={savingEntry} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
@@ -985,7 +986,7 @@ export function CustomersPage() {
                           ].map(section => (
                             <div key={section.key}>
                               <label className="block text-xs font-medium text-slate-600 mb-1">{section.label}</label>
-                              <textarea value={anamneseData[section.field] || ''} onChange={(e) => setAnamneseData({ ...anamneseData, [section.field]: e.target.value })} className={inputCls + ' h-24 resize-none'} placeholder={section.placeholder} />
+                              <DictationTextarea value={anamneseData[section.field] || ''} onChange={(v) => setAnamneseData({ ...anamneseData, [section.field]: v })} className={inputCls + ' h-24 resize-none'} placeholder={section.placeholder} />
                             </div>
                           ))}
 
@@ -1011,19 +1012,19 @@ export function CustomersPage() {
                         <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Descricao / Subjetivo</label>
-                            <textarea value={evolucaoForm.subjective} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, subjective: e.target.value })} className={inputCls + ' h-24 resize-none'} placeholder="Queixas do paciente, relato, sintomas..." />
+                            <DictationTextarea value={evolucaoForm.subjective} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, subjective: v })} className={inputCls + ' h-24 resize-none'} placeholder="Queixas do paciente, relato, sintomas..." />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Conduta / Objetivo</label>
-                            <textarea value={evolucaoForm.objective} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, objective: e.target.value })} className={inputCls + ' h-24 resize-none'} placeholder="Achados do exame, conduta adotada, tratamento..." />
+                            <DictationTextarea value={evolucaoForm.objective} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, objective: v })} className={inputCls + ' h-24 resize-none'} placeholder="Achados do exame, conduta adotada, tratamento..." />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Exames Solicitados</label>
-                            <textarea value={evolucaoForm.exams} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, exams: e.target.value })} className={inputCls + ' h-20 resize-none'} placeholder="Exames laboratoriais, imagem, outros..." />
+                            <DictationTextarea value={evolucaoForm.exams} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, exams: v })} className={inputCls + ' h-20 resize-none'} placeholder="Exames laboratoriais, imagem, outros..." />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Retorno Previsto</label>
-                            <textarea value={evolucaoForm.returnDate} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, returnDate: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Retorno em 30 dias, apos resultado dos exames..." />
+                            <DictationTextarea value={evolucaoForm.returnDate} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, returnDate: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Retorno em 30 dias, apos resultado dos exames..." />
                           </div>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setShowNewEvolucao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
@@ -1162,7 +1163,7 @@ export function CustomersPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                            <textarea value={prescricaoOculos.observacoes} onChange={(e) => setPrescricaoOculos({ ...prescricaoOculos, observacoes: e.target.value })} className={inputCls + ' h-16 resize-none'} />
+                            <DictationTextarea value={prescricaoOculos.observacoes} onChange={(v) => setPrescricaoOculos({ ...prescricaoOculos, observacoes: v })} className={inputCls + ' h-16 resize-none'} />
                           </div>
                         </div>
                       )}
@@ -1248,7 +1249,7 @@ export function CustomersPage() {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">Motivo</label>
-                        <textarea value={atestadoForm.reason} onChange={(e) => setAtestadoForm({ ...atestadoForm, reason: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Motivo do atestado..." />
+                        <DictationTextarea value={atestadoForm.reason} onChange={(v) => setAtestadoForm({ ...atestadoForm, reason: v })} className={inputCls + ' h-16 resize-none'} placeholder="Motivo do atestado..." />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -1262,7 +1263,7 @@ export function CustomersPage() {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                        <textarea value={atestadoForm.observations} onChange={(e) => setAtestadoForm({ ...atestadoForm, observations: e.target.value })} className={inputCls + ' h-16 resize-none'} />
+                        <DictationTextarea value={atestadoForm.observations} onChange={(v) => setAtestadoForm({ ...atestadoForm, observations: v })} className={inputCls + ' h-16 resize-none'} />
                       </div>
                       <div className="flex gap-2">
                         <button type="button" onClick={() => setShowNewAtestado(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
