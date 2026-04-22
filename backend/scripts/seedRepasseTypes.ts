@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const DEFAULT_TYPES = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'OUTROS'];
+const DEFAULT_TYPES = ['CIRURGIA', 'CONSULTA', 'EXAME', 'OUTROS', 'TERAPIA', 'BOTOX'];
 
 async function main() {
   const tenants = await prisma.tenant.findMany({ select: { id: true, name: true } });

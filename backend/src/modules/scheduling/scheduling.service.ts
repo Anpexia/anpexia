@@ -656,9 +656,10 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
       customer: { select: { id: true, name: true } },
       doctor: { select: { id: true, name: true } },
       procedures: { include: { tussProcedure: true } },
+      privateProcedureCalls: { include: { privateProcedure: true } },
     },
   });
-  if (!call || call.procedures.length === 0) return;
+  if (!call || (call.procedures.length === 0 && call.privateProcedureCalls.length === 0)) return;
 
   const dateIso = call.date.toISOString().slice(0, 10);
   const patientName = call.customer?.name || call.name;
@@ -708,6 +709,48 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
             paymentMethod: 'TRANSFERENCIA',
             status: 'PENDENTE',
             notes: `${AGENDAMENTO_TAG(callId)} [REPASSE:${p.id}] [DOCTOR:${call.doctorId}]`,
+          },
+        });
+      }
+    }
+  }
+
+  // Private (particular) procedures
+  for (const pp of call.privateProcedureCalls) {
+    const proc = pp.privateProcedure;
+    const valor = Number(proc.value) || 0;
+    if (valor <= 0) continue;
+
+    await tx.financialTransaction.create({
+      data: {
+        tenantId,
+        type: 'INCOME',
+        category: 'Procedimentos',
+        description: `${proc.name} - ${patientName} - ${dateIso}`,
+        amount: new Prisma.Decimal(valor),
+        date: call.date,
+        paymentMethod: 'DINHEIRO',
+        customerId: call.customerId || undefined,
+        status: 'PENDENTE',
+        notes: `${AGENDAMENTO_TAG(callId)} [PART:${pp.id}]`,
+      },
+    });
+
+    if (call.doctorId && call.doctor) {
+      const pct = repasseMap.get('CONSULTA') ?? repasseMap.get('OUTROS') ?? 0;
+      if (pct > 0) {
+        const repasse = (valor * pct) / 100;
+        await tx.financialTransaction.create({
+          data: {
+            tenantId,
+            type: 'EXPENSE',
+            category: 'Repasse Médico',
+            description: `Repasse Dr. ${call.doctor.name} - ${proc.name} - ${dateIso}`,
+            amount: new Prisma.Decimal(repasse),
+            date: call.date,
+            paymentMethod: 'TRANSFERENCIA',
+            status: 'PENDENTE',
+            notes: `${AGENDAMENTO_TAG(callId)} [REPASSE-PART:${pp.id}] [DOCTOR:${call.doctorId}]`,
           },
         });
       }
