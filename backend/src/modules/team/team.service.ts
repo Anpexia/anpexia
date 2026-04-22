@@ -9,7 +9,7 @@ interface CreateMemberData {
   email: string;
   password?: string;
   phone?: string;
-  role: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
+  role: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
   especialidade?: string;
   rqe?: string;
   sendInvite?: boolean;
@@ -56,11 +56,13 @@ export const teamService = {
     });
   },
 
-  async create(tenantId: string, data: CreateMemberData) {
-    // Block creating OWNER or SUPER_ADMIN via team API (req.body can send anything at runtime)
+  async create(tenantId: string, data: CreateMemberData, requesterRole?: string) {
     const role = data.role as string;
-    if (role === 'OWNER' || role === 'SUPER_ADMIN') {
-      throw new AppError(400, 'INVALID_ROLE', 'Nao e possivel criar membros com cargo Proprietario ou Super Admin');
+    if (role === 'SUPER_ADMIN') {
+      throw new AppError(400, 'INVALID_ROLE', 'Nao e possivel criar Super Admin');
+    }
+    if (role === 'OWNER' && requesterRole !== 'OWNER' && requesterRole !== 'SUPER_ADMIN') {
+      throw new AppError(403, 'FORBIDDEN', 'Apenas um Admin pode criar outro Admin');
     }
 
     // Invite flow: no password provided -> send invite email to define password
@@ -115,7 +117,7 @@ export const teamService = {
     return user;
   },
 
-  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'; especialidade?: string; rqe?: string; horarios?: any }) {
+  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'; especialidade?: string; rqe?: string; horarios?: any }) {
     const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario nao encontrado');
 

@@ -74,11 +74,11 @@ teamRouter.get('/doctors', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
-// Create team member — OWNER only
-teamRouter.post('/', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
+// Create team member — OWNER and MANAGER
+teamRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log('[EQUIPE] body:', { ...req.body, password: '***' }, 'tenantId:', req.auth!.tenantId);
-    const user = await teamService.create(req.auth!.tenantId!, req.body);
+    const user = await teamService.create(req.auth!.tenantId!, req.body, req.auth!.role);
     await logAction({ ...auditCtx(req), action: 'CREATE', entity: 'USER', entityId: (user as any)?.id, metadata: { email: (user as any)?.email, role: (user as any)?.role } });
     return created(res, user);
   } catch (err) {

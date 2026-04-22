@@ -194,9 +194,6 @@ export function SchedulingPage() {
   const [partSubmitting, setPartSubmitting] = useState(false);
   const [partRetro, setPartRetro] = useState(false);
   const [partLoading, setPartLoading] = useState(false);
-  const [partTussSelectedId, setPartTussSelectedId] = useState<string>('');
-  const [partTussTplMaterials, setPartTussTplMaterials] = useState<MaterialRow[]>([]);
-  const [partTussList, setPartTussList] = useState<TussProc[]>([]);
 
   // Assign/change doctor
   const [doctorEditCall, setDoctorEditCall] = useState<Appointment | null>(null);
@@ -756,16 +753,8 @@ export function SchedulingPage() {
     setPartExtraMaterials([]);
     setPartError('');
     setPartSubmitting(false);
-    setPartTussSelectedId('');
-    setPartTussTplMaterials([]);
     setPartLoading(true);
-    // Fetch private procedures + templates + products + TUSS list in parallel
     const tasks: Promise<unknown>[] = [];
-    tasks.push(
-      api.get('/tuss/procedures')
-        .then(({ data }) => setPartTussList(data.data || []))
-        .catch(() => setPartTussList([])),
-    );
     tasks.push(
       api.get('/private-procedures')
         .then(({ data }) => setPartProcedures((data.data || []).filter((p: PrivProc) => p.isActive)))
@@ -822,31 +811,8 @@ export function SchedulingPage() {
     }
   }, [partSelectedId, partModalCall, partProcedures, procedureTemplates, inventoryProducts]);
 
-  // Match TUSS selection against templates (independent of particular procedure)
-  useEffect(() => {
-    if (!partModalCall || !partTussSelectedId) {
-      setPartTussTplMaterials([]);
-      return;
-    }
-    const tussItem = partTussList.find((t) => t.id === partTussSelectedId);
-    if (!tussItem) { setPartTussTplMaterials([]); return; }
-    const target = (tussItem.description || '').trim().toLowerCase();
-    const tpl = (procedureTemplates || []).find((t: any) => t.name.trim().toLowerCase() === target && (!t.procedureType || t.procedureType === 'TUSS')) || null;
-    if (tpl) {
-      const products = inventoryProducts || [];
-      setPartTussTplMaterials(
-        tpl.materials.map((m: any) => {
-          const prod = products.find((p: any) => p.id === m.productId);
-          return { productId: m.productId, productName: m.productName || prod?.name || '', unit: m.unit || prod?.unit || 'un', quantity: m.quantity, available: prod?.quantity ?? 0 };
-        }),
-      );
-    } else {
-      setPartTussTplMaterials([]);
-    }
-  }, [partTussSelectedId, partModalCall, partTussList, procedureTemplates, inventoryProducts]);
-
   const partCombinedMaterials = (): { productId: string; quantity: number }[] => {
-    return [...partTplMaterials, ...partTussTplMaterials, ...partExtraMaterials]
+    return [...partTplMaterials, ...partExtraMaterials]
       .filter((m) => m.productId && Number(m.quantity) > 0)
       .map((m) => ({ productId: m.productId, quantity: Number(m.quantity) }));
   };
@@ -1937,9 +1903,9 @@ export function SchedulingPage() {
                 onClick={() => setPartTab('estoque')}
                 className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
               >
-                Estoque {(partTplMaterials.length + partTussTplMaterials.length + partExtraMaterials.length) > 0 && (
+                Estoque {(partTplMaterials.length + partExtraMaterials.length) > 0 && (
                   <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-[#1E3A5F] text-white rounded-full">
-                    {partTplMaterials.length + partTussTplMaterials.length + partExtraMaterials.length}
+                    {partTplMaterials.length + partExtraMaterials.length}
                   </span>
                 )}
               </button>
@@ -1958,30 +1924,33 @@ export function SchedulingPage() {
                     Cadastre em Configuracoes &rarr; Procedimentos.
                   </div>
                 ) : (
-                  <div className="mb-4 space-y-2 max-h-60 overflow-y-auto">
-                    {partProcedures.map((p) => (
-                      <label
-                        key={p.id}
-                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${partSelectedId === p.id ? 'border-[#2563EB] bg-[#EFF6FF]' : 'border-slate-200 hover:bg-slate-50'}`}
-                      >
-                        <input
-                          type="radio"
-                          name="partProc"
-                          value={p.id}
-                          checked={partSelectedId === p.id}
-                          onChange={() => setPartSelectedId(p.id)}
-                          className="mt-0.5 accent-[#1E3A5F]"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-slate-800">{p.name}</div>
-                          {p.description && <div className="text-xs text-slate-500 mt-0.5">{p.description}</div>}
-                          <div className="flex gap-3 mt-1 text-xs text-slate-500">
-                            {p.value != null && <span>R$ {Number(p.value).toFixed(2)}</span>}
-                            {p.duration != null && <span>{p.duration} min</span>}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Procedimento</label>
+                    <select
+                      value={partSelectedId}
+                      onChange={(e) => setPartSelectedId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                    >
+                      <option value="">Selecione um procedimento...</option>
+                      {partProcedures.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.value != null ? ` — R$ ${Number(p.value).toFixed(2)}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {(() => {
+                      const sel = partProcedures.find((p) => p.id === partSelectedId);
+                      if (!sel) return null;
+                      return (
+                        <div className="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          {sel.description && <p className="text-xs text-slate-500 mb-1">{sel.description}</p>}
+                          <div className="flex gap-3 text-xs text-slate-600">
+                            {sel.value != null && <span>Valor: <strong>R$ {Number(sel.value).toFixed(2)}</strong></span>}
+                            {sel.duration != null && <span>Duracao: <strong>{sel.duration} min</strong></span>}
                           </div>
                         </div>
-                      </label>
-                    ))}
+                      );
+                    })()}
                   </div>
                 )}
                 <div className="mb-4">
@@ -2020,54 +1989,6 @@ export function SchedulingPage() {
                               onChange={(e) => {
                                 const v = Number(e.target.value);
                                 setPartTplMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
-                              }}
-                              className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                            />
-                            <span className="text-xs text-slate-500 w-10">{m.unit}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* TUSS selection (independent of particular procedure) */}
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-slate-700 mb-2">Procedimento TUSS (opcional)</h4>
-                  <select
-                    value={partTussSelectedId}
-                    onChange={(e) => setPartTussSelectedId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                  >
-                    <option value="">Selecione um procedimento TUSS...</option>
-                    {partTussList.map((t) => (
-                      <option key={t.id} value={t.id}>[{t.code}] {t.description} {t.value != null ? `— R$ ${Number(t.value).toFixed(2)}` : ''}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {partTussTplMaterials.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais do TUSS</h4>
-                    <div className="space-y-2">
-                      {partTussTplMaterials.map((m, i) => {
-                        const insufficient = m.available < m.quantity;
-                        return (
-                          <div key={`part-tuss-tpl-${m.productId}-${i}`} className="flex items-center gap-2 text-sm">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-slate-800 truncate">{m.productName}</div>
-                              <div className={`text-xs ${insufficient ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
-                                Disponivel: {m.available} {m.unit}
-                              </div>
-                            </div>
-                            <input
-                              type="number"
-                              min={0}
-                              step="any"
-                              value={m.quantity}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                setPartTussTplMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
                               }}
                               className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
                             />

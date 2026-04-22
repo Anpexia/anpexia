@@ -51,7 +51,7 @@ export function TeamPage() {
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [formRole, setFormRole] = useState<'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'>('RECEPTIONIST');
+  const [formRole, setFormRole] = useState<'OWNER' | 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'>('RECEPTIONIST');
   const [formEspecialidade, setFormEspecialidade] = useState('');
   const [formRqe, setFormRqe] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -195,7 +195,7 @@ export function TeamPage() {
     setEditTab('dados');
     setFormName(m.name);
     setFormPhone(m.phone || '');
-    setFormRole(m.role === 'OWNER' ? 'MANAGER' : (m.role as any));
+    setFormRole(m.role as any);
     setFormEspecialidade(m.especialidade || '');
     setFormRqe(m.rqe || '');
     if (m.role === 'DOCTOR') {
@@ -247,7 +247,7 @@ export function TeamPage() {
           <h1 className="text-2xl font-bold text-slate-800">Equipe</h1>
           <p className="text-sm text-slate-500 mt-1">Gerencie os membros da sua equipe</p>
         </div>
-        {isOwner && (
+        {canManage && (
           <button onClick={() => { resetForm(); setShowCreateModal(true); }}
             className="btn-pill btn-primary">
             <Plus size={16} /> Adicionar Membro
@@ -300,24 +300,20 @@ export function TeamPage() {
                     {canManage && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {m.role !== 'OWNER' && (
-                            <>
-                              {canManage && (
-                                <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-slate-100 text-slate-500" title="Editar">
-                                  <Edit2 size={15} />
-                                </button>
-                              )}
-                              {isOwner && (
-                                <button onClick={() => handleToggle(m.id)} className={`p-1.5 rounded hover:bg-slate-100 ${m.isActive ? 'text-red-500' : 'text-emerald-500'}`} title={m.isActive ? 'Desativar' : 'Ativar'}>
-                                  {m.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
-                                </button>
-                              )}
-                              {isOwner && (
-                                <button onClick={() => setRemoveConfirm(m)} className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600" title="Remover">
-                                  <Trash2 size={15} />
-                                </button>
-                              )}
-                            </>
+                          {(m.role !== 'OWNER' || isOwner) && canManage && (
+                            <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-slate-100 text-slate-500" title="Editar">
+                              <Edit2 size={15} />
+                            </button>
+                          )}
+                          {m.role !== 'OWNER' && isOwner && (
+                            <button onClick={() => handleToggle(m.id)} className={`p-1.5 rounded hover:bg-slate-100 ${m.isActive ? 'text-red-500' : 'text-emerald-500'}`} title={m.isActive ? 'Desativar' : 'Ativar'}>
+                              {m.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
+                            </button>
+                          )}
+                          {m.role !== 'OWNER' && isOwner && (
+                            <button onClick={() => setRemoveConfirm(m)} className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600" title="Remover">
+                              <Trash2 size={15} />
+                            </button>
                           )}
                           {m.role === 'OWNER' && <Shield size={15} className="text-[#1E3A5F]" />}
                         </div>
@@ -355,6 +351,7 @@ export function TeamPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
                 <select value={formRole} onChange={e => setFormRole(e.target.value as any)} className={inputCls}>
+                  {isOwner && <option value="OWNER">Admin</option>}
                   <option value="MANAGER">Gerente</option>
                   <option value="DOCTOR">Medico</option>
                   <option value="RECEPTIONIST">Recepcionista</option>
@@ -449,6 +446,7 @@ export function TeamPage() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
                     <select value={formRole} onChange={e => setFormRole(e.target.value as any)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')}>
+                      {isOwner && <option value="OWNER">Admin</option>}
                       <option value="MANAGER">Gerente</option>
                       <option value="DOCTOR">Medico</option>
                       <option value="RECEPTIONIST">Recepcionista</option>
