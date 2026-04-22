@@ -64,7 +64,14 @@ chatbotRouter.post('/webhook/:event', async (req: Request, res: Response, next: 
       // Log QR code for debugging — QR can be fetched via /instance/connect
       console.log(`[WEBHOOK] QR Code updated for instance: ${req.body?.instance}`);
     } else if (event === 'connection-update') {
-      console.log(`[WEBHOOK] Connection update for ${req.body?.instance}: ${JSON.stringify(req.body?.data?.state || req.body?.data)}`);
+      const instance = req.body?.instance;
+      const state = req.body?.data?.state || req.body?.data?.status;
+      const statusReason = req.body?.data?.statusReason;
+      console.log(`[WEBHOOK] 🔌 Connection update for "${instance}": state=${state}, reason=${statusReason || 'none'}`);
+
+      if (state === 'close' || state === 'disconnected') {
+        console.warn(`[WEBHOOK] ⚠️ WhatsApp "${instance}" DISCONNECTED (reason: ${statusReason || 'unknown'})`);
+      }
     }
 
     return res.status(200).json({ received: true });

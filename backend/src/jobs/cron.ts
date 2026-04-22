@@ -677,11 +677,65 @@ export function initCronJobs() {
     await sendReactivationMessages();
   }, { timezone: 'America/Sao_Paulo' });
 
+  // Every 5 min: WhatsApp connection health check
+  cron.schedule('*/5 * * * *', async () => {
+    await checkWhatsAppConnections();
+  }, { timezone: 'America/Sao_Paulo' });
+
+  // On startup: check WhatsApp connections after 30s delay
+  setTimeout(() => checkWhatsAppConnections(), 30_000);
+
   console.log(`${TAG} Cron jobs registered:`);
   console.log(`${TAG}   - Message queues: every 1 min`);
-  console.log(`${TAG}   - Appointment reminders + post-consultation: every 30 min`);
+  console.log(`${TAG}   - Appointment reminders: every 30 min`);
+  console.log(`${TAG}   - WhatsApp health check: every 5 min`);
   console.log(`${TAG}   - Stock/expiry alerts (OWNER): daily 8:00 AM`);
   console.log(`${TAG}   - Birthday greetings: daily 9:00 AM`);
   console.log(`${TAG}   - 30-day return reminders: daily 10:00 AM`);
   console.log(`${TAG}   - 90-day reactivation: Monday 10:00 AM`);
+}
+
+// ============================================================
+// WhatsApp connection health check
+// ============================================================
+async function checkWhatsAppConnections() {
+  if (!isWhatsAppConfigured()) return;
+
+  try {
+    const configs = await prisma.chatbotConfig.findMany({
+      where: { isActive: true, instanceName: { not: null } },
+      select: { instanceName: true, tenantId: true },
+    });
+
+    for (const config of configs) {
+      if (!config.instanceName) continue;
+
+      try {
+        const state = await evolutionApi.getConnectionState(config.instanceName);
+        const connState = state?.instance?.state || 'unknown';
+
+        if (connState === 'open') continue;
+
+        console.warn(`${TAG} ⚠️ WhatsApp "${config.instanceName}" state: ${connState} (tenant: ${config.tenantId})`);
+
+        if (connState === 'close' || connState === 'connecting') {
+          // Try to get fresh QR / trigger reconnection
+          try {
+            await evolutionApi.getConnectQr(config.instanceName);
+            console.log(`${TAG} 🔄 Reconnection attempt for "${config.instanceName}"`);
+          } catch {
+            console.warn(`${TAG} ❌ Could not reconnect "${config.instanceName}" — may need manual QR scan`);
+          }
+        }
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          console.warn(`${TAG} ❌ Instance "${config.instanceName}" not found in Evolution API — needs recreation`);
+        } else {
+          console.error(`${TAG} Error checking "${config.instanceName}":`, err.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`${TAG} checkWhatsAppConnections error:`, err);
+  }
 }
