@@ -10,6 +10,7 @@ interface PrivateProcedureItem {
   id: string;
   name: string;
   description: string | null;
+  type: string;
   value: number | null;
   duration: number | null;
   isActive: boolean;
@@ -30,7 +31,7 @@ interface TrustedDevice {
   createdAt: string;
 }
 
-const PROCEDURE_TYPES = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'OUTROS'] as const;
+const PROCEDURE_TYPES = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'BOTOX', 'OUTROS'] as const;
 type ProcedureType = typeof PROCEDURE_TYPES[number];
 
 interface TussProcedureItem {
@@ -463,8 +464,8 @@ export function ConfiguracoesPage() {
   const [procModalOpen, setProcModalOpen] = useState(false);
   const [procEditing, setProcEditing] = useState<PrivateProcedureItem | null>(null);
   const [procSaving, setProcSaving] = useState(false);
-  const [procForm, setProcForm] = useState<{ name: string; description: string; value: string; duration: string; isActive: boolean }>({
-    name: '', description: '', value: '', duration: '30', isActive: true,
+  const [procForm, setProcForm] = useState<{ name: string; description: string; type: string; value: string; duration: string; isActive: boolean }>({
+    name: '', description: '', type: 'CONSULTA', value: '', duration: '30', isActive: true,
   });
 
   // Role permissions
@@ -686,7 +687,7 @@ export function ConfiguracoesPage() {
 
   const openProcCreate = () => {
     setProcEditing(null);
-    setProcForm({ name: '', description: '', value: '', duration: '30', isActive: true });
+    setProcForm({ name: '', description: '', type: 'CONSULTA', value: '', duration: '30', isActive: true });
     setProcModalOpen(true);
   };
 
@@ -695,6 +696,7 @@ export function ConfiguracoesPage() {
     setProcForm({
       name: p.name,
       description: p.description || '',
+      type: p.type || 'CONSULTA',
       value: p.value != null ? String(p.value) : '',
       duration: p.duration != null ? String(p.duration) : '',
       isActive: p.isActive,
@@ -711,6 +713,7 @@ export function ConfiguracoesPage() {
     const payload: any = {
       name,
       description: procForm.description.trim() || null,
+      type: procForm.type || 'CONSULTA',
       value: procForm.value === '' ? null : Number(procForm.value),
       duration: procForm.duration === '' ? null : Number(procForm.duration),
     };
@@ -1201,7 +1204,7 @@ export function ConfiguracoesPage() {
               <thead className="bg-gray-50 text-left text-gray-600">
                 <tr>
                   <th className="px-3 py-2 font-medium">Nome</th>
-                  <th className="px-3 py-2 font-medium">Descricao</th>
+                  <th className="px-3 py-2 font-medium">Tipo</th>
                   <th className="px-3 py-2 font-medium">Valor</th>
                   <th className="px-3 py-2 font-medium">Duracao (min)</th>
                   <th className="px-3 py-2 font-medium">Status</th>
@@ -1215,7 +1218,7 @@ export function ConfiguracoesPage() {
                 {procList.map((p) => (
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 font-medium text-gray-800">{p.name}</td>
-                    <td className="px-3 py-2 text-gray-600">{p.description || '-'}</td>
+                    <td className="px-3 py-2 text-gray-600">{p.type || '-'}</td>
                     <td className="px-3 py-2 text-gray-700">{p.value != null ? `R$ ${Number(p.value).toFixed(2)}` : '-'}</td>
                     <td className="px-3 py-2 text-gray-700">{p.duration != null ? p.duration : '-'}</td>
                     <td className="px-3 py-2">
@@ -1259,10 +1262,20 @@ export function ConfiguracoesPage() {
                 <textarea
                   value={procForm.description}
                   onChange={(e) => setProcForm({ ...procForm, description: e.target.value })}
-                  rows={3}
+                  rows={2}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
                   placeholder="Detalhes do procedimento"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                <select
+                  value={procForm.type}
+                  onChange={(e) => setProcForm({ ...procForm, type: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  {PROCEDURE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

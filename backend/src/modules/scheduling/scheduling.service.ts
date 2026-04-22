@@ -737,7 +737,7 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
     });
 
     if (call.doctorId && call.doctor) {
-      const pct = repasseMap.get('CONSULTA') ?? repasseMap.get('OUTROS') ?? 0;
+      const pct = repasseMap.get(proc.type) ?? repasseMap.get('OUTROS') ?? 0;
       if (pct > 0) {
         const repasse = (valor * pct) / 100;
         await tx.financialTransaction.create({

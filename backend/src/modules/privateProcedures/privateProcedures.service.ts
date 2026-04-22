@@ -4,6 +4,7 @@ import { AppError } from '../../shared/middleware/error-handler';
 interface CreateInput {
   name: string;
   description?: string | null;
+  type?: string;
   value?: number | null;
   duration?: number | null;
 }
@@ -11,6 +12,7 @@ interface CreateInput {
 interface UpdateInput {
   name?: string;
   description?: string | null;
+  type?: string;
   value?: number | null;
   duration?: number | null;
   isActive?: boolean;
@@ -65,6 +67,7 @@ export const privateProceduresService = {
         tenantId,
         name,
         description: data.description?.toString().trim() || null,
+        type: (data.type || 'CONSULTA').toUpperCase().trim(),
         value: value ?? null,
         duration: duration === undefined ? 30 : duration ?? 30,
         isActive: true,
@@ -101,6 +104,10 @@ export const privateProceduresService = {
 
     if (data.description !== undefined) {
       updateData.description = data.description?.toString().trim() || null;
+    }
+
+    if (data.type !== undefined) {
+      updateData.type = (data.type || 'CONSULTA').toUpperCase().trim();
     }
 
     if (data.value !== undefined) {

@@ -1311,6 +1311,7 @@ model PrivateProcedure {
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   description String?
+  type        String   @default("CONSULTA") // CONSULTA, EXAME, CIRURGIA, TERAPIA, OUTROS, BOTOX
   value       Float?
   duration    Int?     @default(30)
   isActive    Boolean  @default(true) @map("is_active")
