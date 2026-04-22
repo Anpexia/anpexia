@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import prisma from '../config/database';
 import { evolutionApi } from '../modules/messaging/evolution.client';
 import { env } from '../config/env';
-import { sendReminder48h, sendReminder2h, sendPostConsultation } from '../modules/scheduling/scheduling.notifications';
+import { sendReminder48h, sendReminder2h } from '../modules/scheduling/scheduling.notifications';
 
 const TAG = '[CRON]';
 
@@ -118,6 +118,7 @@ async function sendAppointmentReminders() {
         date: call.date,
         leadId: call.leadId,
         tenantId: call.tenantId,
+        doctorId: call.doctorId,
       });
       await prisma.scheduledCall.update({
         where: { id: call.id },
@@ -159,6 +160,7 @@ async function sendAppointmentReminders() {
         date: call.date,
         leadId: call.leadId,
         tenantId: call.tenantId,
+        doctorId: call.doctorId,
       });
       await prisma.scheduledCall.update({
         where: { id: call.id },
@@ -174,54 +176,7 @@ async function sendAppointmentReminders() {
   }
 }
 
-// ============================================================
-// JOB 4: Post-consultation follow-up (every 30 min)
-// 2h after completed appointments
-// ============================================================
-async function sendPostConsultationFollowUp() {
-  if (!isWhatsAppConfigured()) return;
-
-  try {
-    const now = new Date();
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-    const twoAndHalfHoursAgo = new Date(now.getTime() - 2.5 * 60 * 60 * 1000);
-
-    // Find appointments that ended ~2h ago (30min window)
-    const completedCalls = await prisma.scheduledCall.findMany({
-      where: {
-        date: { gte: twoAndHalfHoursAgo, lt: twoHoursAgo },
-        status: 'completed',
-      },
-    });
-
-    for (const call of completedCalls) {
-      // Check if we already sent post-consultation for this call
-      if (call.leadId) {
-        const alreadySent = await prisma.leadActivity.findFirst({
-          where: {
-            leadId: call.leadId,
-            metadata: { path: ['reminderType'], equals: 'POST_CONSULTATION' },
-          },
-        });
-        if (alreadySent) continue;
-      }
-
-      await sendPostConsultation({
-        id: call.id,
-        name: call.name,
-        phone: call.phone,
-        leadId: call.leadId,
-        tenantId: call.tenantId,
-      });
-    }
-
-    if (completedCalls.length > 0) {
-      console.log(`${TAG} Post-consultation: ${completedCalls.length} follow-ups sent`);
-    }
-  } catch (err) {
-    console.error(`${TAG} sendPostConsultationFollowUp error:`, err);
-  }
-}
+// JOB 4: Removed — post-consultation follow-up out of scope
 
 // ============================================================
 // JOB 5: Low stock alerts (daily at 8:00 AM)
@@ -692,10 +647,9 @@ export function initCronJobs() {
     await processPendingTenantMessages();
   }, { timezone: 'America/Sao_Paulo' });
 
-  // Every 30 min: appointment reminders (48h + 2h) and post-consultation
+  // Every 30 min: appointment reminders (48h + 2h)
   cron.schedule('*/30 * * * *', async () => {
     await sendAppointmentReminders();
-    await sendPostConsultationFollowUp();
   }, { timezone: 'America/Sao_Paulo' });
 
   // Daily at 8:00 AM: stock & expiry alerts for OWNER

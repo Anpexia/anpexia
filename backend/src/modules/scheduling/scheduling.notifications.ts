@@ -27,8 +27,26 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
 }
 
+function formatDayOfWeek(date: Date): string {
+  const days = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
+  const spDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  return days[spDate.getDay()];
+}
+
+async function getDoctorName(doctorId: string | null | undefined): Promise<string | null> {
+  if (!doctorId) return null;
+  const doctor = await prisma.user.findUnique({ where: { id: doctorId }, select: { name: true } });
+  return doctor?.name || null;
+}
+
+async function getTenantAddress(tenantId: string | null | undefined): Promise<string | null> {
+  if (!tenantId) return null;
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { address: true } });
+  return (tenant as any)?.address || null;
+}
+
 /**
- * Send immediate confirmation after booking — with buttons
+ * Send immediate confirmation after booking
  */
 export async function sendBookingConfirmation(call: {
   id: string;
@@ -43,35 +61,25 @@ export async function sendBookingConfirmation(call: {
 }) {
   const dateStr = formatDate(call.date);
   const timeStr = formatTime(call.date);
-  const clinicLine = call.tenantName ? `\n📍 ${call.tenantName}` : '';
-  const doctorLine = call.doctorName ? `\n👨‍⚕️ Medico: ${call.doctorName}` : '';
+  const dayOfWeek = formatDayOfWeek(call.date);
+  const doctorLine = call.doctorName ? `\n👨‍⚕️ ${call.doctorName}` : '';
 
   const body =
-    `Ola, ${call.name}! 👋\nSua consulta esta confirmada:\n` +
-    `📅 Data: ${dateStr}\n` +
-    `⏰ Horario: ${timeStr}` +
-    doctorLine + clinicLine + `\n\n` +
-    `Por favor, confirme sua presenca:`;
+    `Agendamento confirmado! ✅\n\n` +
+    `📅 ${dayOfWeek}, ${dateStr} as ${timeStr}` +
+    doctorLine +
+    `\n\nVoce recebera um lembrete antes da consulta.`;
 
   if (isWhatsAppConfigured()) {
     const instance = await resolveInstance(call.tenantId);
     if (instance) {
       try {
-        await evolutionApi.sendButtons(instance, call.phone, body, [
-          { id: 'btn_confirm', text: 'Confirmar presenca' },
-          { id: 'btn_cancel', text: 'Cancelar consulta' },
-        ], 'Consulta agendada!');
-        console.log(`${TAG} Booking confirmation sent to ${call.phone} via ${instance}`);
+        await evolutionApi.sendText(instance, call.phone, body);
+        console.log(`${TAG} Booking confirmation sent to ${call.phone}`);
       } catch (err) {
-        try {
-          await evolutionApi.sendText(instance, call.phone,
-            `✅ Consulta agendada!\n\n${body}\n\nResponda CONFIRMAR ou CANCELAR.`);
-        } catch {}
         console.error(`${TAG} Failed to send booking confirmation:`, err);
       }
     }
-  } else {
-    console.log(`${TAG} [DRY-RUN] Would send to ${call.phone}: ${body.slice(0, 60)}...`);
   }
 
   if (call.leadId) {
@@ -87,7 +95,7 @@ export async function sendBookingConfirmation(call: {
 }
 
 /**
- * Send cancellation notification — with button to rebook
+ * Send cancellation notification
  */
 export async function sendCancellationNotice(call: {
   id: string;
@@ -100,85 +108,23 @@ export async function sendCancellationNotice(call: {
   const dateStr = formatDate(call.date);
   const timeStr = formatTime(call.date);
 
-  const body = `Sua consulta de ${dateStr} as ${timeStr} foi cancelada.\n\nQuando quiser reagendar, estamos aqui!`;
+  const body = `Sua consulta de ${dateStr} as ${timeStr} foi cancelada.\n\nQuando quiser reagendar, e so mandar mensagem novamente!`;
 
   if (isWhatsAppConfigured()) {
     const instance = await resolveInstance(call.tenantId);
     if (instance) {
       try {
-        await evolutionApi.sendButtons(instance, call.phone, body, [
-          { id: 'btn_rebook', text: 'Agendar nova consulta' },
-          { id: 'btn_ok', text: 'Ok, obrigado' },
-        ], 'Consulta cancelada');
-        console.log(`${TAG} Cancellation notice sent to ${call.phone} via ${instance}`);
+        await evolutionApi.sendText(instance, call.phone, body);
+        console.log(`${TAG} Cancellation notice sent to ${call.phone}`);
       } catch (err) {
-        try {
-          await evolutionApi.sendText(instance, call.phone,
-            `Consulta cancelada.\n\n${body}\n\nResponda AGENDAR para reagendar.`);
-        } catch {}
         console.error(`${TAG} Failed to send cancellation notice:`, err);
       }
     }
-  } else {
-    console.log(`${TAG} [DRY-RUN] Would send cancellation to ${call.phone}`);
-  }
-
-  await notifyWaitList(call.date, call.tenantId);
-}
-
-/**
- * When a slot opens, notify recently cancelled customers
- */
-async function notifyWaitList(freedDate: Date, tenantId?: string | null) {
-  try {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const where: any = {
-      status: 'cancelled',
-      updatedAt: { gte: sevenDaysAgo },
-      date: { gte: new Date() },
-    };
-    if (tenantId) where.tenantId = tenantId;
-
-    const recentCancelled = await prisma.scheduledCall.findMany({
-      where,
-      take: 5,
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    if (!isWhatsAppConfigured() || recentCancelled.length === 0) return;
-
-    const instance = await resolveInstance(tenantId);
-    if (!instance) return;
-
-    const dateStr = formatDate(freedDate);
-    const timeStr = formatTime(freedDate);
-
-    for (const cancelled of recentCancelled) {
-      const body = `Oi ${cancelled.name}! Um horario acabou de abrir: ${dateStr} as ${timeStr}.`;
-
-      try {
-        await evolutionApi.sendButtons(instance, cancelled.phone, body, [
-          { id: 'btn_confirm', text: 'Quero agendar' },
-          { id: 'btn_no', text: 'Nao, obrigado' },
-        ], 'Vaga disponivel!');
-        console.log(`${TAG} Wait list notification sent to ${cancelled.phone}`);
-      } catch (err) {
-        try {
-          await evolutionApi.sendText(instance, cancelled.phone,
-            `${body} Deseja agendar? Responda SIM para confirmar.`);
-        } catch {}
-        console.error(`${TAG} Wait list notification failed:`, err);
-      }
-    }
-  } catch (err) {
-    console.error(`${TAG} notifyWaitList error:`, err);
   }
 }
 
 /**
- * Send 48h reminder — with buttons
+ * Send 48h reminder with confirmation options
  */
 export async function sendReminder48h(call: {
   id: string;
@@ -187,30 +133,30 @@ export async function sendReminder48h(call: {
   date: Date;
   leadId: string | null;
   tenantId?: string | null;
-  tenantName?: string;
-  doctorName?: string;
+  doctorId?: string | null;
 }) {
   const dateStr = formatDate(call.date);
   const timeStr = formatTime(call.date);
-  const doctorLine = call.doctorName ? ` com ${call.doctorName}` : '';
-  const clinicLine = call.tenantName ? `\n📍 ${call.tenantName}` : '';
+  const dayOfWeek = formatDayOfWeek(call.date);
+  const doctorName = await getDoctorName(call.doctorId);
+  const doctorLine = doctorName ? `\n👨‍⚕️ ${doctorName}` : '';
 
-  const body = `Ola, ${call.name}! 👋\nSua consulta esta confirmada:\n📅 Data: ${dateStr}\n⏰ Horario: ${timeStr}${doctorLine}${clinicLine}\n\nPor favor, confirme sua presenca:`;
+  const body =
+    `Ola ${call.name}! Lembrete da sua consulta:\n\n` +
+    `📅 ${dayOfWeek}, ${dateStr} as ${timeStr}` +
+    doctorLine +
+    `\n\nPodemos contar com sua presenca?\n\n` +
+    `1 - Confirmar presenca\n` +
+    `2 - Cancelar\n` +
+    `3 - Reagendar`;
 
   if (isWhatsAppConfigured()) {
     const instance = await resolveInstance(call.tenantId);
     if (instance) {
       try {
-        await evolutionApi.sendButtons(instance, call.phone, body, [
-          { id: 'btn_confirm', text: 'Confirmar presenca' },
-          { id: 'btn_cancel', text: 'Cancelar consulta' },
-          { id: 'btn_reschedule', text: 'Reagendar' },
-        ], 'Lembrete de consulta');
+        await evolutionApi.sendText(instance, call.phone, body);
+        console.log(`${TAG} 48h reminder sent to ${call.phone}`);
       } catch (err) {
-        try {
-          await evolutionApi.sendText(instance, call.phone,
-            `⏰ Lembrete: ${body}\n\nResponda CONFIRMAR, CANCELAR ou REAGENDAR.`);
-        } catch {}
         console.error(`${TAG} 48h reminder failed:`, err);
       }
     }
@@ -229,7 +175,7 @@ export async function sendReminder48h(call: {
 }
 
 /**
- * Send 2h reminder — with buttons
+ * Send 2h reminder with clinic address
  */
 export async function sendReminder2h(call: {
   id: string;
@@ -238,26 +184,28 @@ export async function sendReminder2h(call: {
   date: Date;
   leadId: string | null;
   tenantId?: string | null;
-  doctorName?: string;
+  doctorId?: string | null;
 }) {
   const timeStr = formatTime(call.date);
-  const doctorLine = call.doctorName ? ` com ${call.doctorName}` : '';
+  const doctorName = await getDoctorName(call.doctorId);
+  const doctorLine = doctorName ? `\n👨‍⚕️ ${doctorName}` : '';
+  const address = await getTenantAddress(call.tenantId);
+  const addressLine = address ? `\n\nEndereco: ${address}` : '';
 
-  const body = `Ola, ${call.name}! Lembrando que sua consulta e hoje as ${timeStr}${doctorLine}. Te esperamos! 🏥`;
+  const body =
+    `Sua consulta e em 2 horas! ⏰\n\n` +
+    `📅 Hoje as ${timeStr}` +
+    doctorLine +
+    addressLine +
+    `\n\nNos vemos em breve! 😊`;
 
   if (isWhatsAppConfigured()) {
     const instance = await resolveInstance(call.tenantId);
     if (instance) {
       try {
-        await evolutionApi.sendButtons(instance, call.phone, body, [
-          { id: 'btn_ok', text: 'Ok, estarei la' },
-          { id: 'btn_cancel', text: 'Preciso cancelar' },
-        ], 'Consulta em breve!');
+        await evolutionApi.sendText(instance, call.phone, body);
+        console.log(`${TAG} 2h reminder sent to ${call.phone}`);
       } catch (err) {
-        try {
-          await evolutionApi.sendText(instance, call.phone,
-            `🏥 ${body}\n\nResponda OK ou CANCELAR.`);
-        } catch {}
         console.error(`${TAG} 2h reminder failed:`, err);
       }
     }
@@ -276,54 +224,19 @@ export async function sendReminder2h(call: {
 }
 
 /**
- * Send post-consultation follow-up (2h after) — with buttons
- */
-export async function sendPostConsultation(call: {
-  id: string;
-  name: string;
-  phone: string;
-  leadId: string | null;
-  tenantId?: string | null;
-}) {
-  const body = `Como foi sua consulta, ${call.name}?\n\nQueremos saber se esta tudo bem com voce.`;
-
-  if (isWhatsAppConfigured()) {
-    const instance = await resolveInstance(call.tenantId);
-    if (instance) {
-      try {
-        await evolutionApi.sendButtons(instance, call.phone, body, [
-          { id: 'btn_fine', text: 'Estou bem' },
-          { id: 'btn_doubt', text: 'Tenho duvida' },
-          { id: 'btn_return', text: 'Quero retorno' },
-        ], 'Pos-consulta');
-      } catch (err) {
-        try {
-          await evolutionApi.sendText(instance, call.phone,
-            `${body}\n\nResponda:\n1 - Estou bem\n2 - Tenho duvida\n3 - Quero retorno`);
-        } catch {}
-        console.error(`${TAG} Post-consultation failed:`, err);
-      }
-    }
-  }
-
-  if (call.leadId) {
-    await prisma.leadActivity.create({
-      data: {
-        leadId: call.leadId,
-        type: 'message_sent',
-        description: `Pos-consulta enviado para ${call.name}`,
-        metadata: { callId: call.id, reminderType: 'POST_CONSULTATION' },
-      },
-    });
-  }
-}
-
-/**
  * Handle incoming WhatsApp reply for appointment flow
- * Handles both text replies and button IDs
+ * Handles both text replies and button IDs from reminders
  */
 export async function handleAppointmentReply(phone: string, message: string, tenantId?: string | null): Promise<string | null> {
   const msg = message.trim().toUpperCase();
+
+  // Only handle direct replies to reminders (1/2/3 or keywords)
+  const isReminderReply = ['1', '2', '3', 'SIM', 'CONFIRMAR', 'CONFIRMO', 'OK',
+    'CANCELAR', 'CANCELA', 'REAGENDAR', 'REMARCAR',
+    'BTN_CONFIRM', 'BTN_CANCEL', 'BTN_RESCHEDULE', 'BTN_OK',
+    'CONFIRMAR PRESENCA', 'OK, ESTAREI LA', 'PRECISO CANCELAR'].includes(msg);
+
+  if (!isReminderReply) return null;
 
   const where: any = {
     phone: { contains: phone.slice(-8) },
@@ -342,18 +255,18 @@ export async function handleAppointmentReply(phone: string, message: string, ten
   const dateStr = formatDate(activeCall.date);
   const timeStr = formatTime(activeCall.date);
 
-  // CONFIRM (text or button)
-  if (['SIM', 'CONFIRMAR', 'CONFIRMO', 'OK', 'BTN_CONFIRM', 'BTN_OK'].includes(msg) ||
-      msg === 'CONFIRMAR PRESENCA' || msg === 'OK, ESTAREI LA') {
+  // CONFIRM
+  if (['1', 'SIM', 'CONFIRMAR', 'CONFIRMO', 'OK', 'BTN_CONFIRM', 'BTN_OK',
+       'CONFIRMAR PRESENCA', 'OK, ESTAREI LA'].includes(msg)) {
     await prisma.scheduledCall.update({
       where: { id: activeCall.id },
       data: { status: 'confirmed' },
     });
-    return `Perfeito, ${activeCall.name}! Sua consulta de ${dateStr} as ${timeStr} esta confirmada. Ate la!`;
+    return `Perfeito, ${activeCall.name}! Sua consulta de ${dateStr} as ${timeStr} esta confirmada. Ate la! 😊`;
   }
 
-  // CANCEL (text or button)
-  if (['CANCELAR', 'CANCELA', 'NAO', 'BTN_CANCEL', 'PRECISO CANCELAR'].includes(msg)) {
+  // CANCEL
+  if (['2', 'CANCELAR', 'CANCELA', 'BTN_CANCEL', 'PRECISO CANCELAR'].includes(msg)) {
     await prisma.scheduledCall.update({
       where: { id: activeCall.id },
       data: { status: 'cancelled' },
@@ -366,25 +279,16 @@ export async function handleAppointmentReply(phone: string, message: string, ten
       leadId: activeCall.leadId,
       tenantId: activeCall.tenantId,
     });
-    return null; // cancellation notice sent with buttons already
+    return null;
   }
 
-  // RESCHEDULE (text or button)
-  if (['REAGENDAR', 'REMARCAR', 'BTN_RESCHEDULE', 'BTN_REBOOK', 'AGENDAR', 'AGENDAR NOVA CONSULTA'].includes(msg)) {
-    return `Para reagendar, digite *menu* e escolha "Agendar consulta". Vamos encontrar o melhor horario para voce!`;
-  }
-
-  // POST-CONSULTATION replies
-  if (['ESTOU BEM', 'BTN_FINE', '1'].includes(msg)) {
-    return `Que bom saber, ${activeCall.name}! Se precisar de algo, estamos aqui. Ate a proxima!`;
-  }
-
-  if (['TENHO DUVIDA', 'BTN_DOUBT', '2'].includes(msg)) {
-    return '__HANDOFF__'; // Forward to human agent
-  }
-
-  if (['QUERO RETORNO', 'BTN_RETURN', '3'].includes(msg)) {
-    return `Vamos agendar seu retorno! Digite *menu* e escolha "Agendar consulta".`;
+  // RESCHEDULE
+  if (['3', 'REAGENDAR', 'REMARCAR', 'BTN_RESCHEDULE', 'BTN_REBOOK'].includes(msg)) {
+    await prisma.scheduledCall.update({
+      where: { id: activeCall.id },
+      data: { status: 'cancelled' },
+    });
+    return `Sua consulta de ${dateStr} as ${timeStr} foi cancelada. Para reagendar, envie qualquer mensagem e escolha "Agendar consulta".`;
   }
 
   return null;

@@ -1,10 +1,8 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
-import { aiService } from './ai.service';
 import { evolutionApi } from '../messaging/evolution.client';
 import { handleAppointmentReply } from '../scheduling/scheduling.notifications';
 import { handleConversationFlow, FlowResponse } from './conversation-flow';
-import { startCollection, getMissingFields } from './data-collection.service';
 
 interface UpdateConfigData {
   instanceName?: string;
@@ -47,13 +45,9 @@ interface IncomingMessage {
     pushName?: string;
   };
   event: string;
-  sender?: string; // Phone@s.whatsapp.net (from Evolution v1.8.2 webhook payload)
+  sender?: string;
 }
 
-/**
- * Send a FlowResponse via the appropriate Evolution API method (text, buttons, or list).
- * Falls back to plain text if interactive message fails.
- */
 async function sendFlowResponse(
   instanceName: string,
   sendTo: string,
@@ -64,7 +58,6 @@ async function sendFlowResponse(
 ) {
   const phoneForDb = dbPhone || sendTo;
 
-  // Handoff to human
   if (response.type === 'handoff') {
     const handoffMsg = config.humanHandoffMessage ||
       'Vou te encaminhar para um atendente. Aguarde um momento!';
@@ -82,17 +75,7 @@ async function sendFlowResponse(
     return;
   }
 
-  let sentText = response.text;
-
-  if (response.buttons) {
-    sentText += '\n\n' + response.buttons.map((b, i) => `*${i + 1}* - ${b.text}`).join('\n');
-  }
-  if (response.listSections) {
-    for (const section of response.listSections) {
-      sentText += '\n\n' + section.rows.map((r, i) => `*${i + 1}* - ${r.title}${r.description ? ` (${r.description})` : ''}`).join('\n');
-    }
-  }
-
+  const sentText = response.text;
   await evolutionApi.sendText(instanceName, sendTo, sentText);
 
   await prisma.chatMessage.create({
@@ -108,14 +91,8 @@ async function sendFlowResponse(
 }
 
 export const chatbotService = {
-  /**
-   * Processa mensagem recebida do WhatsApp
-   */
   async handleIncomingMessage(data: IncomingMessage) {
-    // Ignorar mensagens enviadas por nós mesmos
     if (data.data.key.fromMe) return;
-
-    // Só processar mensagens de texto
     if (data.event !== 'messages.upsert') return;
 
     const messageText =
@@ -132,63 +109,36 @@ export const chatbotService = {
     const instanceName = data.instance;
     const remoteJid = data.data.key.remoteJid;
 
-    // Skip group messages and non-standard JIDs (status@broadcast, etc.)
     if (remoteJid.includes('@g.us') || remoteJid === 'status@broadcast') return;
 
-    console.log(`[CHATBOT] 📩 MENSAGEM RECEBIDA: "${messageText}" de ${data.data.pushName || 'Desconhecido'} (${remoteJid})`);
+    console.log(`[CHATBOT] 📩 "${messageText}" de ${data.data.pushName || 'Desconhecido'} (${remoteJid})`);
 
-    // Extract phone number — handle @s.whatsapp.net and @lid (Linked ID) formats
     const senderPhone = remoteJid.replace(/@s\.whatsapp\.net$/, '').replace(/@lid$/, '');
     const senderName = data.data.pushName || 'Cliente';
 
-    // Use remoteJid for both sending and DB — data.sender is the instance OWNER, not the message sender
     const phoneForSend = remoteJid;
     const phoneForDb = evolutionApi.ensureBrazilian9thDigit(
       senderPhone.startsWith('55') ? senderPhone : `55${senderPhone}`
     );
-    console.log(`[CHATBOT] remoteJid=${remoteJid} phoneForSend=${phoneForSend} phoneForDb=${phoneForDb} fromMe=${data.data.key.fromMe}`);
 
-    // Encontrar o tenant pela instância do WhatsApp
     const config = await prisma.chatbotConfig.findFirst({
       where: { instanceName, isActive: true },
       include: { tenant: true },
     });
 
     if (!config) {
-      console.log(`[CHATBOT] ❌ Nenhum config ativo para instancia "${instanceName}"`);
+      console.log(`[CHATBOT] Nenhum config ativo para instancia "${instanceName}"`);
       return;
     }
-    console.log(`[CHATBOT] ✅ Config encontrado: tenant=${config.tenantId}, business=${config.businessName}`);
 
     const tenantId = config.tenantId;
+    const phone = phoneForDb;
 
-    // phoneForSend = full remoteJid for Evolution API (handles LID format)
-    // phoneForDb = clean number for database storage and lookups
-    const phone = phoneForDb; // For DB operations
-
-    // Save incoming message
     await prisma.chatMessage.create({
-      data: {
-        tenantId,
-        phone,
-        senderName,
-        direction: 'INCOMING',
-        body: messageText,
-      },
+      data: { tenantId, phone, senderName, direction: 'INCOMING', body: messageText },
     });
 
-    // --- Conversation Flow Engine (registration, booking, menu) ---
-    console.log(`[CHATBOT] 🔄 Verificando conversation flow...`);
-    const flowResponse = await handleConversationFlow(tenantId, phone, senderName, messageText);
-
-    if (flowResponse) {
-      console.log(`[CHATBOT] 📋 Flow response: type=${flowResponse.type}, text="${(flowResponse.text || '').substring(0, 100)}"`);
-      await sendFlowResponse(instanceName, phoneForSend, flowResponse, tenantId, config, phone);
-      return;
-    }
-    console.log(`[CHATBOT] ➡️ Sem flow response, seguindo para AI...`);
-
-    // --- Appointment reply handler (SIM, CANCELAR, button IDs from notifications) ---
+    // --- Appointment reply handler (from reminders) ---
     const appointmentReply = await handleAppointmentReply(phone, messageText, tenantId);
     if (appointmentReply) {
       if (appointmentReply === '__HANDOFF__') {
@@ -197,112 +147,33 @@ export const chatbotService = {
       }
       await evolutionApi.sendText(instanceName, phoneForSend, appointmentReply);
       await prisma.chatMessage.create({
-        data: {
-          tenantId,
-          phone,
-          senderName: 'Anpexia Bot',
-          direction: 'OUTGOING',
-          body: appointmentReply,
-          metadata: { type: 'appointment_reply' },
-        },
+        data: { tenantId, phone, senderName: 'Anpexia Bot', direction: 'OUTGOING', body: appointmentReply, metadata: { type: 'appointment_reply' } },
       });
       return;
     }
 
-    // --- Fallback: AI response ---
-    const customer = await prisma.customer.findFirst({
-      where: { tenantId, phone: { contains: phone.slice(-8) } },
-    });
-
-    const recentMessages = await prisma.chatMessage.findMany({
-      where: { tenantId, phone },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    });
-
-    const faqs = await prisma.chatbotFaq.findMany({
-      where: { tenantId, isActive: true },
-    });
-
-    console.log(`[CHATBOT] 🤖 Chamando Claude AI... (customer=${customer?.name || 'nao encontrado'}, faqs=${faqs.length}, historico=${recentMessages.length})`);
-    const aiResponse = await aiService.generateResponse({
-      userMessage: messageText,
-      senderName,
-      config,
-      faqs,
-      conversationHistory: recentMessages.reverse(),
-      customer,
-    });
-    console.log(`[CHATBOT] 🤖 Claude respondeu: handoff=${aiResponse.handoffToHuman}, registration=${aiResponse.startRegistration}, texto="${aiResponse.text.substring(0, 150)}..."`);
-
-    if (aiResponse.handoffToHuman) {
-      const handoffMsg = config.humanHandoffMessage ||
-        'Vou te encaminhar para um atendente. Aguarde um momento!';
-      await evolutionApi.sendText(instanceName, phoneForSend, handoffMsg);
-      await prisma.chatMessage.create({
-        data: {
-          tenantId,
-          phone,
-          senderName: 'Anpexia Bot',
-          direction: 'OUTGOING',
-          body: handoffMsg,
-          metadata: { handoff: true },
-        },
-      });
+    // --- Conversation flow (menu, registration, scheduling) ---
+    const flowResponse = await handleConversationFlow(tenantId, phone, senderName, messageText);
+    if (flowResponse) {
+      await sendFlowResponse(instanceName, phoneForSend, flowResponse, tenantId, config, phone);
       return;
     }
 
-    // Send the AI text response first
-    if (aiResponse.text) {
-      console.log(`[CHATBOT] 📤 Enviando resposta via Evolution API para ${phoneForSend}...`);
-      await evolutionApi.sendText(instanceName, phoneForSend, aiResponse.text);
-      console.log(`[CHATBOT] ✅ Resposta enviada com sucesso!`);
-      await prisma.chatMessage.create({
-        data: {
-          tenantId,
-          phone,
-          senderName: 'Anpexia Bot',
-          direction: 'OUTGOING',
-          body: aiResponse.text,
-          metadata: (aiResponse.metadata || undefined) as any,
-        },
-      });
-    }
-
-    // If AI detected patient intent, start structured data collection
-    if (aiResponse.startRegistration) {
-      const requiredFields = (config.requiredPatientFields as string[]) || ['name', 'birthDate'];
-
-      if (!customer) {
-        // New person → collect all required fields
-        const collectionResponse = await startCollection(tenantId, phone, requiredFields);
-        await sendFlowResponse(instanceName, phoneForSend, collectionResponse, tenantId, config, phone);
-      } else {
-        // Existing customer → check for missing fields
-        const missing = await getMissingFields(tenantId, customer.id, requiredFields);
-        if (missing.length > 0) {
-          const existingData: Record<string, any> = {};
-          if (customer.name) existingData.name = customer.name;
-          if (customer.birthDate) existingData.birthDate = customer.birthDate;
-          if ((customer as any).cpfCnpj) existingData.cpfCnpj = (customer as any).cpfCnpj;
-          if (customer.email) existingData.email = customer.email;
-
-          const collectionResponse = await startCollection(tenantId, phone, requiredFields, customer.id, existingData);
-          await sendFlowResponse(instanceName, phoneForSend, collectionResponse, tenantId, config, phone);
-        }
-      }
-    }
+    // No handler matched — repeat entry menu
+    const entryResponse: FlowResponse = {
+      type: 'text',
+      text: 'Ola! 👋 Este canal e exclusivo para agendamento de consultas.\n\n' +
+            '1 - Agendar consulta\n' +
+            '2 - Falar com atendente\n\n' +
+            'Responda com o numero da opcao.',
+    };
+    await sendFlowResponse(instanceName, phoneForSend, entryResponse, tenantId, config, phone);
   },
 
-  /**
-   * Test endpoint: simulates incoming message without sending to WhatsApp.
-   * Returns the bot responses as an array.
-   */
   async handleTestMessage(phone: string, messageText: string): Promise<{ responses: FlowResponse[]; debug: Record<string, any> }> {
     const responses: FlowResponse[] = [];
     const debug: Record<string, any> = {};
 
-    // Use the anpexia instance / clinica teste
     const config = await prisma.chatbotConfig.findFirst({
       where: { instanceName: 'anpexia', isActive: true },
       include: { tenant: true },
@@ -315,28 +186,11 @@ export const chatbotService = {
     const tenantId = config.tenantId;
     const senderName = 'Test User';
     debug.tenantId = tenantId;
-    debug.instanceName = 'anpexia';
 
-    // Save incoming message (same as real flow)
     await prisma.chatMessage.create({
       data: { tenantId, phone, senderName, direction: 'INCOMING', body: messageText },
     });
 
-    // --- Conversation Flow Engine ---
-    const flowResponse = await handleConversationFlow(tenantId, phone, senderName, messageText);
-    if (flowResponse) {
-      debug.source = 'conversation_flow';
-      responses.push(flowResponse);
-
-      // Save outgoing message
-      await prisma.chatMessage.create({
-        data: { tenantId, phone, senderName: 'Anpexia Bot', direction: 'OUTGOING', body: flowResponse.text, metadata: { type: 'conversation_flow', responseType: flowResponse.type } },
-      });
-
-      return { responses, debug };
-    }
-
-    // --- Appointment reply handler ---
     const appointmentReply = await handleAppointmentReply(phone, messageText, tenantId);
     if (appointmentReply) {
       debug.source = 'appointment_reply';
@@ -348,87 +202,25 @@ export const chatbotService = {
       return { responses, debug };
     }
 
-    // --- AI response ---
-    debug.source = 'ai_fallback';
-    const customer = await prisma.customer.findFirst({
-      where: { tenantId, phone: { contains: phone.slice(-8) } },
-    });
-    debug.customerFound = !!customer;
-    debug.customerName = customer?.name || null;
-
-    const recentMessages = await prisma.chatMessage.findMany({
-      where: { tenantId, phone },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    });
-
-    const faqs = await prisma.chatbotFaq.findMany({
-      where: { tenantId, isActive: true },
-    });
-
-    const aiResponse = await aiService.generateResponse({
-      userMessage: messageText,
-      senderName,
-      config,
-      faqs,
-      conversationHistory: recentMessages.reverse(),
-      customer,
-    });
-
-    debug.aiHandoff = aiResponse.handoffToHuman;
-    debug.aiStartRegistration = aiResponse.startRegistration;
-
-    if (aiResponse.handoffToHuman) {
-      const handoffMsg = config.humanHandoffMessage || 'Vou te encaminhar para um atendente.';
-      responses.push({ type: 'handoff', text: handoffMsg });
+    const flowResponse = await handleConversationFlow(tenantId, phone, senderName, messageText);
+    if (flowResponse) {
+      debug.source = 'conversation_flow';
+      responses.push(flowResponse);
       await prisma.chatMessage.create({
-        data: { tenantId, phone, senderName: 'Anpexia Bot', direction: 'OUTGOING', body: handoffMsg, metadata: { handoff: true } },
+        data: { tenantId, phone, senderName: 'Anpexia Bot', direction: 'OUTGOING', body: flowResponse.text, metadata: { type: 'conversation_flow' } },
       });
       return { responses, debug };
     }
 
-    // Send AI text
-    if (aiResponse.text) {
-      responses.push({ type: 'text', text: aiResponse.text });
-      await prisma.chatMessage.create({
-        data: { tenantId, phone, senderName: 'Anpexia Bot', direction: 'OUTGOING', body: aiResponse.text, metadata: { type: 'ai_response' } },
-      });
-    }
-
-    // If AI detected patient intent, start registration
-    if (aiResponse.startRegistration) {
-      const requiredFields = (config.requiredPatientFields as string[]) || ['name', 'birthDate'];
-
-      if (!customer) {
-        const collectionResponse = await startCollection(tenantId, phone, requiredFields);
-        responses.push(collectionResponse);
-        await prisma.chatMessage.create({
-          data: { tenantId, phone, senderName: 'Anpexia Bot', direction: 'OUTGOING', body: collectionResponse.text, metadata: { type: 'data_collection_start' } },
-        });
-      } else {
-        const missing = await getMissingFields(tenantId, customer.id, requiredFields);
-        if (missing.length > 0) {
-          const existingData: Record<string, any> = {};
-          if (customer.name) existingData.name = customer.name;
-          if (customer.birthDate) existingData.birthDate = customer.birthDate;
-          if ((customer as any).cpfCnpj) existingData.cpfCnpj = (customer as any).cpfCnpj;
-          if (customer.email) existingData.email = customer.email;
-
-          const collectionResponse = await startCollection(tenantId, phone, requiredFields, customer.id, existingData);
-          responses.push(collectionResponse);
-          await prisma.chatMessage.create({
-            data: { tenantId, phone, senderName: 'Anpexia Bot', direction: 'OUTGOING', body: collectionResponse.text, metadata: { type: 'data_collection_start' } },
-          });
-        }
-      }
-    }
+    debug.source = 'entry_menu';
+    responses.push({
+      type: 'text',
+      text: 'Ola! 👋 Este canal e exclusivo para agendamento de consultas.\n\n1 - Agendar consulta\n2 - Falar com atendente\n\nResponda com o numero da opcao.',
+    });
 
     return { responses, debug };
   },
 
-  /**
-   * Configuração do chatbot
-   */
   async getConfig(tenantId: string) {
     let config = await prisma.chatbotConfig.findFirst({ where: { tenantId } });
 
@@ -462,9 +254,6 @@ export const chatbotService = {
     });
   },
 
-  /**
-   * FAQs
-   */
   async listFaqs(tenantId: string) {
     return prisma.chatbotFaq.findMany({
       where: { tenantId },
@@ -492,11 +281,7 @@ export const chatbotService = {
     await prisma.chatbotFaq.delete({ where: { id } });
   },
 
-  /**
-   * Conversas
-   */
   async listConversations(tenantId: string, params: { skip: number; take: number }) {
-    // Agrupar por telefone, pegar última mensagem de cada
     const conversations = await prisma.$queryRaw<any[]>`
       SELECT DISTINCT ON (phone)
         phone,
@@ -527,9 +312,6 @@ export const chatbotService = {
     });
   },
 
-  /**
-   * Estatísticas
-   */
   async getStats(tenantId: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
