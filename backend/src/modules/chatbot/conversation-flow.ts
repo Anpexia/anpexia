@@ -171,9 +171,18 @@ export async function handleConversationFlow(
 
 async function showEntryMenu(tenantId: string, phone: string): Promise<FlowResponse> {
   setState(tenantId, phone, 'MENU', {});
+
+  let greeting = 'Ola! 👋';
+  try {
+    const config = await prisma.chatbotConfig.findFirst({ where: { tenantId }, select: { assistantName: true } });
+    if (config?.assistantName) {
+      greeting = `Ola! 👋 Eu sou ${config.assistantName}, assistente virtual.`;
+    }
+  } catch {}
+
   return {
     type: 'text',
-    text: 'Ola! 👋 Este canal e exclusivo para agendamento de consultas.\n\n' +
+    text: `${greeting} Este canal e exclusivo para agendamento de consultas.\n\n` +
           '1 - Agendar consulta\n' +
           '2 - Falar com atendente\n\n' +
           'Responda com o numero da opcao.',

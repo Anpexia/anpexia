@@ -172,7 +172,7 @@ export function DashboardPage() {
               icon={MessageSquare}
               accent
               color="purple"
-              onClick={() => navigate('/mensagens')}
+              onClick={() => navigate('/agendamentos')}
             />
             <StatCard
               title="Consultas hoje"

@@ -70,6 +70,10 @@ function WhatsAppTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [polling, setPolling] = useState(false);
+  const [assistantName, setAssistantName] = useState('');
+  const [assistantNameOriginal, setAssistantNameOriginal] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [nameSuccess, setNameSuccess] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -88,6 +92,29 @@ function WhatsAppTab() {
       setStatus('error');
     }
   }, []);
+
+  useEffect(() => {
+    api.get('/chatbot/config').then(({ data }) => {
+      const name = data.data?.assistantName || '';
+      setAssistantName(name);
+      setAssistantNameOriginal(name);
+    }).catch(() => {});
+  }, []);
+
+  const handleSaveAssistantName = async () => {
+    setSavingName(true);
+    setNameSuccess(false);
+    try {
+      await api.put('/chatbot/config', { assistantName: assistantName.trim() || null });
+      setAssistantNameOriginal(assistantName.trim());
+      setNameSuccess(true);
+      setTimeout(() => setNameSuccess(false), 3000);
+    } catch {
+      setError('Erro ao salvar nome da assistente');
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
@@ -137,6 +164,38 @@ function WhatsAppTab() {
 
   return (
     <div className="space-y-6">
+      {/* Assistente Virtual */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Smartphone size={20} />
+          Assistente Virtual
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Nome exibido na saudacao do chatbot WhatsApp. Ex: &quot;Ola! Eu sou <strong>{assistantName || 'a assistente virtual'}</strong>.&quot;
+        </p>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nome da assistente</label>
+            <input
+              type="text"
+              value={assistantName}
+              onChange={(e) => setAssistantName(e.target.value)}
+              placeholder="Ex: Ana, Sofia, Lia..."
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <button
+            onClick={handleSaveAssistantName}
+            disabled={savingName || assistantName.trim() === assistantNameOriginal}
+            className="px-4 py-2 text-sm rounded-lg bg-[#1E3A5F] text-white hover:bg-[#2A4D7A] disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {savingName ? <Loader2 size={14} className="animate-spin" /> : nameSuccess ? <CheckCircle size={14} /> : null}
+            {savingName ? 'Salvando...' : nameSuccess ? 'Salvo!' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+
+      {/* Conexao WhatsApp */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
           <Wifi size={20} />
@@ -243,7 +302,7 @@ function WhatsAppTab() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <p className="text-sm text-green-800">
               Seu WhatsApp esta conectado e pronto para receber e enviar mensagens automaticas.
-              O chatbot com IA ira responder automaticamente as mensagens recebidas.
+              O chatbot ira atender os pacientes e realizar agendamentos automaticamente.
             </p>
           </div>
         )}
@@ -414,7 +473,6 @@ export function ConfiguracoesPage() {
     { path: '/pacientes', label: 'Pacientes' },
     { path: '/estoque', label: 'Estoque' },
     { path: '/financeiro', label: 'Financeiro' },
-    { path: '/mensagens', label: 'Mensagens' },
     { path: '/agendamentos', label: 'Agendamentos' },
     { path: '/scripts', label: 'Scripts' },
     { path: '/assinatura', label: 'Assinatura' },
@@ -430,7 +488,7 @@ export function ConfiguracoesPage() {
   ];
 
   const DEFAULT_ROLE_PERMS: Record<string, string[]> = {
-    DOCTOR: ['/pacientes', '/mensagens', '/agendamentos', '/scripts'],
+    DOCTOR: ['/pacientes', '/agendamentos', '/scripts'],
     RECEPTIONIST: ['/pacientes', '/agendamentos', '/scripts'],
     FINANCIAL: ['/financeiro'],
     EMPLOYEE: ['/estoque'],
