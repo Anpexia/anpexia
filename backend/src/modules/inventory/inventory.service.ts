@@ -387,11 +387,23 @@ export const inventoryService = {
   },
 
   async listCategories(tenantId: string) {
+    await this.seedDefaultProductCategories(tenantId);
     return prisma.productCategory.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
       include: { _count: { select: { products: true } } },
     });
+  },
+
+  async seedDefaultProductCategories(tenantId: string) {
+    const defaults = ['Equipamento', 'Higiene', 'Limpeza', 'Medicamentos', 'Material Descartável', 'Outros'];
+    for (const name of defaults) {
+      await prisma.productCategory.upsert({
+        where: { tenantId_name: { tenantId, name } },
+        update: {},
+        create: { tenantId, name },
+      });
+    }
   },
 
   async createCategory(tenantId: string, name: string) {

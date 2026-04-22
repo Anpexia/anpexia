@@ -493,7 +493,7 @@ export function InventoryPage() {
     setFormData(emptyForm);
     setLinkedSuppliers([]);
     setSupplierForm(emptySupplierForm);
-    setSupplierStepMode('select');
+    setSupplierStepMode('create');
     setSupplierSearch('');
     setShowSupplierDropdown(false);
     try {
@@ -1124,7 +1124,7 @@ export function InventoryPage() {
                   </label>
                 </div>
                 <div className="flex gap-3 mt-4">
-                  <button type="button" onClick={() => setSupplierStepMode('select')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Voltar</button>
+                  <button type="button" onClick={() => setSupplierStepMode('select')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Selecionar existente</button>
                   <button type="button" onClick={handleCreateSupplierAndProceed} disabled={savingSupplier || !supplierForm.name.trim()} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{savingSupplier ? 'Salvando...' : 'Criar e continuar'}</button>
                 </div>
               </>
