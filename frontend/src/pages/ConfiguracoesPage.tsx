@@ -877,6 +877,40 @@ export function ConfiguracoesPage() {
       {tab === 'clinica' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Dados da Clinica</h2>
+          <div className="flex items-center gap-6 mb-2">
+            <div className="flex-shrink-0">
+              {clinica.logo ? (
+                <img src={clinica.logo} alt="Logo" className="w-20 h-20 rounded-lg object-contain border border-gray-200 bg-gray-50" />
+              ) : (
+                <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+                  <span className="text-xs text-gray-400 text-center">Sem logo</span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="block text-sm font-medium text-gray-700">Logo da clinica</label>
+              <div className="flex gap-2">
+                <label className="cursor-pointer px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg font-medium transition-colors">
+                  Enviar imagem
+                  <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 500 * 1024) { flash('Imagem muito grande (max 500KB)'); return; }
+                    const reader = new FileReader();
+                    reader.onload = () => setClinica({ ...clinica, logo: reader.result as string });
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                  }} />
+                </label>
+                {clinica.logo && (
+                  <button onClick={() => setClinica({ ...clinica, logo: '' })} className="px-3 py-1.5 text-red-600 hover:bg-red-50 text-sm rounded-lg font-medium transition-colors">
+                    Remover
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">PNG, JPG ou SVG. Max 500KB.</p>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>

@@ -8,7 +8,7 @@ interface User {
   email: string;
   role: string;
   twoFactorEnabled?: boolean;
-  tenant: { id: string; name: string; slug: string; plan: string; segment?: string } | null;
+  tenant: { id: string; name: string; slug: string; plan: string; segment?: string; logo?: string } | null;
 }
 
 export function useAuth() {

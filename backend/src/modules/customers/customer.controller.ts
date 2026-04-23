@@ -1,4 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import Papa from 'papaparse';
 import { customerService } from './customer.service';
 import { createCustomerSchema, updateCustomerSchema } from './customer.validators';
 import { success, created, noContent } from '../../shared/utils/response';
@@ -7,6 +9,8 @@ import { getPagination, paginationMeta } from '../../shared/utils/pagination';
 import { createAuditLog } from '../../shared/middleware/audit';
 import { logAction, getClientIp } from '../../services/auditLog.service';
 import prisma from '../../config/database';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 export const customerRouter = Router();
 
@@ -187,6 +191,86 @@ customerRouter.delete('/:id/medical-entries/:entryId', async (req: Request, res:
     });
 
     return noContent(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CSV Import
+const CSV_COLUMN_MAP: Record<string, string> = {
+  nome: 'name', name: 'name',
+  telefone: 'phone', phone: 'phone', celular: 'phone', whatsapp: 'phone',
+  email: 'email', 'e-mail': 'email',
+  cpf: 'cpfCnpj', cnpj: 'cpfCnpj', cpfcnpj: 'cpfCnpj', 'cpf/cnpj': 'cpfCnpj',
+  nascimento: 'birthDate', 'data de nascimento': 'birthDate', 'data nascimento': 'birthDate', birthdate: 'birthDate',
+  convenio: 'insurance', plano: 'insurance', insurance: 'insurance',
+  observacoes: 'notes', notas: 'notes', notes: 'notes', obs: 'notes',
+  origem: 'origin', origin: 'origin',
+  cep: 'cep', endereco: 'street', rua: 'street', street: 'street',
+  numero: 'number', number: 'number', num: 'number',
+  bairro: 'neighborhood', neighborhood: 'neighborhood',
+  cidade: 'city', city: 'city',
+  estado: 'state', uf: 'state', state: 'state',
+};
+
+customerRouter.post('/import', upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ success: false, error: { message: 'Arquivo CSV obrigatório' } });
+
+    const csvText = file.buffer.toString('utf-8').replace(/^﻿/, '');
+    const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true, transformHeader: (h: string) => h.trim().toLowerCase() });
+
+    if (!parsed.data || parsed.data.length === 0) {
+      return res.status(400).json({ success: false, error: { message: 'Arquivo vazio ou formato inválido' } });
+    }
+
+    const tenantId = req.auth!.tenantId!;
+    const results = { imported: 0, skipped: 0, errors: [] as string[] };
+
+    for (let i = 0; i < (parsed.data as any[]).length; i++) {
+      const row = parsed.data[i] as Record<string, string>;
+      try {
+        const mapped: Record<string, any> = {};
+        for (const [csvCol, val] of Object.entries(row)) {
+          const field = CSV_COLUMN_MAP[csvCol.trim().toLowerCase()];
+          if (field && val && val.trim()) mapped[field] = val.trim();
+        }
+
+        if (!mapped.name) {
+          results.errors.push(`Linha ${i + 2}: nome obrigatório`);
+          results.skipped++;
+          continue;
+        }
+
+        const address = (mapped.cep || mapped.street || mapped.number || mapped.neighborhood || mapped.city || mapped.state)
+          ? { cep: mapped.cep || '', street: mapped.street || '', number: mapped.number || '', neighborhood: mapped.neighborhood || '', city: mapped.city || '', state: mapped.state || '' }
+          : undefined;
+
+        await prisma.customer.create({
+          data: {
+            tenantId,
+            name: mapped.name,
+            phone: mapped.phone || null,
+            email: mapped.email || null,
+            cpfCnpj: mapped.cpfCnpj || null,
+            birthDate: mapped.birthDate ? new Date(mapped.birthDate.split('/').reverse().join('-')) : null,
+            insurance: mapped.insurance || null,
+            notes: mapped.notes || null,
+            origin: mapped.origin || 'importacao_csv',
+            address: address || undefined,
+          },
+        });
+        results.imported++;
+      } catch (err: any) {
+        results.errors.push(`Linha ${i + 2}: ${err.message?.slice(0, 80)}`);
+        results.skipped++;
+      }
+    }
+
+    await logAction({ ...auditCtx(req), action: 'IMPORT', entity: 'PATIENT', entityId: 'bulk', metadata: { imported: results.imported, skipped: results.skipped } });
+
+    return success(res, results);
   } catch (err) {
     next(err);
   }

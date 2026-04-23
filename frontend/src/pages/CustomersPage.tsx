@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield } from 'lucide-react';
+import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -176,6 +176,12 @@ export function CustomersPage() {
   const [atestadoForm, setAtestadoForm] = useState({ type: 'ATESTADO', reason: '', daysOff: '', startDate: '', endDate: '', observations: '' });
   const [savingAtestado, setSavingAtestado] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+
+  // Import CSV state
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
 
   // Convenio state
   const [conveniosList, setConveniosList] = useState<any[]>([]);
@@ -488,6 +494,23 @@ export function CustomersPage() {
     };
   };
 
+  const handleImportCsv = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      const { data } = await api.post('/customers/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setImportResult(data.data);
+      fetchCustomers();
+    } catch (err: any) {
+      setImportResult({ imported: 0, skipped: 0, errors: [err.response?.data?.error?.message || 'Erro ao importar'] });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -495,9 +518,14 @@ export function CustomersPage() {
           <h2 className="text-2xl font-bold text-slate-800">Pacientes</h2>
           <p className="text-slate-500 mt-1">Gerencie seus pacientes</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
-          <Plus size={18} /> Novo paciente
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => { setShowImport(true); setImportFile(null); setImportResult(null); }} className="flex items-center gap-2 border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+            <Upload size={18} /> Importar CSV
+          </button>
+          <button onClick={openCreate} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
+            <Plus size={18} /> Novo paciente
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -1350,6 +1378,75 @@ export function CustomersPage() {
         </div>
         );
       })()}
+
+      {/* Import CSV Modal */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-800">Importar Pacientes</h3>
+              <button onClick={() => setShowImport(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+
+            {!importResult ? (
+              <>
+                <div
+                  className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-[#1E3A5F] transition-colors cursor-pointer"
+                  onClick={() => document.getElementById('csv-file-input')?.click()}
+                  onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-[#1E3A5F]', 'bg-blue-50'); }}
+                  onDragLeave={e => { e.currentTarget.classList.remove('border-[#1E3A5F]', 'bg-blue-50'); }}
+                  onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-[#1E3A5F]', 'bg-blue-50'); const f = e.dataTransfer.files[0]; if (f) setImportFile(f); }}
+                >
+                  <Upload size={32} className="mx-auto text-slate-400 mb-3" />
+                  {importFile ? (
+                    <p className="text-sm text-slate-700 font-medium">{importFile.name}</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-600 font-medium">Clique ou arraste um arquivo CSV</p>
+                      <p className="text-xs text-slate-400 mt-1">Maximo 5MB</p>
+                    </>
+                  )}
+                  <input id="csv-file-input" type="file" accept=".csv,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) setImportFile(f); e.target.value = ''; }} />
+                </div>
+
+                <div className="mt-4 bg-slate-50 rounded-lg p-3">
+                  <p className="text-xs font-medium text-slate-600 mb-1">Colunas aceitas:</p>
+                  <p className="text-xs text-slate-500">Nome*, Telefone, Email, CPF, Data de Nascimento, Convenio, Observacoes, Origem, CEP, Endereco, Numero, Bairro, Cidade, Estado</p>
+                  <p className="text-xs text-slate-400 mt-1">* obrigatorio. Separador: virgula ou ponto-e-virgula.</p>
+                </div>
+
+                <div className="flex gap-2 mt-5">
+                  <button onClick={() => setShowImport(false)} className="flex-1 border border-slate-300 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+                  <button onClick={handleImportCsv} disabled={!importFile || importing} className="flex-1 bg-[#1E3A5F] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                    {importing ? 'Importando...' : 'Importar'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-center py-4">
+                  <div className={`w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-3 ${importResult.imported > 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                    {importResult.imported > 0 ? (
+                      <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                      <X size={28} className="text-red-600" />
+                    )}
+                  </div>
+                  <p className="text-lg font-semibold text-slate-800">{importResult.imported} importado{importResult.imported !== 1 ? 's' : ''}</p>
+                  {importResult.skipped > 0 && <p className="text-sm text-slate-500">{importResult.skipped} ignorado{importResult.skipped !== 1 ? 's' : ''}</p>}
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="mt-3 max-h-32 overflow-y-auto bg-red-50 border border-red-200 rounded-lg p-3">
+                    {importResult.errors.slice(0, 20).map((e, i) => <p key={i} className="text-xs text-red-700">{e}</p>)}
+                    {importResult.errors.length > 20 && <p className="text-xs text-red-500 mt-1">...e mais {importResult.errors.length - 20} erros</p>}
+                  </div>
+                )}
+                <button onClick={() => setShowImport(false)} className="w-full mt-5 bg-[#1E3A5F] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A]">Fechar</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Toast notification */}
       {toastMsg && (

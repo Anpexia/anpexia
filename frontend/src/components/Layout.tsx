@@ -100,7 +100,11 @@ export function Layout() {
         className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14"
         style={{ backgroundColor: '#1E3A5F' }}
       >
-        <img src="/anpexia-logo.svg" alt="Anpexia" className="h-7" style={{ filter: 'brightness(0) invert(1)' }} />
+        {user?.tenant?.logo ? (
+          <img src={user.tenant.logo} alt={user.tenant.name} className="h-8 max-w-[140px] object-contain" />
+        ) : (
+          <img src="/anpexia-logo.svg" alt="Anpexia" className="h-7" style={{ filter: 'brightness(0) invert(1)' }} />
+        )}
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded-lg text-white">
           {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
@@ -122,7 +126,11 @@ export function Layout() {
       >
         {/* Logo */}
         <div className="h-14 md:h-16 flex items-center px-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <img src="/anpexia-logo.svg" alt="Anpexia" className="h-7" style={{ filter: 'brightness(0) invert(1)' }} />
+          {user?.tenant?.logo ? (
+            <img src={user.tenant.logo} alt={user.tenant.name} className="h-8 max-w-[180px] object-contain" />
+          ) : (
+            <img src="/anpexia-logo.svg" alt="Anpexia" className="h-7" style={{ filter: 'brightness(0) invert(1)' }} />
+          )}
         </div>
 
         {/* Navigation */}

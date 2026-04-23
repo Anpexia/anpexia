@@ -58,17 +58,17 @@ export const authService = {
     if (context === 'admin') {
       user = await prisma.user.findFirst({
         where: { email, OR: [{ tenantId: null }, { role: 'SUPER_ADMIN' }] },
-        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
+        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true, logo: true } } },
       });
     } else if (tenantId) {
       user = await prisma.user.findFirst({
         where: { email, tenantId },
-        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
+        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true, logo: true } } },
       });
     } else {
       const users = await prisma.user.findMany({
         where: { email, tenantId: { not: null }, isActive: true },
-        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
+        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true, logo: true } } },
       });
 
       if (users.length > 1) {
@@ -226,7 +226,7 @@ export const authService = {
   async verify2FA(userId: string, code: string, method: 'email' | 'totp', deviceId: string | undefined, deviceName: string | undefined, rememberDevice: boolean, ipAddress: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } } },
+      include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true, logo: true } } },
     });
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuário não encontrado');
 
@@ -398,7 +398,7 @@ export const authService = {
         email: true,
         role: true,
         twoFactorEnabled: true,
-        tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true } },
+        tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true, logo: true } },
       },
     });
 
