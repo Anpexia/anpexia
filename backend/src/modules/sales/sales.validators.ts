@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 const LeadStage = z.enum([
-  'NEW', 'CONTACTED', 'QUALIFIED', 'CALL_SCHEDULED', 'CALL_DONE',
-  'PROPOSAL_SENT', 'NEGOTIATION', 'CONTRACTED', 'ONBOARDING', 'ACTIVE', 'LOST',
+  'NEW', 'CONTACTED', 'QUALIFIED', 'MEETING', 'CALL_SCHEDULED', 'CALL_DONE',
+  'PROPOSAL_SENT', 'NEGOTIATION', 'CONTRACTED', 'ONBOARDING', 'ACTIVE', 'WON', 'LOST',
 ]);
 
 export const createLeadSchema = z.object({
