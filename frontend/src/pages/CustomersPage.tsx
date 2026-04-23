@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload } from 'lucide-react';
+import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, ChevronRight, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import Papa from 'papaparse';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { DictationTextarea } from '../components/DictationTextarea';
@@ -179,7 +180,11 @@ export function CustomersPage() {
 
   // Import CSV state
   const [showImport, setShowImport] = useState(false);
+  const [importStep, setImportStep] = useState<'upload' | 'preview' | 'result'>('upload');
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
 
@@ -494,22 +499,129 @@ export function CustomersPage() {
     };
   };
 
-  const handleImportCsv = async () => {
-    if (!importFile) return;
+  const IMPORT_FIELDS = [
+    { key: '_skip', label: '— Ignorar —' },
+    { key: 'name', label: 'Nome' },
+    { key: 'phone', label: 'Telefone' },
+    { key: 'email', label: 'Email' },
+    { key: 'cpfCnpj', label: 'CPF/CNPJ' },
+    { key: 'birthDate', label: 'Data de Nascimento' },
+    { key: 'insurance', label: 'Convênio' },
+    { key: 'notes', label: 'Observações' },
+    { key: 'origin', label: 'Origem' },
+    { key: 'cep', label: 'CEP' },
+    { key: 'street', label: 'Endereço' },
+    { key: 'number', label: 'Número' },
+    { key: 'neighborhood', label: 'Bairro' },
+    { key: 'city', label: 'Cidade' },
+    { key: 'state', label: 'Estado/UF' },
+  ];
+
+  const AUTO_MAP: Record<string, string> = {
+    nome: 'name', name: 'name', 'nome completo': 'name', paciente: 'name',
+    telefone: 'phone', phone: 'phone', celular: 'phone', whatsapp: 'phone', fone: 'phone', tel: 'phone',
+    email: 'email', 'e-mail': 'email',
+    cpf: 'cpfCnpj', cnpj: 'cpfCnpj', cpfcnpj: 'cpfCnpj', 'cpf/cnpj': 'cpfCnpj', documento: 'cpfCnpj',
+    nascimento: 'birthDate', 'data de nascimento': 'birthDate', 'data nascimento': 'birthDate', birthdate: 'birthDate', 'dt nascimento': 'birthDate', 'dt nasc': 'birthDate',
+    convenio: 'insurance', plano: 'insurance', insurance: 'insurance', 'plano de saude': 'insurance',
+    observacoes: 'notes', notas: 'notes', notes: 'notes', obs: 'notes', observacao: 'notes',
+    origem: 'origin', origin: 'origin',
+    cep: 'cep', endereco: 'street', rua: 'street', street: 'street', logradouro: 'street',
+    numero: 'number', number: 'number', num: 'number', 'nº': 'number',
+    bairro: 'neighborhood', neighborhood: 'neighborhood',
+    cidade: 'city', city: 'city', municipio: 'city',
+    estado: 'state', uf: 'state', state: 'state',
+  };
+
+  const normalizePhone = (v: string) => {
+    const digits = v.replace(/\D/g, '');
+    if (digits.length === 10 || digits.length === 11) return '55' + digits;
+    if (digits.length === 12 || digits.length === 13) return digits;
+    return digits;
+  };
+
+  const normalizeCpf = (v: string) => v.replace(/\D/g, '');
+
+  const normalizeDate = (v: string): string | null => {
+    if (!v || !v.trim()) return null;
+    const s = v.trim();
+    // DD/MM/YYYY or DD-MM-YYYY
+    const brMatch = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
+    // YYYY-MM-DD
+    const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+    return null;
+  };
+
+  const handleFileParsed = (file: File) => {
+    setImportFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = (e.target?.result as string || '').replace(/^﻿/, '');
+      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, transformHeader: (h: string) => h.trim() });
+      if (!parsed.data || parsed.data.length === 0) return;
+      const headers = parsed.meta.fields || [];
+      setCsvHeaders(headers);
+      setCsvRows(parsed.data as Record<string, string>[]);
+      const mapping: Record<string, string> = {};
+      for (const h of headers) {
+        const key = h.toLowerCase().trim();
+        mapping[h] = AUTO_MAP[key] || '_skip';
+      }
+      setColumnMapping(mapping);
+      setImportStep('preview');
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const getMappedPreviewRows = () => {
+    return csvRows.slice(0, 5).map(row => {
+      const mapped: Record<string, string> = {};
+      for (const [csvCol, field] of Object.entries(columnMapping)) {
+        if (field === '_skip' || !row[csvCol]) continue;
+        let val = (row[csvCol] || '').trim();
+        if (field === 'phone') val = normalizePhone(val);
+        if (field === 'cpfCnpj') val = normalizeCpf(val);
+        if (field === 'birthDate') val = normalizeDate(val) || val;
+        mapped[field] = val;
+      }
+      return mapped;
+    });
+  };
+
+  const handleImportConfirm = async () => {
     setImporting(true);
     setImportResult(null);
     try {
-      const formData = new FormData();
-      formData.append('file', importFile);
-      const { data } = await api.post('/customers/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const rows = csvRows.map(row => {
+        const mapped: Record<string, any> = {};
+        for (const [csvCol, field] of Object.entries(columnMapping)) {
+          if (field === '_skip' || !row[csvCol]) continue;
+          let val = (row[csvCol] || '').trim();
+          if (!val) continue;
+          if (field === 'phone') val = normalizePhone(val);
+          if (field === 'cpfCnpj') val = normalizeCpf(val);
+          if (field === 'birthDate') val = normalizeDate(val) || val;
+          mapped[field] = val;
+        }
+        return mapped;
+      }).filter(r => r.name);
+
+      const { data } = await api.post('/customers/import-batch', { rows });
       setImportResult(data.data);
+      setImportStep('result');
       fetchCustomers();
     } catch (err: any) {
       setImportResult({ imported: 0, skipped: 0, errors: [err.response?.data?.error?.message || 'Erro ao importar'] });
+      setImportStep('result');
     } finally {
       setImporting(false);
     }
   };
+
+  const mappedFieldCount = Object.values(columnMapping).filter(v => v !== '_skip').length;
+  const hasNameMapped = Object.values(columnMapping).includes('name');
 
   return (
     <div>
@@ -519,7 +631,7 @@ export function CustomersPage() {
           <p className="text-slate-500 mt-1">Gerencie seus pacientes</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => { setShowImport(true); setImportFile(null); setImportResult(null); }} className="flex items-center gap-2 border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+          <button onClick={() => { setShowImport(true); setImportStep('upload'); setImportFile(null); setCsvHeaders([]); setCsvRows([]); setColumnMapping({}); setImportResult(null); }} className="flex items-center gap-2 border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
             <Upload size={18} /> Importar CSV
           </button>
           <button onClick={openCreate} className="flex items-center gap-2 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] transition-colors">
@@ -1382,47 +1494,123 @@ export function CustomersPage() {
       {/* Import CSV Modal */}
       {showImport && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
+          <div className={`bg-white rounded-xl w-full p-6 ${importStep === 'preview' ? 'max-w-3xl' : 'max-w-md'}`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-800">Importar Pacientes</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-slate-800">Importar Pacientes</h3>
+                {importStep !== 'upload' && (
+                  <span className="text-xs text-slate-400">
+                    {importStep === 'preview' ? '— Conferir dados' : '— Resultado'}
+                  </span>
+                )}
+              </div>
               <button onClick={() => setShowImport(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
 
-            {!importResult ? (
+            {/* Step 1: Upload */}
+            {importStep === 'upload' && (
               <>
                 <div
                   className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-[#1E3A5F] transition-colors cursor-pointer"
                   onClick={() => document.getElementById('csv-file-input')?.click()}
                   onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-[#1E3A5F]', 'bg-blue-50'); }}
                   onDragLeave={e => { e.currentTarget.classList.remove('border-[#1E3A5F]', 'bg-blue-50'); }}
-                  onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-[#1E3A5F]', 'bg-blue-50'); const f = e.dataTransfer.files[0]; if (f) setImportFile(f); }}
+                  onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-[#1E3A5F]', 'bg-blue-50'); const f = e.dataTransfer.files[0]; if (f) handleFileParsed(f); }}
                 >
                   <Upload size={32} className="mx-auto text-slate-400 mb-3" />
-                  {importFile ? (
-                    <p className="text-sm text-slate-700 font-medium">{importFile.name}</p>
-                  ) : (
-                    <>
-                      <p className="text-sm text-slate-600 font-medium">Clique ou arraste um arquivo CSV</p>
-                      <p className="text-xs text-slate-400 mt-1">Maximo 5MB</p>
-                    </>
-                  )}
-                  <input id="csv-file-input" type="file" accept=".csv,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) setImportFile(f); e.target.value = ''; }} />
+                  <p className="text-sm text-slate-600 font-medium">Clique ou arraste um arquivo CSV</p>
+                  <p className="text-xs text-slate-400 mt-1">Maximo 5MB</p>
+                  <input id="csv-file-input" type="file" accept=".csv,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileParsed(f); e.target.value = ''; }} />
                 </div>
-
                 <div className="mt-4 bg-slate-50 rounded-lg p-3">
-                  <p className="text-xs font-medium text-slate-600 mb-1">Colunas aceitas:</p>
-                  <p className="text-xs text-slate-500">Nome*, Telefone, Email, CPF, Data de Nascimento, Convenio, Observacoes, Origem, CEP, Endereco, Numero, Bairro, Cidade, Estado</p>
-                  <p className="text-xs text-slate-400 mt-1">* obrigatorio. Separador: virgula ou ponto-e-virgula.</p>
+                  <p className="text-xs font-medium text-slate-600 mb-1">Colunas reconhecidas automaticamente:</p>
+                  <p className="text-xs text-slate-500">Nome, Telefone, Email, CPF, Data de Nascimento, Convênio, Observações, Origem, CEP, Endereço, Número, Bairro, Cidade, Estado</p>
+                  <p className="text-xs text-slate-400 mt-1">Você poderá ajustar o mapeamento antes de importar.</p>
+                </div>
+                <button onClick={() => setShowImport(false)} className="w-full mt-5 border border-slate-300 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+              </>
+            )}
+
+            {/* Step 2: Preview + Mapping */}
+            {importStep === 'preview' && (
+              <>
+                <div className="flex items-center gap-3 mb-4 text-sm text-slate-600">
+                  <span className="bg-slate-100 px-2 py-1 rounded font-medium">{importFile?.name}</span>
+                  <span>{csvRows.length} linha{csvRows.length !== 1 ? 's' : ''} encontrada{csvRows.length !== 1 ? 's' : ''}</span>
+                  <span>•</span>
+                  <span>{mappedFieldCount} coluna{mappedFieldCount !== 1 ? 's' : ''} mapeada{mappedFieldCount !== 1 ? 's' : ''}</span>
                 </div>
 
-                <div className="flex gap-2 mt-5">
-                  <button onClick={() => setShowImport(false)} className="flex-1 border border-slate-300 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                  <button onClick={handleImportCsv} disabled={!importFile || importing} className="flex-1 bg-[#1E3A5F] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
-                    {importing ? 'Importando...' : 'Importar'}
+                {!hasNameMapped && (
+                  <div className="flex items-center gap-2 mb-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2">
+                    <AlertTriangle size={14} />
+                    <span>A coluna <strong>Nome</strong> é obrigatória. Mapeie pelo menos uma coluna para "Nome".</span>
+                  </div>
+                )}
+
+                {/* Column Mapping */}
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Mapeamento de colunas</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                    {csvHeaders.map(h => (
+                      <div key={h} className="flex flex-col">
+                        <span className="text-xs text-slate-500 truncate mb-0.5" title={h}>{h}</span>
+                        <select
+                          value={columnMapping[h] || '_skip'}
+                          onChange={e => setColumnMapping({ ...columnMapping, [h]: e.target.value })}
+                          className={`text-xs border rounded px-2 py-1.5 ${columnMapping[h] === '_skip' ? 'border-slate-200 text-slate-400' : 'border-blue-300 text-blue-800 bg-blue-50'}`}
+                        >
+                          {IMPORT_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview Table */}
+                <div className="border border-slate-200 rounded-lg overflow-hidden mb-4">
+                  <div className="bg-slate-50 px-3 py-2 border-b border-slate-200">
+                    <p className="text-xs font-medium text-slate-600">Preview (primeiras {Math.min(5, csvRows.length)} linhas já normalizadas)</p>
+                  </div>
+                  <div className="overflow-x-auto max-h-48">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-slate-50">
+                          {IMPORT_FIELDS.filter(f => f.key !== '_skip' && Object.values(columnMapping).includes(f.key)).map(f => (
+                            <th key={f.key} className="text-left px-3 py-2 text-slate-600 font-medium whitespace-nowrap">{f.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getMappedPreviewRows().map((row, i) => (
+                          <tr key={i} className="border-t border-slate-100">
+                            {IMPORT_FIELDS.filter(f => f.key !== '_skip' && Object.values(columnMapping).includes(f.key)).map(f => (
+                              <td key={f.key} className={`px-3 py-2 whitespace-nowrap ${!row[f.key] && f.key === 'name' ? 'text-red-500 italic' : 'text-slate-700'}`}>
+                                {row[f.key] || (f.key === 'name' ? 'vazio' : '—')}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button onClick={() => setImportStep('upload')} className="flex-1 border border-slate-300 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Voltar</button>
+                  <button
+                    onClick={handleImportConfirm}
+                    disabled={!hasNameMapped || importing}
+                    className="flex-1 bg-[#1E3A5F] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {importing ? 'Importando...' : <><span>Importar {csvRows.length} paciente{csvRows.length !== 1 ? 's' : ''}</span><ChevronRight size={16} /></>}
                   </button>
                 </div>
               </>
-            ) : (
+            )}
+
+            {/* Step 3: Result */}
+            {importStep === 'result' && importResult && (
               <>
                 <div className="text-center py-4">
                   <div className={`w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-3 ${importResult.imported > 0 ? 'bg-green-100' : 'bg-red-100'}`}>
