@@ -46,7 +46,7 @@ interface ConversationState {
   expiresAt: number;
 }
 
-const STATE_TTL = 15 * 60 * 1000; // 15 minutes
+const STATE_TTL = 10 * 60 * 1000; // 10 minutes
 const conversations = new Map<string, ConversationState>();
 
 function key(tenantId: string, phone: string) {
