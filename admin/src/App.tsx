@@ -640,9 +640,9 @@ const navItems: NavItem[] = [
   { to: '/financeiro', label: 'Financeiro', icon: CreditCard },
   { to: '/audit-log', label: 'Audit Log', icon: FileSearch },
   { to: '/lembretes', label: 'Lembretes', icon: Calendar },
-  { to: '/captacao', label: 'Captação', icon: Target, roles: ['SUPER_ADMIN', 'ADMIN'] },
-  { to: '/usuarios', label: 'Usuários', icon: UserCog, roles: ['SUPER_ADMIN', 'ADMIN'] },
-  { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { to: '/captacao', label: 'Captação', icon: Target, roles: ['SUPER_ADMIN', 'ADMIN', 'OWNER'] },
+  { to: '/usuarios', label: 'Usuários', icon: UserCog, roles: ['SUPER_ADMIN', 'ADMIN', 'OWNER'] },
+  { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'OWNER'] },
 ];
 
 function AdminLayout() {
@@ -660,12 +660,12 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen flex">
-      <aside className="w-64 bg-[#1E3A5F] text-white flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-white/10">
+      <aside className="w-64 bg-[#1E3A5F] text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-y-auto">
+        <div className="h-16 flex items-center px-6 border-b border-white/10 flex-shrink-0">
           <img src="/anpexia-logo-white.svg" alt="Anpexia" className="h-7" />
           <span className="ml-3 text-xs bg-[#2563EB] px-2 py-0.5 rounded">Admin</span>
         </div>
-        <nav className="flex-1 py-4 px-3">
+        <nav className="flex-1 py-4 px-3 overflow-y-auto">
           {visibleNavItems.map((item) => {
             const isParentActive = item.matchPaths
               ? item.matchPaths.some((p) => pathname === p || pathname.startsWith(p + '/'))
@@ -715,7 +715,7 @@ function AdminLayout() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto bg-[#F8FAFC]">
+      <main className="flex-1 overflow-auto bg-[#F8FAFC] ml-64">
         <div className="max-w-7xl mx-auto p-8">
           <Outlet />
         </div>
