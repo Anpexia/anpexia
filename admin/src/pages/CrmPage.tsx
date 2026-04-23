@@ -19,6 +19,7 @@ const STAGES = [
   { key: 'NEW', label: 'Novo', color: 'bg-slate-100 text-slate-800 border-slate-300', accent: '#64748b' },
   { key: 'CONTACTED', label: 'Contatado', color: 'bg-blue-100 text-blue-800 border-blue-300', accent: '#2563eb' },
   { key: 'QUALIFIED', label: 'Qualificado', color: 'bg-indigo-100 text-indigo-800 border-indigo-300', accent: '#4f46e5' },
+  { key: 'MEETING', label: 'Reunião', color: 'bg-purple-100 text-purple-800 border-purple-300', accent: '#7c3aed' },
   { key: 'PROPOSAL_SENT', label: 'Proposta Enviada', color: 'bg-cyan-100 text-cyan-800 border-cyan-300', accent: '#0891b2' },
   { key: 'NEGOTIATION', label: 'Negociação', color: 'bg-amber-100 text-amber-800 border-amber-300', accent: '#d97706' },
   { key: 'WON', label: 'Fechado', color: 'bg-green-100 text-green-800 border-green-300', accent: '#16a34a' },
@@ -302,6 +303,9 @@ export default function CrmPage() {
   const [form, setForm] = useState({ name: '', phone: '', email: '', companyName: '', source: 'manual', notes: '', estimatedValue: '', responsible: '' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [meetingLead, setMeetingLead] = useState<any>(null);
+  const [meetingForm, setMeetingForm] = useState({ dueAt: '', notes: '' });
+  const [meetingSubmitting, setMeetingSubmitting] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const fetchData = useCallback(async () => {
@@ -370,8 +374,36 @@ export default function CrmPage() {
     setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, stage: newStage } : l));
     try {
       await api.patch(`/admin/leads/${leadId}/stage`, { stage: newStage });
+      if (newStage === 'MEETING') {
+        setMeetingLead(lead);
+        setMeetingForm({ dueAt: '', notes: '' });
+      }
     } catch {
       fetchData();
+    }
+  };
+
+  const submitMeeting = async () => {
+    if (!meetingLead || !meetingForm.dueAt) return;
+    setMeetingSubmitting(true);
+    try {
+      await api.post(`/admin/leads/${meetingLead.id}/tasks`, {
+        type: 'MEETING',
+        dueAt: datetimeLocalToBrazilISO(meetingForm.dueAt),
+        responsible: '',
+      });
+      if (meetingForm.notes.trim()) {
+        await api.post(`/admin/leads/${meetingLead.id}/activities`, {
+          type: 'MEETING',
+          content: meetingForm.notes.trim(),
+        });
+      }
+      setMeetingLead(null);
+      fetchData();
+    } catch (err: any) {
+      console.error('[CRM] Erro ao agendar reunião:', err);
+    } finally {
+      setMeetingSubmitting(false);
     }
   };
 
@@ -476,6 +508,58 @@ export default function CrmPage() {
                 <button type="submit" disabled={creating} className="flex-1 bg-[#1E3A5F] text-white py-2 rounded text-sm disabled:opacity-50">{creating ? 'Criando...' : 'Criar'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {meetingLead && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Calendar size={20} className="text-purple-600" />
+                <h3 className="font-semibold text-gray-900">Agendar Reunião</h3>
+              </div>
+              <button onClick={() => setMeetingLead(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              <strong>{meetingLead.name}</strong>{meetingLead.companyName || meetingLead.company ? ` — ${meetingLead.companyName || meetingLead.company}` : ''}
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data e horário *</label>
+                <input
+                  type="datetime-local"
+                  value={meetingForm.dueAt}
+                  onChange={(e) => setMeetingForm({ ...meetingForm, dueAt: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <textarea
+                  value={meetingForm.notes}
+                  onChange={(e) => setMeetingForm({ ...meetingForm, notes: e.target.value })}
+                  rows={3}
+                  placeholder="Pauta da reunião, link do Zoom, etc."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setMeetingLead(null)} className="flex-1 border border-gray-300 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+                Depois
+              </button>
+              <button
+                onClick={submitMeeting}
+                disabled={!meetingForm.dueAt || meetingSubmitting}
+                className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Calendar size={16} />
+                {meetingSubmitting ? 'Agendando...' : 'Agendar'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3 text-center">Será criado automaticamente no Google Agenda</p>
           </div>
         </div>
       )}
