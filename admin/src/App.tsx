@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap, FileSearch, UserCog, Settings as SettingsIcon, Calendar, Trash2 } from 'lucide-react';
+import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap, FileSearch, UserCog, Settings as SettingsIcon, Calendar, Trash2, Target } from 'lucide-react';
 import clsx from 'clsx';
 import api from './services/api';
 import { getDeviceId } from './utils/device';
@@ -14,6 +14,7 @@ import SettingsPage from './pages/SettingsPage';
 import LembretesPage from './pages/LembretesPage';
 import Verify2FAPage from './pages/Verify2FAPage';
 import CriarSenhaPage from './pages/CriarSenhaPage';
+import CaptacaoPage from './pages/CaptacaoPage';
 
 // ============ AUTH ============
 
@@ -639,6 +640,7 @@ const navItems: NavItem[] = [
   { to: '/financeiro', label: 'Financeiro', icon: CreditCard },
   { to: '/audit-log', label: 'Audit Log', icon: FileSearch },
   { to: '/lembretes', label: 'Lembretes', icon: Calendar },
+  { to: '/captacao', label: 'Captação', icon: Target, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { to: '/usuarios', label: 'Usuários', icon: UserCog, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ];
@@ -750,6 +752,7 @@ export default function App() {
         <Route path="financeiro" element={<BillingPage />} />
         <Route path="audit-log" element={<AuditLogPage />} />
         <Route path="lembretes" element={<LembretesPage />} />
+        <Route path="captacao" element={<CaptacaoPage />} />
         <Route path="usuarios" element={<AdminUsersPage />} />
         <Route path="configuracoes" element={<SettingsPage />} />
       </Route>
