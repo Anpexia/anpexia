@@ -114,7 +114,7 @@ export default function CaptacaoPage() {
             <div className="bg-gradient-to-r from-[#1E3A5F] to-[#2A5A8F] rounded-xl p-6 text-white mb-6">
               <h4 className="text-xl font-bold mb-2">A plataforma que automatiza sua clínica de ponta a ponta</h4>
               <p className="text-blue-100 leading-relaxed">
-                A Anpexia é uma plataforma completa de gestão para clínicas médicas. Agenda, prontuário, financeiro, estoque, WhatsApp automatizado com IA — tudo em um único sistema. Seu paciente marca consulta pelo WhatsApp 24h por dia, recebe lembretes automáticos, e você controla tudo de qualquer lugar.
+                A Anpexia é uma plataforma completa de gestão para clínicas médicas. Agenda, prontuário com ditado por voz, financeiro, estoque inteligente com baixa automática, WhatsApp automatizado com IA — tudo em um único sistema. Seu paciente marca consulta pelo WhatsApp 24h por dia, recebe lembretes automáticos, o médico dita a evolução sem digitar, e o convênio nunca fica sem cobrar.
               </p>
             </div>
 
@@ -151,6 +151,7 @@ export default function CaptacaoPage() {
                 'Dados clínicos, alergias, tipo sanguíneo, medicamentos',
                 'Anamnese especializada (oftalmologia, clínica geral)',
                 'Evolução SOAP com PIO e acuidade visual',
+                'Transcrição por voz — médico dita e o sistema escreve',
                 'Prescrições: medicamentos, exames, óculos',
                 'Atestados médicos com geração de PDF',
                 'Assinatura digital do médico',
@@ -163,18 +164,20 @@ export default function CaptacaoPage() {
                 'Separação convênio vs. particular',
                 'Relatório de repasse por período',
               ]} />
-              <FeatureCard title="Estoque com Alertas" items={[
+              <FeatureCard title="Estoque Inteligente" items={[
                 'Cadastro com lote, validade, fornecedor e margem',
                 'Alerta de estoque baixo via WhatsApp pro dono',
+                'Pedido de reposição automático quando estoque atinge mínimo',
                 'Alerta de produtos próximos do vencimento',
                 'Categorias personalizáveis',
                 'Movimentações de entrada e saída com histórico',
-                'Vinculação de materiais por procedimento',
+                'Baixa automática ao realizar consulta (via template de materiais)',
               ]} />
               <FeatureCard title="Convênios + TUSS" items={[
                 'Cadastro ilimitado de convênios aceitos',
                 'Tabela TUSS com busca por código ou nome',
                 'Materiais e medicamentos por procedimento TUSS',
+                'Controle de procedimentos realizados — nunca esqueça de cobrar o convênio',
                 'Exportação XML para cobrança (agiliza faturamento)',
                 'Procedimentos particulares com tipo e valor',
                 'Separação total entre convênio e particular',
@@ -195,11 +198,27 @@ export default function CaptacaoPage() {
                 'Parabéns de aniversário',
                 'Reativação de pacientes inativos (90 dias)',
               ]} />
+              <FeatureCard title="Consulta + Estoque Integrados" items={[
+                'Template de materiais por tipo de procedimento',
+                'Ao realizar consulta, baixa automática do estoque',
+                'Médico não precisa se preocupar com controle manual',
+                'Histórico de materiais utilizados por consulta',
+                'Redução de desperdício e controle de custo por atendimento',
+                'Reposição automática quando estoque atinge mínimo',
+              ]} />
+              <FeatureCard title="Ditado por Voz" items={[
+                'Médico dita a evolução pelo microfone durante a consulta',
+                'Transcrição automática em tempo real no prontuário',
+                'Elimina digitação — foco 100% no paciente',
+                'Funciona para evolução SOAP, anamnese e anotações',
+                'Economia de 5-10 minutos por atendimento',
+                'Compatível com qualquer dispositivo com microfone',
+              ]} />
             </div>
           </Section>
 
           <Section title="Diferenciais competitivos">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
                 <div className="text-3xl font-bold text-[#1E3A5F] mb-1">24h</div>
                 <p className="text-sm text-slate-600">Atendimento via WhatsApp com IA sem parar</p>
@@ -211,6 +230,18 @@ export default function CaptacaoPage() {
               <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
                 <div className="text-3xl font-bold text-[#1E3A5F] mb-1">100%</div>
                 <p className="text-sm text-slate-600">Controle financeiro com repasse automático</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                <div className="text-3xl font-bold text-[#1E3A5F] mb-1">0 min</div>
+                <p className="text-sm text-slate-600">Digitando prontuário — médico dita por voz</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                <div className="text-3xl font-bold text-[#1E3A5F] mb-1">Auto</div>
+                <p className="text-sm text-slate-600">Baixa de estoque ao realizar consulta</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-5 text-center">
+                <div className="text-3xl font-bold text-[#1E3A5F] mb-1">R$ 0</div>
+                <p className="text-sm text-slate-600">De procedimento esquecido — TUSS organizado</p>
               </div>
             </div>
           </Section>
@@ -233,6 +264,9 @@ export default function CaptacaoPage() {
                   <ul className="space-y-2 text-sm text-slate-700">
                     <li>✓ Todos os módulos (agenda, prontuário, financeiro, estoque, WhatsApp)</li>
                     <li>✓ Chatbot com IA 24h</li>
+                    <li>✓ Ditado por voz no prontuário</li>
+                    <li>✓ Baixa automática de estoque por consulta</li>
+                    <li>✓ Organização TUSS com controle de faturamento</li>
                     <li>✓ Implantação e migração de dados</li>
                     <li>✓ Treinamento da equipe</li>
                     <li>✓ Suporte via WhatsApp</li>
@@ -445,8 +479,28 @@ Se um dia fizer sentido, meu contato está aqui. Sucesso na clínica! 🤝`}
                 <ol className="text-sm text-slate-700 space-y-1 list-decimal pl-4">
                   <li>Tabela TUSS integrada com busca</li>
                   <li>Materiais/medicamentos por procedimento</li>
+                  <li>Controle pra nunca esquecer de faturar</li>
                   <li>Exportação XML pra faturamento</li>
                   <li>Fluxo separado convênio vs. particular</li>
+                </ol>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <h4 className="font-semibold text-slate-800 mb-2">Se a dor é TEMPO DO MÉDICO</h4>
+                <ol className="text-sm text-slate-700 space-y-1 list-decimal pl-4">
+                  <li>Ditado por voz — médico fala, sistema transcreve</li>
+                  <li>Prontuário preenchido sem digitar</li>
+                  <li>Baixa automática de estoque na consulta</li>
+                  <li>Prescrições e atestados com 1 clique</li>
+                </ol>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <h4 className="font-semibold text-slate-800 mb-2">Se a dor é ESTOQUE</h4>
+                <ol className="text-sm text-slate-700 space-y-1 list-decimal pl-4">
+                  <li>Alerta automático de estoque baixo no WhatsApp</li>
+                  <li>Pedido de reposição automático</li>
+                  <li>Template de materiais por procedimento</li>
+                  <li>Baixa automática ao realizar consulta</li>
+                  <li>Controle de validade com alerta</li>
                 </ol>
               </div>
             </div>
@@ -559,6 +613,81 @@ Isso é a Anpexia. Um sistema completo pra sua clínica.
 Sem contrato. Sem fidelidade. Sem complicação.
 
 👉 Veja uma demonstração ao vivo`}
+            />
+            <ScriptBlock
+              title="Copy — Anúncio Facebook (Ditado por Voz)"
+              tag="Ads"
+              content={`Médico, quanto tempo você perde digitando no prontuário?
+
+Com a Anpexia, você DITA a evolução do paciente pelo microfone enquanto atende. O sistema transcreve tudo automaticamente no prontuário.
+
+🎙️ Ditado por voz em tempo real
+📋 Prontuário preenchido sem digitar
+⏱️ 5-10 minutos a menos por consulta
+👨‍⚕️ Foco 100% no paciente, não no teclado
+
+Ainda tem: agendamento por WhatsApp com IA, lembretes automáticos, financeiro com repasse, estoque inteligente e muito mais.
+
+R$ 1.200/mês. Sem fidelidade. Implantação inclusa.
+
+👉 Agende uma demonstração gratuita`}
+            />
+            <ScriptBlock
+              title="Copy — Anúncio Facebook (Estoque Inteligente)"
+              tag="Ads"
+              content={`Sua clínica já perdeu material por vencimento?
+Já faltou insumo no meio de um procedimento?
+
+Com a Anpexia, o estoque da sua clínica funciona no automático:
+
+📦 Alerta de estoque baixo direto no WhatsApp do dono
+🔄 Pedido de reposição automático ao atingir o mínimo
+🏥 Ao realizar a consulta, os materiais usados já dão baixa sozinhos
+📊 Template de materiais por tipo de procedimento
+
+Chega de planilha. Chega de controle manual. Chega de prejuízo.
+
+R$ 1.200/mês. Sem fidelidade. Sem taxa de implantação.
+
+👉 Veja como funciona ao vivo`}
+            />
+            <ScriptBlock
+              title="Copy — Anúncio Facebook (Convênio + TUSS)"
+              tag="Ads"
+              content={`Quantos procedimentos sua clínica deixou de cobrar do convênio esse mês?
+
+A maioria das clínicas perde dinheiro por esquecer de faturar procedimentos realizados. Com a Anpexia, isso acaba:
+
+💰 Todo procedimento realizado fica registrado com código TUSS
+📋 O sistema organiza tudo pra você não esquecer de cobrar
+📤 Exportação XML pronta pro convênio
+🔍 Tabela TUSS completa com busca por código ou nome
+
+Pare de deixar dinheiro na mesa. Cada procedimento esquecido é receita perdida.
+
+R$ 1.200/mês. Sem fidelidade. Implantação inclusa.
+
+👉 Agende uma demonstração gratuita`}
+            />
+            <ScriptBlock
+              title="Copy — Anúncio Facebook (Automação Total)"
+              tag="Ads"
+              content={`E se sua clínica funcionasse quase sozinha?
+
+Com a Anpexia, é possível:
+
+🤖 Paciente agenda pelo WhatsApp 24h — sem ligar
+🎙️ Médico dita no microfone — prontuário preenchido automaticamente
+📦 Estoque dá baixa sozinho quando a consulta é realizada
+💰 Repasse de médicos calculado automaticamente
+🔔 Lembrete de consulta, aniversário e reativação no piloto automático
+📋 Procedimentos TUSS organizados pra não perder faturamento de convênio
+
+Tudo em um único sistema. Tudo automatizado.
+
+R$ 1.200/mês. Sem fidelidade. Implantação inclusa. Treinamento da equipe por nossa conta.
+
+👉 Quero ver a demonstração`}
             />
           </Section>
 
@@ -721,8 +850,12 @@ Se tiver alguém pra me apresentar, fico muito grato! E se a pessoa fechar, tenh
                 { stat: '3 dias', desc: 'para implantação completa' },
                 { stat: 'R$ 0', desc: 'de taxa de implantação' },
                 { stat: '0', desc: 'meses de fidelidade' },
-                { stat: '6+', desc: 'módulos integrados num só sistema' },
+                { stat: '10+', desc: 'módulos integrados num só sistema' },
                 { stat: '9', desc: 'automações rodando 24h (lembretes, aniversário, reativação)' },
+                { stat: '5-10 min', desc: 'economizados por consulta com ditado por voz' },
+                { stat: 'Auto', desc: 'baixa de estoque ao realizar consulta' },
+                { stat: '100%', desc: 'dos procedimentos TUSS rastreados pra faturamento' },
+                { stat: '0', desc: 'procedimentos esquecidos de cobrar do convênio' },
               ].map((item, i) => (
                 <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-[#1E3A5F]">{item.stat}</div>
