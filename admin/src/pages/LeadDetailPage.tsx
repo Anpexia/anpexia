@@ -30,6 +30,7 @@ const STAGES = [
   { key: 'CALL_DONE', label: 'Call Realizada', color: 'bg-[#EFF6FF] text-[#1E3A5F]' },
   { key: 'PROPOSAL_SENT', label: 'Proposta Enviada', color: 'bg-cyan-100 text-cyan-800' },
   { key: 'NEGOTIATION', label: 'Negociacao', color: 'bg-amber-100 text-amber-800' },
+  { key: 'FOLLOW_UP', label: 'Follow-up', color: 'bg-orange-100 text-orange-800' },
   { key: 'CONTRACTED', label: 'Contratado', color: 'bg-blue-200 text-blue-900' },
   { key: 'ONBOARDING', label: 'Onboarding', color: 'bg-teal-100 text-teal-800' },
   { key: 'ACTIVE', label: 'Ativo', color: 'bg-green-100 text-green-800' },

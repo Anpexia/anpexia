@@ -22,6 +22,7 @@ const STAGES = [
   { key: 'MEETING', label: 'Reunião', color: 'bg-purple-100 text-purple-800 border-purple-300', accent: '#7c3aed' },
   { key: 'PROPOSAL_SENT', label: 'Proposta Enviada', color: 'bg-cyan-100 text-cyan-800 border-cyan-300', accent: '#0891b2' },
   { key: 'NEGOTIATION', label: 'Negociação', color: 'bg-amber-100 text-amber-800 border-amber-300', accent: '#d97706' },
+  { key: 'FOLLOW_UP', label: 'Follow-up', color: 'bg-orange-100 text-orange-800 border-orange-300', accent: '#ea580c' },
   { key: 'WON', label: 'Fechado', color: 'bg-green-100 text-green-800 border-green-300', accent: '#16a34a' },
   { key: 'LOST', label: 'Perdido', color: 'bg-red-100 text-red-800 border-red-300', accent: '#dc2626' },
 ];
@@ -306,6 +307,9 @@ export default function CrmPage() {
   const [meetingLead, setMeetingLead] = useState<any>(null);
   const [meetingForm, setMeetingForm] = useState({ dueAt: '', notes: '' });
   const [meetingSubmitting, setMeetingSubmitting] = useState(false);
+  const [followUpLead, setFollowUpLead] = useState<any>(null);
+  const [followUpForm, setFollowUpForm] = useState({ dueAt: '', notes: '' });
+  const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const fetchData = useCallback(async () => {
@@ -378,6 +382,10 @@ export default function CrmPage() {
         setMeetingLead(lead);
         setMeetingForm({ dueAt: '', notes: '' });
       }
+      if (newStage === 'FOLLOW_UP') {
+        setFollowUpLead(lead);
+        setFollowUpForm({ dueAt: '', notes: '' });
+      }
     } catch {
       fetchData();
     }
@@ -404,6 +412,30 @@ export default function CrmPage() {
       console.error('[CRM] Erro ao agendar reunião:', err);
     } finally {
       setMeetingSubmitting(false);
+    }
+  };
+
+  const submitFollowUp = async () => {
+    if (!followUpLead || !followUpForm.dueAt) return;
+    setFollowUpSubmitting(true);
+    try {
+      await api.post(`/admin/leads/${followUpLead.id}/tasks`, {
+        type: 'FOLLOWUP',
+        dueAt: datetimeLocalToBrazilISO(followUpForm.dueAt),
+        responsible: '',
+      });
+      if (followUpForm.notes.trim()) {
+        await api.post(`/admin/leads/${followUpLead.id}/activities`, {
+          type: 'NOTE',
+          content: followUpForm.notes.trim(),
+        });
+      }
+      setFollowUpLead(null);
+      fetchData();
+    } catch (err: any) {
+      console.error('[CRM] Erro ao agendar follow-up:', err);
+    } finally {
+      setFollowUpSubmitting(false);
     }
   };
 
@@ -557,6 +589,58 @@ export default function CrmPage() {
               >
                 <Calendar size={16} />
                 {meetingSubmitting ? 'Agendando...' : 'Agendar'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3 text-center">Será criado automaticamente no Google Agenda</p>
+          </div>
+        </div>
+      )}
+
+      {followUpLead && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Clock size={20} className="text-orange-600" />
+                <h3 className="font-semibold text-gray-900">Agendar Follow-up</h3>
+              </div>
+              <button onClick={() => setFollowUpLead(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              <strong>{followUpLead.name}</strong>{followUpLead.companyName || followUpLead.company ? ` — ${followUpLead.companyName || followUpLead.company}` : ''}
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data de retorno *</label>
+                <input
+                  type="datetime-local"
+                  value={followUpForm.dueAt}
+                  onChange={(e) => setFollowUpForm({ ...followUpForm, dueAt: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo / Observações</label>
+                <textarea
+                  value={followUpForm.notes}
+                  onChange={(e) => setFollowUpForm({ ...followUpForm, notes: e.target.value })}
+                  rows={3}
+                  placeholder="Ex: Disse que vai avaliar após o Q2, retomar em julho..."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setFollowUpLead(null)} className="flex-1 border border-gray-300 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+                Depois
+              </button>
+              <button
+                onClick={submitFollowUp}
+                disabled={!followUpForm.dueAt || followUpSubmitting}
+                className="flex-1 bg-orange-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Clock size={16} />
+                {followUpSubmitting ? 'Agendando...' : 'Agendar'}
               </button>
             </div>
             <p className="text-xs text-gray-400 mt-3 text-center">Será criado automaticamente no Google Agenda</p>
