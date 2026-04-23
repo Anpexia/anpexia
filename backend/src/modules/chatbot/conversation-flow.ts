@@ -366,7 +366,12 @@ function handleRegAddressNumber(tenantId: string, phone: string, text: string): 
     return { type: 'text', text: 'Informe seu endereco completo (rua, numero, bairro, cidade e estado):' };
   }
 
-  conv.data.reg = { ...conv.data.reg, number: text.trim() };
+  const num = text.trim().replace(/\D/g, '');
+  if (!num) {
+    return { type: 'text', text: 'Informe apenas o numero do endereco (somente digitos).' };
+  }
+
+  conv.data.reg = { ...conv.data.reg, number: num };
   setState(tenantId, phone, 'REG_COMPLEMENTO_ASK', conv.data);
   return {
     type: 'text',
@@ -579,7 +584,7 @@ async function showSpecialties(tenantId: string, phone: string): Promise<FlowRes
       tenantId,
       isActive: true,
       especialidade: { not: null },
-      role: { in: ['OWNER', 'MANAGER', 'EMPLOYEE'] },
+      role: { in: ['DOCTOR', 'OWNER', 'MANAGER', 'EMPLOYEE'] },
     },
     select: { id: true, name: true, especialidade: true, horarios: true, duracaoConsulta: true },
   });
@@ -602,29 +607,6 @@ async function showSpecialties(tenantId: string, phone: string): Promise<FlowRes
     conv.data.specialty = null;
     setState(tenantId, phone, 'IDLE', conv.data);
     return showDates(tenantId, phone);
-  }
-
-  if (specialties.length === 1) {
-    // Only one specialty — auto-select
-    const spec = specialties[0];
-    const docs = specialtyMap.get(spec)!;
-    const conv = getState(tenantId, phone)!;
-    conv.data.specialty = spec;
-    conv.data.specialtyDoctors = docs;
-
-    if (docs.length === 1) {
-      conv.data.doctorId = docs[0].id;
-      conv.data.doctorName = docs[0].name;
-      setState(tenantId, phone, 'IDLE', conv.data);
-      return showDates(tenantId, phone);
-    }
-
-    setState(tenantId, phone, 'SCHED_DOCTOR', conv.data);
-    const list = docs.map((d, i) => `${i + 1} - ${d.name}`).join('\n');
-    return {
-      type: 'text',
-      text: `Escolha o medico:\n\n${list}\n\nResponda com o numero da opcao.`,
-    };
   }
 
   const conv = getState(tenantId, phone)!;
@@ -653,15 +635,8 @@ async function handleSchedSpecialty(tenantId: string, phone: string, text: strin
   conv.data.specialty = selected;
   conv.data.specialtyDoctors = docs;
 
-  if (docs.length === 1) {
-    conv.data.doctorId = docs[0].id;
-    conv.data.doctorName = docs[0].name;
-    setState(tenantId, phone, 'IDLE', conv.data);
-    return showDates(tenantId, phone);
-  }
-
   setState(tenantId, phone, 'SCHED_DOCTOR', conv.data);
-  const docList = docs.map((d, i) => `${i + 1} - ${d.name}`).join('\n');
+  const docList = docs.map((d, i) => `${i + 1} - Dr(a). ${d.name}`).join('\n');
   return {
     type: 'text',
     text: `Escolha o medico:\n\n${docList}\n\nResponda com o numero da opcao.`,
