@@ -307,13 +307,26 @@ async function handleRegCep(tenantId: string, phone: string, text: string): Prom
     return { type: 'text', text: 'CEP invalido. Informe 8 digitos (exemplo: 40444444).' };
   }
 
-  // Lookup via ViaCEP
+  const conv = getState(tenantId, phone);
+  if (!conv) {
+    return { type: 'text', text: 'Sessao expirada. Envie qualquer mensagem para recomecar.' };
+  }
+
   try {
-    const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.error(`[CHATBOT] ViaCEP HTTP ${response.status} for CEP ${cep}`);
+      return { type: 'text', text: 'Servico de CEP indisponivel no momento. Tente novamente em alguns segundos.' };
+    }
+
     const data = await response.json() as any;
 
     if (data.erro) {
-      const conv = getState(tenantId, phone)!;
       conv.data.reg = { ...conv.data.reg, cep, street: '', neighborhood: '', city: '', state: '', cepNotFound: true };
       setState(tenantId, phone, 'REG_ADDRESS_NUMBER', conv.data);
       return {
@@ -322,7 +335,6 @@ async function handleRegCep(tenantId: string, phone: string, text: string): Prom
       };
     }
 
-    const conv = getState(tenantId, phone)!;
     conv.data.reg = {
       ...conv.data.reg,
       cep: data.cep || cep,
@@ -338,8 +350,9 @@ async function handleRegCep(tenantId: string, phone: string, text: string): Prom
       type: 'text',
       text: `Achei este endereco: 📍\n${data.logradouro}, ${data.bairro}, ${data.localidade}-${data.uf}\n\nQual o numero?`,
     };
-  } catch {
-    return { type: 'text', text: 'Erro ao buscar CEP. Tente novamente.' };
+  } catch (err: any) {
+    console.error(`[CHATBOT] CEP lookup failed for ${cep}:`, err.message || err);
+    return { type: 'text', text: 'Erro ao buscar CEP. Tente novamente em alguns segundos.' };
   }
 }
 
