@@ -81,5 +81,5 @@ export function useAuth() {
     }
   }, [isAuthenticated, user, fetchMe]);
 
-  return { user, loading, error, isAuthenticated, login, logout };
+  return { user, loading, error, isAuthenticated, login, logout, fetchMe };
 }

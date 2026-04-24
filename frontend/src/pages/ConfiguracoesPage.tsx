@@ -313,7 +313,7 @@ function WhatsAppTab() {
 }
 
 export function ConfiguracoesPage() {
-  const { user } = useAuth();
+  const { user, fetchMe } = useAuth();
   const canManageTuss = user?.role === 'OWNER' || user?.role === 'MANAGER' || user?.role === 'SUPER_ADMIN';
 
   const TABS: { key: Tab; label: string; icon: any }[] = [
@@ -789,6 +789,7 @@ export function ConfiguracoesPage() {
     setSaving(true);
     try {
       await api.put('/settings/clinica', clinica);
+      await fetchMe();
       flash('Dados da clinica salvos!');
     } catch { flash('Erro ao salvar'); }
     setSaving(false);
