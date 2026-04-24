@@ -292,7 +292,7 @@ Meu nome é [Seu Nome], sou da Anpexia. A gente trabalha com automação pra cl�
 
 Estou entrando em contato porque a gente ajuda clínicas como a de vocês a reduzir faltas de pacientes e automatizar a recepção. Vocês ainda agendam por telefone hoje?
 
-[Se sim]: Entendo. Esse é exatamente o problema que a gente resolve. Com a Anpexia, o paciente marca pelo WhatsApp 24h, recebe lembrete automático, e a recepcionista não precisa ficar ligando pra confirmar. Além disso, o profissional dita a evolução pelo microfone sem precisar digitar, e o estoque dá baixa automática quando a consulta é realizada. Posso te mostrar em 15 minutos como funciona?
+[Se sim]: Entendo. Esse é exatamente o problema que a gente resolve. Com a Anpexia, o paciente marca pelo WhatsApp 24h, recebe lembrete automático, e a recepcionista não precisa ficar ligando pra confirmar. Além disso, tem prontuário digital com ditado por voz — o profissional dita e o sistema escreve. Financeiro com repasse automático por médico e relatório. Estoque com alerta de validade e baixa automática quando a consulta é realizada. E controle de TUSS pra não esquecer de cobrar convênio. Posso te mostrar em 15 minutos como funciona?
 
 [Se já tem sistema]: Legal! E vocês estão satisfeitos? O sistema de vocês tem WhatsApp com IA integrado? Ditado por voz no prontuário? Baixa automática de estoque por consulta? Controle de TUSS pra não esquecer de cobrar convênio? Porque o nosso diferencial é exatamente isso — automação de ponta a ponta.`}
             />
@@ -306,7 +306,7 @@ O [Quem indicou] me passou seu contato. Ele comentou que você tem uma clínica 
 
 A gente criou um sistema que automatiza a clínica de ponta a ponta — o paciente marca consulta pelo WhatsApp 24h, recebe lembrete automático, e a recepcionista não precisa ficar no telefone.
 
-O profissional dita a evolução pelo microfone sem digitar, o estoque dá baixa automática quando a consulta é realizada, tem pedido de reposição automático, financeiro com repasse por profissional, e organização de TUSS pra não esquecer de cobrar convênio. Tudo num lugar só.
+Além disso, tem prontuário digital com ditado por voz — o profissional dita e o sistema transcreve sem precisar digitar. Financeiro com repasse automático por médico e relatório completo. Estoque com alerta de validade, pedido de reposição automático, e baixa automática quando a consulta é realizada via template de materiais. E organização de procedimentos TUSS pra nunca esquecer de cobrar convênio. Tudo num lugar só.
 
 Posso te mandar um vídeo curto ou a gente marca 15 min pra eu te mostrar ao vivo?`}
             />
@@ -322,7 +322,7 @@ Você é médico / administra uma clínica?
 
 [Ouvir a resposta e entrar com o pitch]:
 
-A gente automatizou esse processo inteiro. O paciente manda um "oi" pro WhatsApp da clínica e uma assistente virtual com inteligência artificial cuida de tudo — marca a consulta, confirma, manda lembrete. Além disso, o profissional dita no microfone sem precisar digitar, o estoque dá baixa sozinho quando a consulta é realizada, e o sistema organiza os procedimentos TUSS pra não esquecer de cobrar convênio. Tudo integrado num sistema só.
+A gente automatizou esse processo inteiro. O paciente manda um "oi" pro WhatsApp da clínica e uma assistente virtual com inteligência artificial cuida de tudo — marca a consulta, confirma, manda lembrete. Tem prontuário digital com ditado por voz, financeiro com repasse automático por médico, estoque com alerta de validade e baixa automática quando a consulta é realizada. E o sistema organiza os procedimentos TUSS pra não esquecer de cobrar convênio. Tudo integrado num sistema só.
 
 Posso pegar seu contato pra te mandar um material? São 15 minutos de demonstração e você decide se faz sentido.`}
             />
@@ -380,7 +380,7 @@ Se preferir, posso te mostrar ao vivo em 15 minutos — sem compromisso. Qual o 
               tag="WhatsApp"
               content={`[Nome], tudo bem? Aqui é o [Seu Nome] da Anpexia.
 
-Sei que a rotina de clínica é corrida, então vou ser direto: a gente ajuda clínicas a reduzir faltas em até 40% e automatizar o agendamento pelo WhatsApp.
+Sei que a rotina de clínica é corrida, então vou ser direto: a gente ajuda clínicas a reduzir faltas em até 40% com agendamento e lembretes automáticos pelo WhatsApp. Além disso, tem prontuário com ditado por voz, financeiro com repasse automático por médico, estoque com baixa automática por consulta, e controle de TUSS pra não perder faturamento de convênio.
 
 Se não faz sentido agora, sem problemas. Mas se quiser ver uma demo rápida de 15 min, é só me falar. Abraço!`}
             />
@@ -389,7 +389,7 @@ Se não faz sentido agora, sem problemas. Mas se quiser ver uma demo rápida de 
               tag="WhatsApp"
               content={`Oi, [Nome]! Última mensagem, prometo rs
 
-Só queria deixar registrado: a Anpexia automatiza agendamento por WhatsApp, manda lembretes, tem prontuário digital e financeiro integrado. Tudo por R$ 1.200/mês sem fidelidade.
+Só queria deixar registrado: a Anpexia automatiza agendamento por WhatsApp com IA 24h, manda lembretes, tem prontuário com ditado por voz, financeiro com repasse automático por médico, estoque com baixa automática por consulta, e controle TUSS pra convênio. Tudo por R$ 1.200/mês sem fidelidade.
 
 Se um dia fizer sentido, meu contato está aqui. Sucesso na clínica! 🤝`}
             />
@@ -763,7 +763,7 @@ R$ 1.200/mês. Sem fidelidade. Implantação inclusa. Treinamento da equipe por 
 
 A gente automatiza o agendamento pelo WhatsApp com inteligência artificial — o paciente marca consulta sozinho, 24h por dia, e recebe lembrete automático.
 
-Além disso, o sistema tem prontuário digital, financeiro com repasse por médico, estoque com alerta de validade, e muito mais.
+Além disso, tem prontuário digital com ditado por voz (o profissional dita e o sistema transcreve), financeiro com repasse automático por médico e relatório, estoque com alerta de validade e baixa automática quando a consulta é realizada, e controle de TUSS pra não perder faturamento de convênio.
 
 Posso te mostrar como funciona em 15 minutos? Sem compromisso.`}
             />
@@ -775,7 +775,10 @@ Posso te mostrar como funciona em 15 minutos? Sem compromisso.`}
 Recapitulando o que conversamos:
 ✅ Agendamento por WhatsApp com IA 24h
 ✅ Lembretes automáticos que reduzem faltas em até 40%
-✅ Prontuário digital + financeiro com repasse automático
+✅ Prontuário digital com ditado por voz
+✅ Financeiro com repasse automático por médico e relatório
+✅ Estoque com alerta de validade e baixa automática por consulta
+✅ Controle de TUSS pra não perder faturamento de convênio
 ✅ R$ 1.200/mês, sem fidelidade, implantação inclusa
 
 Se tiver qualquer dúvida, estou aqui. Quando quiser começar, a implantação leva 2-3 dias úteis.`}
@@ -787,7 +790,7 @@ Se tiver qualquer dúvida, estou aqui. Quando quiser começar, a implantação l
 
 Estou trabalhando num sistema de gestão pra clínicas médicas (Anpexia) e queria saber: você conhece algum médico ou dono de clínica que eu possa apresentar?
 
-O sistema agenda pelo WhatsApp com IA, manda lembrete pro paciente, tem prontuário, financeiro, estoque... Tudo num lugar só.
+O sistema agenda pelo WhatsApp com IA, manda lembrete pro paciente, tem prontuário com ditado por voz, financeiro com repasse automático por médico, estoque com baixa automática por consulta, e controle de TUSS. Tudo num lugar só.
 
 Se tiver alguém pra me apresentar, fico muito grato! E se a pessoa fechar, tenho uma bonificação pra você também. 🤝`}
             />
