@@ -846,9 +846,13 @@ async function handleSchedConfirm(tenantId: string, phone: string, text: string)
   const conv = getState(tenantId, phone)!;
 
   try {
-    const customer = conv.customerId
-      ? await prisma.customer.findUnique({ where: { id: conv.customerId } })
-      : await findCustomer(tenantId, phone);
+    let customer = conv.customerId
+      ? await prisma.customer.findFirst({ where: { id: conv.customerId, tenantId, isActive: true } })
+      : null;
+
+    if (!customer) {
+      customer = await findCustomer(tenantId, phone);
+    }
 
     if (!customer) {
       clearState(tenantId, phone);
@@ -905,12 +909,14 @@ async function handleSchedConfirm(tenantId: string, phone: string, text: string)
 // ============================================================
 
 async function findCustomer(tenantId: string, phone: string) {
+  const suffix = phone.replace(/\D/g, '').slice(-8);
   return prisma.customer.findFirst({
     where: {
       tenantId,
-      phone: { contains: phone.slice(-8) },
+      phone: { contains: suffix },
       isActive: true,
     },
+    orderBy: { createdAt: 'desc' },
   });
 }
 

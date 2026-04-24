@@ -351,19 +351,19 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
   // Build datetime — interpret time as São Paulo (UTC-3)
   const callDate = new Date(`${data.date}T${time}:00${SP_OFFSET}`);
 
-  // Find or link existing lead by phone
-  let lead = await prisma.lead.findFirst({
-    where: { phone: data.phone },
-  });
+  // Find or link existing lead by phone — scoped to tenant
+  let lead = tenantId
+    ? await prisma.lead.findFirst({ where: { phone: data.phone, tenantId } })
+    : await prisma.lead.findFirst({ where: { phone: data.phone } });
 
-  // Auto-link to customer by phone (last 8 digits match) — scoped to tenant
+  // Auto-link to customer by phone (last 8 digits match) — scoped to tenant, only active
   const phoneSuffix = data.phone.replace(/\D/g, '').slice(-8);
-  const customerWhere: any = { phone: { contains: phoneSuffix } };
+  const customerWhere: any = { phone: { contains: phoneSuffix }, isActive: true };
   if (tenantId) customerWhere.tenantId = tenantId;
 
   let customer = data.customerId
-    ? await prisma.customer.findFirst({ where: { id: data.customerId, ...(tenantId ? { tenantId } : {}) } })
-    : await prisma.customer.findFirst({ where: customerWhere });
+    ? await prisma.customer.findFirst({ where: { id: data.customerId, isActive: true, ...(tenantId ? { tenantId } : {}) } })
+    : await prisma.customer.findFirst({ where: customerWhere, orderBy: { createdAt: 'desc' } });
 
   const call = await prisma.$transaction(async (tx) => {
     // Create the scheduled call
