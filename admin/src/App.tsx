@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, Navigate, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap, FileSearch, UserCog, Settings as SettingsIcon, Calendar, Trash2, Target } from 'lucide-react';
 import clsx from 'clsx';
@@ -645,6 +645,40 @@ const navItems: NavItem[] = [
   { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'OWNER'] },
 ];
 
+function useInactivityLogout() {
+  const [showWarning, setShowWarning] = useState(false);
+  const warnTimer = useRef<number | null>(null);
+  const logoutTimer = useRef<number | null>(null);
+
+  const doLogout = useCallback(async () => {
+    try { await api.post('/auth/logout'); } catch {}
+    sessionStorage.clear();
+    window.location.href = '/';
+  }, []);
+
+  const resetTimers = useCallback(() => {
+    setShowWarning(false);
+    if (warnTimer.current) window.clearTimeout(warnTimer.current);
+    if (logoutTimer.current) window.clearTimeout(logoutTimer.current);
+    warnTimer.current = window.setTimeout(() => setShowWarning(true), 115 * 60 * 1000);
+    logoutTimer.current = window.setTimeout(() => { void doLogout(); }, 120 * 60 * 1000);
+  }, [doLogout]);
+
+  useEffect(() => {
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    const handler = () => resetTimers();
+    events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
+    resetTimers();
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, handler));
+      if (warnTimer.current) window.clearTimeout(warnTimer.current);
+      if (logoutTimer.current) window.clearTimeout(logoutTimer.current);
+    };
+  }, [resetTimers]);
+
+  return { showWarning, dismissWarning: resetTimers };
+}
+
 function AdminLayout() {
   const { logout, user } = useAdminAuth();
   const navigate = useNavigate();
@@ -652,6 +686,7 @@ function AdminLayout() {
   const pathname = location.pathname;
   const userRole = user?.role || '';
   const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(userRole));
+  const { showWarning, dismissWarning } = useInactivityLogout();
 
   const handleLogout = async () => {
     await logout();
@@ -660,6 +695,14 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen flex">
+      {showWarning && (
+        <button
+          onClick={dismissWarning}
+          className="fixed top-0 left-0 right-0 z-50 bg-yellow-400 text-yellow-900 text-sm font-medium px-4 py-2 text-center cursor-pointer hover:bg-yellow-300"
+        >
+          Sua sessão expirará em 5 minutos por inatividade. Clique aqui para continuar.
+        </button>
+      )}
       <aside className="w-64 bg-[#1E3A5F] text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-y-auto">
         <div className="h-16 flex items-center px-6 border-b border-white/10 flex-shrink-0">
           <img src="/anpexia-logo-white.svg" alt="Anpexia" className="h-7" />
