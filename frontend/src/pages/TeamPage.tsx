@@ -364,7 +364,7 @@ export function TeamPage() {
                 <div className="grid grid-cols-[7fr_3fr] gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                    <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Oftalmologia" />
+                    <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Clínica Geral" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
@@ -459,7 +459,7 @@ export function TeamPage() {
                     <div className="grid grid-cols-[7fr_3fr] gap-3">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                        <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Ex: Oftalmologia" />
+                        <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Ex: Clínica Geral" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>

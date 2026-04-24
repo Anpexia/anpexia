@@ -389,7 +389,7 @@ export function ProfilePage() {
             <div className="grid grid-cols-[7fr_3fr] gap-3">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                <input value={especialidade} onChange={e => setEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Oftalmologia" />
+                <input value={especialidade} onChange={e => setEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Clínica Geral" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>

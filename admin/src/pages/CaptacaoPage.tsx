@@ -114,7 +114,7 @@ export default function CaptacaoPage() {
             <div className="bg-gradient-to-r from-[#1E3A5F] to-[#2A5A8F] rounded-xl p-6 text-white mb-6">
               <h4 className="text-xl font-bold mb-2">A plataforma que automatiza sua clínica de ponta a ponta</h4>
               <p className="text-blue-100 leading-relaxed">
-                A Anpexia é uma plataforma completa de gestão para clínicas médicas. Agenda, prontuário com ditado por voz, financeiro, estoque inteligente com baixa automática, WhatsApp automatizado com IA — tudo em um único sistema. Seu paciente marca consulta pelo WhatsApp 24h por dia, recebe lembretes automáticos, o médico dita a evolução sem digitar, e o convênio nunca fica sem cobrar.
+                A Anpexia é uma plataforma completa de gestão para clínicas médicas, estéticas e odontológicas. Agenda, prontuário com ditado por voz, financeiro, estoque inteligente com baixa automática, WhatsApp automatizado com IA — tudo em um único sistema. Seu paciente marca consulta pelo WhatsApp 24h por dia, recebe lembretes automáticos, o profissional dita a evolução sem digitar, e o convênio nunca fica sem cobrar.
               </p>
             </div>
 
@@ -149,12 +149,12 @@ export default function CaptacaoPage() {
               ]} />
               <FeatureCard title="Prontuário Digital Completo" items={[
                 'Dados clínicos, alergias, tipo sanguíneo, medicamentos',
-                'Anamnese especializada (oftalmologia, clínica geral)',
-                'Evolução SOAP com PIO e acuidade visual',
-                'Transcrição por voz — médico dita e o sistema escreve',
-                'Prescrições: medicamentos, exames, óculos',
-                'Atestados médicos com geração de PDF',
-                'Assinatura digital do médico',
+                'Anamnese personalizada por especialidade',
+                'Evolução clínica em formato SOAP',
+                'Transcrição por voz — profissional dita e o sistema escreve',
+                'Prescrições: medicamentos, exames, encaminhamentos',
+                'Atestados com geração de PDF',
+                'Assinatura digital do profissional',
               ]} />
               <FeatureCard title="Financeiro + Repasse Automático" items={[
                 'Controle de receitas e despesas por categoria',
@@ -288,13 +288,13 @@ export default function CaptacaoPage() {
               tag="Ligação"
               content={`Bom dia/boa tarde, [Nome]! Tudo bem?
 
-Meu nome é [Seu Nome], sou da Anpexia. A gente trabalha com automação pra clínicas médicas — agendamento pelo WhatsApp, lembretes automáticos, prontuário, financeiro, tudo integrado.
+Meu nome é [Seu Nome], sou da Anpexia. A gente trabalha com automação pra clínicas — agendamento pelo WhatsApp, lembretes automáticos, prontuário com ditado por voz, financeiro, estoque inteligente, tudo integrado.
 
 Estou entrando em contato porque a gente ajuda clínicas como a de vocês a reduzir faltas de pacientes e automatizar a recepção. Vocês ainda agendam por telefone hoje?
 
-[Se sim]: Entendo. Esse é exatamente o problema que a gente resolve. Com a Anpexia, o paciente marca pelo WhatsApp 24h, recebe lembrete automático, e a recepcionista não precisa ficar ligando pra confirmar. Posso te mostrar em 15 minutos como funciona?
+[Se sim]: Entendo. Esse é exatamente o problema que a gente resolve. Com a Anpexia, o paciente marca pelo WhatsApp 24h, recebe lembrete automático, e a recepcionista não precisa ficar ligando pra confirmar. Além disso, o profissional dita a evolução pelo microfone sem precisar digitar, e o estoque dá baixa automática quando a consulta é realizada. Posso te mostrar em 15 minutos como funciona?
 
-[Se já tem sistema]: Legal! E vocês estão satisfeitos? O sistema de vocês tem WhatsApp com IA integrado? Porque o nosso diferencial é isso — o paciente conversa com uma assistente virtual inteligente e marca sozinho, sem a recepcionista intervir.`}
+[Se já tem sistema]: Legal! E vocês estão satisfeitos? O sistema de vocês tem WhatsApp com IA integrado? Ditado por voz no prontuário? Baixa automática de estoque por consulta? Controle de TUSS pra não esquecer de cobrar convênio? Porque o nosso diferencial é exatamente isso — automação de ponta a ponta.`}
             />
 
             <ScriptBlock
@@ -304,9 +304,9 @@ Estou entrando em contato porque a gente ajuda clínicas como a de vocês a redu
 
 O [Quem indicou] me passou seu contato. Ele comentou que você tem uma clínica e eu queria te mostrar o que a gente faz na Anpexia.
 
-A gente criou um sistema que automatiza o agendamento da clínica pelo WhatsApp — o paciente marca consulta sozinho, 24h por dia, recebe lembrete automático e a recepcionista não precisa ficar no telefone.
+A gente criou um sistema que automatiza a clínica de ponta a ponta — o paciente marca consulta pelo WhatsApp 24h, recebe lembrete automático, e a recepcionista não precisa ficar no telefone.
 
-Além disso, tem prontuário digital, financeiro com repasse automático por médico, estoque com alerta de validade... Tudo num lugar só.
+O profissional dita a evolução pelo microfone sem digitar, o estoque dá baixa automática quando a consulta é realizada, tem pedido de reposição automático, financeiro com repasse por profissional, e organização de TUSS pra não esquecer de cobrar convênio. Tudo num lugar só.
 
 Posso te mandar um vídeo curto ou a gente marca 15 min pra eu te mostrar ao vivo?`}
             />
@@ -322,7 +322,7 @@ Você é médico / administra uma clínica?
 
 [Ouvir a resposta e entrar com o pitch]:
 
-A gente automatizou esse processo inteiro. O paciente manda um "oi" pro WhatsApp da clínica e uma assistente virtual com inteligência artificial cuida de tudo — marca a consulta, confirma, manda lembrete. Além disso, o sistema tem prontuário digital, financeiro, estoque com validade, tudo integrado.
+A gente automatizou esse processo inteiro. O paciente manda um "oi" pro WhatsApp da clínica e uma assistente virtual com inteligência artificial cuida de tudo — marca a consulta, confirma, manda lembrete. Além disso, o profissional dita no microfone sem precisar digitar, o estoque dá baixa sozinho quando a consulta é realizada, e o sistema organiza os procedimentos TUSS pra não esquecer de cobrar convênio. Tudo integrado num sistema só.
 
 Posso pegar seu contato pra te mandar um material? São 15 minutos de demonstração e você decide se faz sentido.`}
             />
@@ -719,7 +719,7 @@ R$ 1.200/mês. Sem fidelidade. Implantação inclusa. Treinamento da equipe por 
               <div className="bg-white border border-slate-200 rounded-xl p-5">
                 <h4 className="font-semibold text-[#1E3A5F] mb-3">Congressos e Eventos Médicos</h4>
                 <ol className="text-sm text-slate-700 space-y-2 list-decimal pl-4">
-                  <li>Identificar congressos da região (CRM estadual, SBOf, etc.)</li>
+                  <li>Identificar congressos da região (CRM, CRO, congressos de estética, etc.)</li>
                   <li>Montar stand simples com notebook + demo ao vivo</li>
                   <li>QR code pra landing page no banner</li>
                   <li>Coletar leads com formulário rápido (nome + WhatsApp)</li>

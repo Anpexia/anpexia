@@ -94,13 +94,13 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 - Busca de paciente no modal de agendamento com autocomplete
 - CRUD completo de clientes, estoque, mensagens, FAQs do chatbot
 - Audit log para acoes criticas
-- Segmentacao de tenants (CLINICA_OFTALMOLOGICA, CLINICA_GERAL, CLINICA_MEDICA, SALAO_BELEZA, OUTROS)
+- Segmentacao de tenants (CLINICA_MEDICA, CLINICA_ESTETICA, CLINICA_ODONTOLOGICA, CLINICA_GERAL, SALAO_BELEZA, OUTROS)
 - Modulo financeiro completo (transacoes, categorias, resumo/dashboard)
 - Assinatura digital do medico (base64 canvas)
 - Atestados medicos com geracao de PDF (PDFKit)
-- Prescricoes: medicamentos, exames externos, oculos (oftalmologia), exames internos
-- Anamnese oftalmologica (formulario 5 secoes, segment-gated)
-- Evolucao do paciente com formato SOAP + PIO/acuidade (segment-gated)
+- Prescricoes: medicamentos, exames externos, exames internos
+- Anamnese personalizada por especialidade (segment-gated)
+- Evolucao do paciente com formato SOAP (segment-gated)
 - Prontuario reorganizado com sub-secoes (Dados Clinicos, Anamnese, Evolucao, Prescricoes, Atestados)
 
 ### Credenciais
@@ -239,5 +239,7 @@ Cobranca por usuario:
 
 ## Nichos alvo
 
-- **Clinica medica**: agendamentos, historico de consultas, estoque de medicamentos/insumos com validade, lembretes 24h, chatbot especializado
+- **Clinica medica**: agendamentos, historico de consultas, estoque de medicamentos/insumos com validade, lembretes 24h, chatbot especializado, ditado por voz, TUSS
+- **Clinica estetica**: agendamentos, prontuario digital, estoque de cosmeticos/insumos, financeiro com repasse por profissional
+- **Clinica odontologica**: agendamentos, prontuario digital, estoque de materiais, controle de procedimentos
 - **Loja de roupa**: estoque com categorias (tamanho, cor, colecao), fornecedor, alertas de reposicao, historico de compras por cliente
