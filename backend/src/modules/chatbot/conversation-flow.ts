@@ -53,6 +53,11 @@ function key(tenantId: string, phone: string) {
   return `${tenantId}:${phone}`;
 }
 
+export function hasActiveFlow(tenantId: string, phone: string): boolean {
+  const s = getState(tenantId, phone);
+  return !!s && s.state !== 'IDLE';
+}
+
 function getState(tenantId: string, phone: string): ConversationState | null {
   const k = key(tenantId, phone);
   const state = conversations.get(k);

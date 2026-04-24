@@ -2,7 +2,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
 import { evolutionApi } from '../messaging/evolution.client';
 import { handleAppointmentReply } from '../scheduling/scheduling.notifications';
-import { handleConversationFlow, FlowResponse } from './conversation-flow';
+import { handleConversationFlow, hasActiveFlow, FlowResponse } from './conversation-flow';
 
 interface UpdateConfigData {
   instanceName?: string;
@@ -139,7 +139,10 @@ export const chatbotService = {
     });
 
     // --- Appointment reply handler (from reminders) ---
-    const appointmentReply = await handleAppointmentReply(phone, messageText, tenantId);
+    // Only intercept when no conversation flow is active, otherwise "1"/"2" belong to the flow
+    const appointmentReply = !hasActiveFlow(tenantId, phone)
+      ? await handleAppointmentReply(phone, messageText, tenantId)
+      : null;
     if (appointmentReply) {
       if (appointmentReply === '__HANDOFF__') {
         await sendFlowResponse(instanceName, phoneForSend, { type: 'handoff', text: '' }, tenantId, config, phone);
