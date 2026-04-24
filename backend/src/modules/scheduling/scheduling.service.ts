@@ -351,10 +351,8 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
   // Build datetime — interpret time as São Paulo (UTC-3)
   const callDate = new Date(`${data.date}T${time}:00${SP_OFFSET}`);
 
-  // Find or link existing lead by phone — scoped to tenant
-  let lead = tenantId
-    ? await prisma.lead.findFirst({ where: { phone: data.phone, tenantId } })
-    : await prisma.lead.findFirst({ where: { phone: data.phone } });
+  // Find or link existing lead by phone (leads are global, no tenantId)
+  let lead = await prisma.lead.findFirst({ where: { phone: data.phone } });
 
   // Auto-link to customer by phone (last 8 digits match) — scoped to tenant, only active
   const phoneSuffix = data.phone.replace(/\D/g, '').slice(-8);
