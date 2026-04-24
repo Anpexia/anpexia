@@ -57,12 +57,12 @@ export const authService = {
 
     if (context === 'admin') {
       user = await prisma.user.findFirst({
-        where: { email, OR: [{ tenantId: null }, { role: 'SUPER_ADMIN' }] },
+        where: { email, isActive: true, OR: [{ tenantId: null }, { role: 'SUPER_ADMIN' }] },
         include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true, logo: true } } },
       });
     } else if (tenantId) {
       user = await prisma.user.findFirst({
-        where: { email, tenantId },
+        where: { email, tenantId, isActive: true },
         include: { tenant: { select: { id: true, name: true, slug: true, plan: true, segment: true, logo: true } } },
       });
     } else {
@@ -475,8 +475,11 @@ export const authService = {
     inviteLinkBase?: string;
   }) {
     const normalizedEmail = params.email.trim().toLowerCase();
-    const existing = await prisma.user.findFirst({ where: { email: normalizedEmail, tenantId: params.tenantId } });
+    const existing = await prisma.user.findFirst({ where: { email: normalizedEmail, tenantId: params.tenantId, isActive: true } });
     if (existing) throw new AppError(409, 'EMAIL_EXISTS', 'Este e-mail já está cadastrado');
+
+    // Clean up any inactive record with the same email+tenant so unique constraint doesn't block
+    await prisma.user.deleteMany({ where: { email: normalizedEmail, tenantId: params.tenantId, isActive: false } });
 
     const inviteToken = crypto.randomUUID();
     const inviteTokenExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
