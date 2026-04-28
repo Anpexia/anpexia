@@ -219,14 +219,29 @@ router.patch('/calls/:id/authorization', authenticate, requireTenant, async (req
 router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req: Request, res: Response, next) => {
   try {
     const id = req.params.id as string;
-    const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId: req.auth!.tenantId! } });
+    const tenantId = req.auth!.tenantId!;
+    const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId } });
     if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
 
     const revertMap: Record<string, string> = { confirmed: 'scheduled', completed: 'confirmed' };
     const newStatus = revertMap[call.status];
     if (!newStatus) throw new AppError(400, 'INVALID_REVERT', 'Status não pode ser revertido');
 
-    const updated = await prisma.scheduledCall.update({ where: { id }, data: { status: newStatus } });
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.scheduledCall.update({ where: { id }, data: { status: newStatus } });
+
+      if (call.status === 'completed') {
+        // Clean up procedure records and financial transactions
+        await tx.scheduledCallProcedure.deleteMany({ where: { scheduledCallId: id } });
+        await tx.privateProcedureCall.deleteMany({ where: { scheduledCallId: id } });
+        await tx.financialTransaction.deleteMany({
+          where: { tenantId, notes: { contains: `[AGENDAMENTO:${id}]` } },
+        });
+      }
+
+      return u;
+    });
+
     await logAction({ ...auditCtx(req), action: 'revert_status', entity: 'scheduled_call', entityId: id, metadata: { statusAnterior: call.status, statusNovo: newStatus } });
 
     return success(res, updated);
