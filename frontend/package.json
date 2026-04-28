@@ -14,6 +14,8 @@
     "axios": "^1.7.0",
     "clsx": "^2.1.0",
     "date-fns": "^4.1.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.460.0",
     "papaparse": "^5.5.3",
     "react": "^19.0.0",

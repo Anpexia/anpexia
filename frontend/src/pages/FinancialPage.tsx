@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Edit2, X, Stethoscope, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Edit2, X, Stethoscope, ChevronDown, ChevronUp, FileDown } from 'lucide-react';
 import api from '../services/api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // --- Types ---
 
@@ -227,9 +229,6 @@ export function FinancialPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [expandedDoctorIds, setExpandedDoctorIds] = useState<Record<string, boolean>>({});
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('all');
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const [dlStart, setDlStart] = useState(firstOfMonth);
-  const [dlEnd, setDlEnd] = useState(new Date().toISOString().split('T')[0]);
   const [downloading, setDownloading] = useState(false);
 
   // --- Fetchers ---
@@ -492,26 +491,87 @@ export function FinancialPage() {
     ? doctorsReport.doctors
     : doctorsReport.doctors.filter((d) => d.id === selectedDoctorId);
 
-  const downloadDoctorCSV = (doc: DoctorReportItem, periodLabel: string) => {
-    const header = 'Data,Paciente,Procedimentos,Valor Faturado,Valor Repasse\n';
-    const rows = doc.procedures.map((p) =>
-      [
-        formatDatePtBR(p.date),
-        `"${p.patientName}"`,
-        `"${p.procedures.join(', ')}"`,
-        p.valorFaturado.toFixed(2).replace('.', ','),
-        p.valorRepasse.toFixed(2).replace('.', ','),
-      ].join(',')
-    ).join('\n');
-    const summary = `\nTotal Procedimentos,${doc.totalProcedimentos}\nTotal Faturado,"${formatBRL(doc.totalFaturado)}"\nTotal Repasse,"${formatBRL(doc.totalRepasse)}"`;
-    const csv = '﻿' + header + rows + '\n' + summary;
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `repasse_${doc.name.replace(/\s+/g, '_')}_${periodLabel}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadReportPDF = () => {
+    if (filteredDoctors.length === 0) return;
+    setDownloading(true);
+
+    try {
+      const { start, end } = computeRange(periodChip, customStart, customEnd);
+      const periodLabel = `${formatDatePtBR(start)} a ${formatDatePtBR(end)}`;
+      const doc = new jsPDF();
+      const pageW = doc.internal.pageSize.getWidth();
+
+      doc.setFontSize(16);
+      doc.text('Relatorio de Repasse Medico', pageW / 2, 18, { align: 'center' });
+      doc.setFontSize(10);
+      doc.text(`Periodo: ${periodLabel}`, pageW / 2, 26, { align: 'center' });
+
+      let y = 34;
+
+      for (const dr of filteredDoctors) {
+        if (y > doc.internal.pageSize.getHeight() - 30) {
+          doc.addPage();
+          y = 18;
+        }
+
+        doc.setFontSize(12);
+        doc.setFont(undefined as any, 'bold');
+        doc.text(`Dr(a). ${dr.name}${dr.especialidade ? ` — ${dr.especialidade}` : ''}`, 14, y);
+        y += 6;
+
+        doc.setFontSize(9);
+        doc.setFont(undefined as any, 'normal');
+        doc.text(`Procedimentos: ${dr.totalProcedimentos}   |   Faturado: ${formatBRL(dr.totalFaturado)}   |   Repasse: ${formatBRL(dr.totalRepasse)}`, 14, y);
+        y += 4;
+
+        if (dr.procedures.length > 0) {
+          autoTable(doc, {
+            startY: y,
+            margin: { left: 14, right: 14 },
+            head: [['Data', 'Paciente', 'Procedimentos', 'Faturado', 'Repasse']],
+            body: dr.procedures.map((p) => [
+              formatDatePtBR(p.date),
+              p.patientName,
+              p.procedures.join(', ') || '—',
+              formatBRL(p.valorFaturado),
+              formatBRL(p.valorRepasse),
+            ]),
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            columnStyles: {
+              3: { halign: 'right' },
+              4: { halign: 'right' },
+            },
+          });
+          y = (doc as any).lastAutoTable.finalY + 10;
+        } else {
+          y += 6;
+        }
+      }
+
+      // Totals
+      if (y > doc.internal.pageSize.getHeight() - 25) {
+        doc.addPage();
+        y = 18;
+      }
+      doc.setDrawColor(200);
+      doc.line(14, y, pageW - 14, y);
+      y += 6;
+      doc.setFontSize(11);
+      doc.setFont(undefined as any, 'bold');
+      const totFat = filteredDoctors.reduce((s, d) => s + d.totalFaturado, 0);
+      const totRep = filteredDoctors.reduce((s, d) => s + d.totalRepasse, 0);
+      const totProc = filteredDoctors.reduce((s, d) => s + d.totalProcedimentos, 0);
+      doc.text(`Total Geral:  ${totProc} procedimentos   |   Faturado: ${formatBRL(totFat)}   |   Repasse: ${formatBRL(totRep)}`, 14, y);
+
+      const fileName = selectedDoctorId === 'all'
+        ? `repasse_todos_${periodChip}.pdf`
+        : `repasse_${filteredDoctors[0]?.name.replace(/\s+/g, '_')}_${periodChip}.pdf`;
+      doc.save(fileName);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const formatDatePtBR = (iso: string) => {
@@ -914,7 +974,7 @@ export function FinancialPage() {
       {/* ==================== TAB: DOCTORS (Medicos) ==================== */}
       {activeTab === 'doctors' && (
         <div className="space-y-6">
-          {/* Period filter chips */}
+          {/* Period filter chips + PDF download */}
           <div className="flex flex-wrap items-center gap-2">
             {periodChips.map((chip) => (
               <button
@@ -938,7 +998,7 @@ export function FinancialPage() {
                   onChange={(e) => setCustomStart(e.target.value)}
                   className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 />
-                <span className="text-xs text-slate-500">Até</span>
+                <span className="text-xs text-slate-500">Ate</span>
                 <input
                   type="date"
                   value={customEnd}
@@ -947,9 +1007,16 @@ export function FinancialPage() {
                 />
               </div>
             )}
+            <button
+              disabled={downloading || filteredDoctors.length === 0}
+              onClick={downloadReportPDF}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors bg-white text-[#1E3A5F] border-[#1E3A5F] hover:bg-[#1E3A5F] hover:text-white disabled:opacity-50"
+            >
+              <FileDown size={14} /> {downloading ? 'Gerando...' : 'Baixar PDF'}
+            </button>
           </div>
 
-          {/* Doctor filter + download */}
+          {/* Doctor filter */}
           <div className="flex flex-wrap items-center gap-3">
             <label className="text-sm font-medium text-slate-700">Medico:</label>
             <select
@@ -962,47 +1029,6 @@ export function FinancialPage() {
                 <option key={d.id} value={d.id}>{d.name}{d.especialidade ? ` — ${d.especialidade}` : ''}</option>
               ))}
             </select>
-          </div>
-
-          {/* Download section */}
-          <div className="bg-white rounded-lg border border-slate-200 p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-slate-700">Baixar relatorio:</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-slate-500">De</span>
-                <input type="date" value={dlStart} onChange={(e) => setDlStart(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
-                <span className="text-xs text-slate-500">ate</span>
-                <input type="date" value={dlEnd} onChange={(e) => setDlEnd(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
-                <button
-                  disabled={downloading || filteredDoctors.length === 0}
-                  onClick={() => {
-                    setDownloading(true);
-                    const s = new Date(dlStart + 'T00:00:00').toISOString();
-                    const e = new Date(dlEnd + 'T23:59:59').toISOString();
-                    api.get('/financial/doctors-report', { params: { dataInicio: s, dataFim: e } })
-                      .then(({ data }) => {
-                        const report = data.data as DoctorsReport;
-                        const targets = selectedDoctorId === 'all'
-                          ? report.doctors
-                          : report.doctors.filter((d: DoctorReportItem) => d.id === selectedDoctorId);
-                        if (targets.length === 0) {
-                          alert('Nenhum dado para este periodo');
-                          return;
-                        }
-                        for (const doc of targets) {
-                          downloadDoctorCSV(doc, `${dlStart}_a_${dlEnd}`);
-                        }
-                      })
-                      .finally(() => setDownloading(false));
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-[#1E3A5F] text-white rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50"
-                >
-                  <Download size={14} /> {downloading ? 'Baixando...' : selectedDoctorId === 'all' ? 'Baixar todos (CSV)' : 'Baixar CSV'}
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* KPI cards */}
@@ -1069,22 +1095,6 @@ export function FinancialPage() {
                           <div className="text-xs text-slate-500">Repasse</div>
                           <div className="text-sm font-semibold text-[#1E3A5F]">{formatBRL(doc.totalRepasse)}</div>
                         </div>
-                        <button
-                          onClick={() => {
-                            const s = new Date(dlStart + 'T00:00:00').toISOString();
-                            const e = new Date(dlEnd + 'T23:59:59').toISOString();
-                            api.get('/financial/doctors-report', { params: { dataInicio: s, dataFim: e } })
-                              .then(({ data }) => {
-                                const d = (data.data as DoctorsReport).doctors.find((dd: DoctorReportItem) => dd.id === doc.id);
-                                if (d) downloadDoctorCSV(d, `${dlStart}_a_${dlEnd}`);
-                                else alert('Nenhum dado para este periodo');
-                              });
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-[#1E3A5F] transition-colors"
-                          title="Baixar CSV deste medico"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
                         <button
                           onClick={() => toggleDoctor(doc.id)}
                           className="flex items-center gap-1 text-xs font-medium text-[#1E3A5F] hover:underline"
