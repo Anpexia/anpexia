@@ -192,6 +192,75 @@ customerRouter.delete('/:id/medical-entries/:entryId', async (req: Request, res:
   }
 });
 
+// Patient Documents
+customerRouter.get('/:id/documents', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const docs = await prisma.patientDocument.findMany({
+      where: { tenantId: req.auth!.tenantId!, customerId: req.params.id as string },
+      select: { id: true, fileName: true, fileType: true, fileSize: true, category: true, description: true, uploaderName: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return success(res, docs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.get('/:id/documents/:docId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const doc = await prisma.patientDocument.findFirst({
+      where: { id: req.params.docId as string, tenantId: req.auth!.tenantId!, customerId: req.params.id as string },
+    });
+    if (!doc) return res.status(404).json({ success: false, error: { message: 'Documento nao encontrado' } });
+    return success(res, doc);
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.post('/:id/documents', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { fileName, fileType, fileSize, fileData, category, description } = req.body;
+    if (!fileName || !fileType || !fileData) {
+      return res.status(400).json({ success: false, error: { message: 'fileName, fileType e fileData sao obrigatorios' } });
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.auth!.userId }, select: { name: true } });
+    const doc = await prisma.patientDocument.create({
+      data: {
+        tenantId: req.auth!.tenantId!,
+        customerId: req.params.id as string,
+        fileName,
+        fileType,
+        fileSize: fileSize || 0,
+        fileData,
+        category: category || 'OUTRO',
+        description: description || null,
+        uploadedBy: req.auth!.userId,
+        uploaderName: user?.name || 'Sistema',
+      },
+      select: { id: true, fileName: true, fileType: true, fileSize: true, category: true, description: true, uploaderName: true, createdAt: true },
+    });
+    await logAction({ ...auditCtx(req), action: 'CREATE', entity: 'PATIENT_DOCUMENT', entityId: doc.id, metadata: { fileName, category } });
+    return created(res, doc);
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.delete('/:id/documents/:docId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const doc = await prisma.patientDocument.findFirst({
+      where: { id: req.params.docId as string, tenantId: req.auth!.tenantId!, customerId: req.params.id as string },
+    });
+    if (!doc) return res.status(404).json({ success: false, error: { message: 'Documento nao encontrado' } });
+    await prisma.patientDocument.delete({ where: { id: doc.id } });
+    await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'PATIENT_DOCUMENT', entityId: doc.id, metadata: { fileName: doc.fileName } });
+    return noContent(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Batch import (receives pre-mapped JSON from frontend)
 customerRouter.post('/import-batch', async (req: Request, res: Response, next: NextFunction) => {
   try {

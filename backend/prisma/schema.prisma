@@ -68,6 +68,7 @@ model Tenant {
   repasseTypes          RepasseType[]
   privateProcedures     PrivateProcedure[]
   settings              TenantSettings?
+  patientDocuments      PatientDocument[]
 
   @@map("tenants")
 }
@@ -242,6 +243,7 @@ model Customer {
   patientEvolutions     PatientEvolution[]
   financialTransactions FinancialTransaction[]
   patientConvenios      PatientConvenio[]
+  documents             PatientDocument[]
 
   @@index([tenantId])
   @@map("customers")
@@ -1182,6 +1184,32 @@ model Autorizacao {
   @@index([patientConvenioId])
   @@index([tenantId])
   @@map("autorizacoes")
+}
+
+// ==========================================
+// PATIENT DOCUMENTS
+// ==========================================
+
+model PatientDocument {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  customerId   String   @map("customer_id")
+  fileName     String   @map("file_name")
+  fileType     String   @map("file_type") // MIME type
+  fileSize     Int      @map("file_size") // bytes
+  fileData     String   @map("file_data") // base64
+  category     String   @default("OUTRO") // EXAME, LAUDO, RECEITA, HISTORICO, IMAGEM, OUTRO
+  description  String?
+  uploadedBy   String   @map("uploaded_by")
+  uploaderName String   @map("uploader_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("patient_documents")
 }
 
 // ==========================================

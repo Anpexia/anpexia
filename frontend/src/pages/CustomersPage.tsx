@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Plus, Search, X, Eye, Pencil, Trash2, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, ChevronRight, AlertTriangle, Paperclip, File } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Papa from 'papaparse';
@@ -73,7 +73,7 @@ interface Customer {
 }
 
 type ModalMode = 'closed' | 'create' | 'detail';
-type DetailTab = 'info' | 'prontuario' | 'prescricoes' | 'atestados' | 'appointments';
+type DetailTab = 'info' | 'prontuario' | 'prescricoes' | 'atestados' | 'appointments' | 'documentos';
 
 const emptyForm = { name: '', phone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } };
 
@@ -176,6 +176,14 @@ export function CustomersPage() {
   const [showNewAtestado, setShowNewAtestado] = useState(false);
   const [atestadoForm, setAtestadoForm] = useState({ type: 'ATESTADO', reason: '', daysOff: '', startDate: '', endDate: '', observations: '' });
   const [savingAtestado, setSavingAtestado] = useState(false);
+
+  // Documents state
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docCategory, setDocCategory] = useState('OUTRO');
+  const [docDescription, setDocDescription] = useState('');
+
   const [toastMsg, setToastMsg] = useState('');
 
   // Import CSV state
@@ -451,6 +459,70 @@ export function CustomersPage() {
     finally { setSavingAtestado(false); }
   };
 
+  // Document handlers
+  const fetchDocuments = async (patientId: string) => {
+    setLoadingDocs(true);
+    try {
+      const { data } = await api.get(`/customers/${patientId}/documents`);
+      setDocuments(data.data || []);
+    } catch { setDocuments([]); }
+    finally { setLoadingDocs(false); }
+  };
+
+  const handleUploadDoc = async (file: File) => {
+    if (!selectedCustomer) return;
+    if (file.size > 4 * 1024 * 1024) { showToast('Arquivo muito grande (max 4MB)'); return; }
+    setUploadingDoc(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await api.post(`/customers/${selectedCustomer.id}/documents`, {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        fileData: base64,
+        category: docCategory,
+        description: docDescription || undefined,
+      });
+      setDocDescription('');
+      setDocCategory('OUTRO');
+      await fetchDocuments(selectedCustomer.id);
+      showToast('Documento salvo!');
+    } catch { showToast('Erro ao enviar documento'); }
+    finally { setUploadingDoc(false); }
+  };
+
+  const handleDownloadDoc = async (docId: string) => {
+    if (!selectedCustomer) return;
+    try {
+      const { data } = await api.get(`/customers/${selectedCustomer.id}/documents/${docId}`);
+      const doc = data.data;
+      const byteChars = atob(doc.fileData);
+      const byteArray = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([byteArray], { type: doc.fileType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { showToast('Erro ao baixar documento'); }
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    if (!selectedCustomer) return;
+    try {
+      await api.delete(`/customers/${selectedCustomer.id}/documents/${docId}`);
+      await fetchDocuments(selectedCustomer.id);
+      showToast('Documento removido');
+    } catch { showToast('Erro ao remover documento'); }
+  };
+
   // Convenio handlers
   const handleSaveConvenio = async () => {
     if (!selectedCustomer || !convenioForm.convenioId || !convenioForm.numeroCarteirinha) {
@@ -480,6 +552,7 @@ export function CustomersPage() {
     if (!selectedCustomer) return;
     if (detailTab === 'prescricoes') fetchPrescricoes(selectedCustomer.id);
     if (detailTab === 'atestados') fetchAtestados(selectedCustomer.id);
+    if (detailTab === 'documentos') fetchDocuments(selectedCustomer.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer?.id, detailTab]);
 
@@ -857,6 +930,7 @@ export function CustomersPage() {
                 { key: 'prontuario', label: 'Prontuario', icon: Heart },
                 { key: 'prescricoes', label: 'Prescricoes', icon: FileText },
                 { key: 'atestados', label: 'Atestados', icon: FileText },
+                { key: 'documentos', label: 'Documentos', icon: Paperclip },
                 { key: 'appointments', label: 'Consultas', icon: Calendar },
               ] as const).map((tab) => (
                 <button key={tab.key} onClick={() => setDetailTab(tab.key)}
@@ -867,6 +941,9 @@ export function CustomersPage() {
                   )}
                   {tab.key === 'atestados' && atestados.length > 0 && (
                     <span className="bg-emerald-50 text-emerald-600 text-xs px-1.5 py-0.5 rounded">{atestados.length}</span>
+                  )}
+                  {tab.key === 'documentos' && documents.length > 0 && (
+                    <span className="bg-amber-50 text-amber-600 text-xs px-1.5 py-0.5 rounded">{documents.length}</span>
                   )}
                   {tab.key === 'appointments' && selectedCustomer.scheduledCalls && selectedCustomer.scheduledCalls.length > 0 && (
                     <span className="bg-[#EFF6FF] text-[#1E3A5F] text-xs px-1.5 py-0.5 rounded">{selectedCustomer.scheduledCalls.length}</span>
@@ -1440,6 +1517,91 @@ export function CustomersPage() {
                                   <Download size={14} /> PDF
                                 </button>
                               </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* DOCUMENTOS TAB */}
+              {detailTab === 'documentos' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-slate-800 flex items-center gap-2">
+                      <Paperclip size={16} className="text-amber-600" /> Documentos
+                    </h4>
+                  </div>
+
+                  <div className="p-4 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50/50">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Categoria</label>
+                        <select value={docCategory} onChange={e => setDocCategory(e.target.value)} className={inputCls}>
+                          <option value="EXAME">Exame</option>
+                          <option value="LAUDO">Laudo</option>
+                          <option value="RECEITA">Receita</option>
+                          <option value="HISTORICO">Historico</option>
+                          <option value="IMAGEM">Imagem</option>
+                          <option value="OUTRO">Outro</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Descricao (opcional)</label>
+                        <input value={docDescription} onChange={e => setDocDescription(e.target.value)} className={inputCls} placeholder="Ex: Hemograma 15/04, Raio-X torax..." />
+                      </div>
+                    </div>
+                    <label className={`flex flex-col items-center justify-center py-4 cursor-pointer rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors ${uploadingDoc ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <Upload size={24} className="text-slate-400 mb-1" />
+                      <span className="text-sm text-slate-600 font-medium">{uploadingDoc ? 'Enviando...' : 'Clique para enviar arquivo'}</span>
+                      <span className="text-xs text-slate-400 mt-0.5">PDF, imagem ou documento (max 4MB)</span>
+                      <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" onChange={e => { if (e.target.files?.[0]) handleUploadDoc(e.target.files[0]); e.target.value = ''; }} disabled={uploadingDoc} />
+                    </label>
+                  </div>
+
+                  {loadingDocs ? (
+                    <p className="text-sm text-slate-500 text-center py-8">Carregando documentos...</p>
+                  ) : documents.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-8">Nenhum documento salvo para este paciente.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {documents.map((doc: any) => {
+                        const catLabels: Record<string, { label: string; cls: string }> = {
+                          EXAME: { label: 'Exame', cls: 'bg-blue-100 text-blue-700' },
+                          LAUDO: { label: 'Laudo', cls: 'bg-purple-100 text-purple-700' },
+                          RECEITA: { label: 'Receita', cls: 'bg-emerald-100 text-emerald-700' },
+                          HISTORICO: { label: 'Historico', cls: 'bg-amber-100 text-amber-700' },
+                          IMAGEM: { label: 'Imagem', cls: 'bg-pink-100 text-pink-700' },
+                          OUTRO: { label: 'Outro', cls: 'bg-slate-100 text-slate-600' },
+                        };
+                        const cat = catLabels[doc.category] || catLabels.OUTRO;
+                        const sizeKB = doc.fileSize ? `${Math.round(doc.fileSize / 1024)}KB` : '';
+                        return (
+                          <div key={doc.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50/50 transition-colors flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                              <File size={18} className="text-slate-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${cat.cls}`}>{cat.label}</span>
+                                <span className="text-sm font-medium text-slate-800 truncate">{doc.fileName}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {doc.description && <span className="text-xs text-slate-500 truncate">{doc.description}</span>}
+                                <span className="text-xs text-slate-400">{sizeKB}</span>
+                                <span className="text-xs text-slate-400">por {doc.uploaderName}</span>
+                                <span className="text-xs text-slate-400">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button onClick={() => handleDownloadDoc(doc.id)} className="p-1.5 text-[#1E3A5F] hover:bg-[#EFF6FF] rounded" title="Baixar">
+                                <Download size={16} />
+                              </button>
+                              <button onClick={() => handleDeleteDoc(doc.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Remover">
+                                <Trash2 size={16} />
+                              </button>
                             </div>
                           </div>
                         );
