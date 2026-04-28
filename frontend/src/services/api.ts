@@ -33,9 +33,22 @@ function processQueue(error: unknown, token: string | null) {
   failedQueue = [];
 }
 
+async function retryOn5xx(error: any) {
+  const config = error.config;
+  if (!config || !error.response || error.response.status < 500) return null;
+  config._retryCount = config._retryCount || 0;
+  if (config._retryCount >= 2) return null;
+  config._retryCount++;
+  await new Promise((r) => setTimeout(r, 1500));
+  return api(config);
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const retried = await retryOn5xx(error);
+    if (retried) return retried;
+
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {

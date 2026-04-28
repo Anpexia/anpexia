@@ -1,4 +1,4 @@
-import prisma from '../../config/database';
+import prisma, { withRetry } from '../../config/database';
 
 export const dashboardService = {
   async getDashboard(tenantId: string) {
@@ -25,7 +25,7 @@ export const dashboardService = {
       totalProducts,
       todayAppointments,
       totalAppointments,
-    ] = await Promise.all([
+    ] = await withRetry(() => Promise.all([
       // Total de clientes ativos
       prisma.customer.count({ where: { tenantId, isActive: true } }),
 
@@ -91,7 +91,7 @@ export const dashboardService = {
           status: { notIn: ['cancelled'] },
         },
       }),
-    ]);
+    ]));
 
     return {
       customers: {

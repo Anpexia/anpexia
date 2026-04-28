@@ -103,6 +103,10 @@ app.get('/api/health', (_req, res) => {
 // --- 5) Rotas da API (carregadas com lazy import para capturar erros) ---
 async function loadRoutes() {
   try {
+    // Acorda o Neon antes de carregar rotas (auto-suspend de 5min)
+    const { warmupDatabase } = await import('./config/database');
+    await warmupDatabase();
+
     // Carrega env e valida variáveis obrigatórias
     const { env } = await import('./config/env');
     console.log(`✅ Env carregado (NODE_ENV=${env.nodeEnv})`);
