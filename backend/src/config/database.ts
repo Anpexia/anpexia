@@ -1,8 +1,99 @@
 import { PrismaClient } from '@prisma/client';
+import { tenantStore } from '../shared/middleware/tenantContext';
 
-const prisma = new PrismaClient({
+const TENANT_SCOPED_MODELS = new Set([
+  'Customer', 'CustomerTag', 'CustomerTagAssignment',
+  'Product', 'ProductCategory', 'InventoryMovement',
+  'MessageTemplate', 'MessageSent',
+  'AuditLog', 'ChatbotConfig', 'ChatbotFaq', 'ChatMessage',
+  'ScriptCategory', 'Script',
+  'Supplier', 'SupplierProduct', 'PurchaseOrder',
+  'FinancialTransaction', 'FinancialCategory',
+  'DoctorSignature', 'MedicalCertificate', 'Prescription',
+  'Anamnesis', 'PatientEvolution', 'ScheduledCall',
+  'Convenio', 'Autorizacao', 'TussProcedure', 'DoctorRepasse',
+  'ProcedureTemplate', 'RepasseType', 'PrivateProcedure',
+  'TenantSettings', 'TenantModule', 'PatientDocument',
+  'MedicalRecord', 'MedicalEntry',
+  'ScheduledCallProcedure', 'PrivateProcedureCall',
+  'GoogleCalendarToken', 'ScheduleConfig',
+]);
+
+const READ_ACTIONS = new Set(['findUnique', 'findFirst', 'findMany', 'count', 'aggregate', 'groupBy']);
+const WRITE_MUTATIONS = new Set(['update', 'updateMany', 'delete', 'deleteMany', 'upsert']);
+
+function enforceIsolation(model: string, action: string, args: any): any {
+  const store = tenantStore.getStore();
+  if (!store?.tenantId) return args;
+
+  const tenantId = store.tenantId;
+
+  if (READ_ACTIONS.has(action)) {
+    if (!args) args = {};
+    if (!args.where) args.where = {};
+
+    if (args.where.tenantId && args.where.tenantId !== tenantId) {
+      console.error(`[SECURITY] Tenant violation BLOCKED: ${model}.${action} — user=${tenantId}, query=${args.where.tenantId}`);
+      throw new Error('Acesso negado: violacao de isolamento de dados');
+    }
+
+    // Handle compound unique keys (e.g. tenantId_customerId)
+    if (action === 'findUnique' && !args.where.tenantId) {
+      const keys = Object.keys(args.where);
+      for (const k of keys) {
+        if (typeof args.where[k] === 'object' && args.where[k]?.tenantId) {
+          if (args.where[k].tenantId !== tenantId) {
+            console.error(`[SECURITY] Tenant violation BLOCKED: ${model}.findUnique compound key`);
+            throw new Error('Acesso negado: violacao de isolamento de dados');
+          }
+          return args;
+        }
+      }
+    }
+
+    if (!args.where.tenantId) {
+      args.where.tenantId = tenantId;
+    }
+  }
+
+  if (action === 'create') {
+    if (args?.data?.tenantId && args.data.tenantId !== tenantId) {
+      console.error(`[SECURITY] Tenant violation BLOCKED: ${model}.create — target=${args.data.tenantId}`);
+      throw new Error('Acesso negado: violacao de isolamento de dados');
+    }
+  }
+
+  if (WRITE_MUTATIONS.has(action)) {
+    if (!args) args = {};
+    if (!args.where) args.where = {};
+    if (args.where.tenantId && args.where.tenantId !== tenantId) {
+      console.error(`[SECURITY] Tenant violation BLOCKED: ${model}.${action}`);
+      throw new Error('Acesso negado: violacao de isolamento de dados');
+    }
+    if (!args.where.tenantId && action !== 'upsert') {
+      args.where.tenantId = tenantId;
+    }
+  }
+
+  return args;
+}
+
+const basePrisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
+
+const prisma = basePrisma.$extends({
+  query: {
+    $allOperations({ model, operation, args, query }) {
+      if (model && TENANT_SCOPED_MODELS.has(model)) {
+        args = enforceIsolation(model, operation, args);
+      }
+      return query(args);
+    },
+  },
+}) as unknown as PrismaClient;
+
+// --- Connection retry ---
 
 const RETRY_DELAYS = [1500, 3000, 6000];
 

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { AppError } from './error-handler';
 import prisma from '../../config/database';
+import { tenantContext } from './tenantContext';
 
 export interface AuthPayload {
   userId: string;
@@ -38,7 +39,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
 
     const payload = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] }) as AuthPayload;
     req.auth = { ...payload, token };
-    next();
+    tenantContext(req, _res, next);
   } catch {
     return next(new AppError(401, 'INVALID_TOKEN', 'Token inválido ou expirado'));
   }
