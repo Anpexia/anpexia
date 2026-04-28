@@ -175,11 +175,12 @@ export const teamService = {
   async updateProfile(userId: string, data: {
     name?: string; phone?: string; especialidade?: string; rqe?: string;
     tipoRegistro?: string; numeroRegistro?: string;
-    duracaoConsulta?: number; horarios?: any; bio?: string;
+    duracaoConsulta?: number; bio?: string;
   }) {
+    const { horarios: _ignored, ...safeData } = data as any;
     return prisma.user.update({
       where: { id: userId },
-      data,
+      data: safeData,
       select: {
         id: true, name: true, email: true, phone: true, role: true,
         especialidade: true, rqe: true, tipoRegistro: true, numeroRegistro: true,

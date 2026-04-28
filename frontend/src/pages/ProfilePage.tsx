@@ -1,27 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { User, Pen, Save, Trash2, Lock, CheckCircle, ShieldCheck, ShieldOff, Smartphone, Clock } from 'lucide-react';
+import { User, Pen, Save, Trash2, Lock, CheckCircle, ShieldCheck, ShieldOff, Smartphone } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
-interface DaySchedule {
-  ativo: boolean;
-  inicio: string;
-  fim: string;
-}
-type Horarios = Record<string, DaySchedule>;
-
-const DAY_LABELS: Record<string, string> = {
-  dom: 'Domingo', seg: 'Segunda', ter: 'Terca', qua: 'Quarta',
-  qui: 'Quinta', sex: 'Sexta', sab: 'Sabado',
-};
-const DAY_KEYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
-
-const DEFAULT_HORARIOS: Horarios = Object.fromEntries(
-  DAY_KEYS.map(k => [k, { ativo: ['seg', 'ter', 'qua', 'qui', 'sex'].includes(k), inicio: '08:00', fim: '18:00' }])
-);
-
-type TabKey = 'perfil' | 'horarios' | 'senha' | 'assinatura' | 'seguranca';
+type TabKey = 'perfil' | 'senha' | 'assinatura' | 'seguranca';
 
 interface Device {
   id: string;
@@ -60,10 +43,6 @@ export function ProfilePage() {
   const [numeroRegistro, setNumeroRegistro] = useState('');
   const [duracaoConsulta, setDuracaoConsulta] = useState('');
   const [bio, setBio] = useState('');
-
-  // Doctor schedule
-  const [horarios, setHorarios] = useState<Horarios>(DEFAULT_HORARIOS);
-  const [savingHorarios, setSavingHorarios] = useState(false);
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState('');
@@ -104,9 +83,6 @@ export function ProfilePage() {
           if (p.numeroRegistro) setNumeroRegistro(p.numeroRegistro);
           if (p.duracaoConsulta) setDuracaoConsulta(String(p.duracaoConsulta));
           if (p.bio) setBio(p.bio);
-          if (p.horarios && typeof p.horarios === 'object') {
-            setHorarios({ ...DEFAULT_HORARIOS, ...p.horarios });
-          }
         }
       }).catch(() => {});
       api.get(`/doctors/${user.id}/signature`).then(({ data }) => {
@@ -225,18 +201,6 @@ export function ProfilePage() {
     }
   };
 
-  const handleSaveHorarios = async () => {
-    setSavingHorarios(true);
-    try {
-      await api.put('/team/me/profile', { horarios });
-      showToast('Horarios atualizados!');
-    } catch (err: any) {
-      showToast(err.response?.data?.error?.message || 'Erro ao salvar horarios');
-    } finally {
-      setSavingHorarios(false);
-    }
-  };
-
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) { showToast('Senhas nao conferem'); return; }
     if (newPassword.length < 6) { showToast('Senha deve ter pelo menos 6 caracteres'); return; }
@@ -332,11 +296,8 @@ export function ProfilePage() {
 
   const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
-  const isDoctor = user?.role === 'DOCTOR';
-
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'perfil', label: 'Perfil' },
-    ...(isDoctor ? [{ key: 'horarios' as TabKey, label: 'Horarios' }] : []),
     { key: 'senha', label: 'Senha' },
     { key: 'assinatura', label: 'Assinatura' },
     { key: 'seguranca', label: 'Seguranca' },
@@ -430,48 +391,6 @@ export function ProfilePage() {
               <Save size={16} /> {saving ? 'Salvando...' : 'Salvar Perfil'}
             </button>
           </div>
-        </div>
-      )}
-
-      {activeTab === 'horarios' && isDoctor && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-2xl">
-          <div className="flex items-center gap-3 mb-6">
-            <Clock size={24} className="text-slate-600" />
-            <div>
-              <h2 className="text-lg font-semibold text-slate-800">Dias e Horarios de Atendimento</h2>
-              <p className="text-sm text-slate-500">Configure os dias e horarios em que voce atende.</p>
-            </div>
-          </div>
-          <div className="space-y-3 mb-6">
-            {DAY_KEYS.map(day => {
-              const d = horarios[day] || { ativo: false, inicio: '08:00', fim: '18:00' };
-              return (
-                <div key={day} className={`flex items-center gap-3 p-3 rounded-lg border ${d.ativo ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50'}`}>
-                  <label className="flex items-center gap-2 min-w-[100px] cursor-pointer">
-                    <input type="checkbox" checked={d.ativo}
-                      onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, ativo: e.target.checked } }))}
-                      className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]" />
-                    <span className={`text-sm font-medium ${d.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{DAY_LABELS[day]}</span>
-                  </label>
-                  {d.ativo && (
-                    <div className="flex items-center gap-2 ml-auto">
-                      <input type="time" value={d.inicio}
-                        onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, inicio: e.target.value } }))}
-                        className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
-                      <span className="text-slate-400 text-sm">ate</span>
-                      <input type="time" value={d.fim}
-                        onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, fim: e.target.value } }))}
-                        className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <button onClick={handleSaveHorarios} disabled={savingHorarios}
-            className="flex items-center justify-center gap-2 btn-pill btn-primary">
-            <Save size={16} /> {savingHorarios ? 'Salvando...' : 'Salvar Horarios'}
-          </button>
         </div>
       )}
 
