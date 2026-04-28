@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Edit2, X, Stethoscope, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Edit2, X, Stethoscope, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import api from '../services/api';
 
 // --- Types ---
@@ -226,6 +226,7 @@ export function FinancialPage() {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [expandedDoctorIds, setExpandedDoctorIds] = useState<Record<string, boolean>>({});
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('all');
 
   // --- Fetchers ---
 
@@ -481,6 +482,32 @@ export function FinancialPage() {
 
   const toggleDoctor = (id: string) => {
     setExpandedDoctorIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const filteredDoctors = selectedDoctorId === 'all'
+    ? doctorsReport.doctors
+    : doctorsReport.doctors.filter((d) => d.id === selectedDoctorId);
+
+  const downloadDoctorCSV = (doc: DoctorReportItem, periodLabel: string) => {
+    const header = 'Data,Paciente,Procedimentos,Valor Faturado,Valor Repasse\n';
+    const rows = doc.procedures.map((p) =>
+      [
+        formatDatePtBR(p.date),
+        `"${p.patientName}"`,
+        `"${p.procedures.join(', ')}"`,
+        p.valorFaturado.toFixed(2).replace('.', ','),
+        p.valorRepasse.toFixed(2).replace('.', ','),
+      ].join(',')
+    ).join('\n');
+    const summary = `\nTotal Procedimentos,${doc.totalProcedimentos}\nTotal Faturado,"${formatBRL(doc.totalFaturado)}"\nTotal Repasse,"${formatBRL(doc.totalRepasse)}"`;
+    const csv = '﻿' + header + rows + '\n' + summary;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `repasse_${doc.name.replace(/\s+/g, '_')}_${periodLabel}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const formatDatePtBR = (iso: string) => {
@@ -918,24 +945,65 @@ export function FinancialPage() {
             )}
           </div>
 
+          {/* Doctor filter */}
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm font-medium text-slate-700">Medico:</label>
+            <select
+              value={selectedDoctorId}
+              onChange={(e) => setSelectedDoctorId(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] min-w-[200px]"
+            >
+              <option value="all">Todos os medicos</option>
+              {doctorsReport.doctors.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}{d.especialidade ? ` — ${d.especialidade}` : ''}</option>
+              ))}
+            </select>
+            {selectedDoctorId !== 'all' && filteredDoctors.length > 0 && (
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-xs text-slate-500">Baixar:</span>
+                {([
+                  { key: 'hoje' as PeriodChip, label: 'Diario' },
+                  { key: 'semana' as PeriodChip, label: 'Semanal' },
+                  { key: 'mes' as PeriodChip, label: 'Mensal' },
+                ]).map((dl) => (
+                  <button
+                    key={dl.key}
+                    onClick={() => {
+                      const range = computeRange(dl.key);
+                      api.get('/financial/doctors-report', { params: { dataInicio: range.start, dataFim: range.end } })
+                        .then(({ data }) => {
+                          const doc = (data.data as DoctorsReport).doctors.find((d: DoctorReportItem) => d.id === selectedDoctorId);
+                          if (doc) downloadDoctorCSV(doc, dl.label.toLowerCase());
+                          else alert('Nenhum dado para este período');
+                        });
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+                  >
+                    <Download size={12} /> {dl.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* KPI cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-lg border border-slate-200 p-4">
               <div className="flex items-center gap-2 text-slate-500 mb-2">
                 <TrendingUp className="w-4 h-4 text-green-600" />
-                <span className="text-xs font-medium uppercase tracking-wide">Total Faturado Geral</span>
+                <span className="text-xs font-medium uppercase tracking-wide">Total Faturado{selectedDoctorId !== 'all' ? '' : ' Geral'}</span>
               </div>
               <div className="text-2xl font-bold text-slate-800">
-                {formatBRL(doctorsReport.totalFaturado)}
+                {formatBRL(filteredDoctors.reduce((s, d) => s + d.totalFaturado, 0))}
               </div>
             </div>
             <div className="bg-white rounded-lg border border-slate-200 p-4">
               <div className="flex items-center gap-2 text-slate-500 mb-2">
                 <DollarSign className="w-4 h-4 text-[#2563EB]" />
-                <span className="text-xs font-medium uppercase tracking-wide">Total Repasses Geral</span>
+                <span className="text-xs font-medium uppercase tracking-wide">Total Repasses{selectedDoctorId !== 'all' ? '' : ' Geral'}</span>
               </div>
               <div className="text-2xl font-bold text-slate-800">
-                {formatBRL(doctorsReport.totalRepasse)}
+                {formatBRL(filteredDoctors.reduce((s, d) => s + d.totalRepasse, 0))}
               </div>
             </div>
             <div className="bg-white rounded-lg border border-slate-200 p-4">
@@ -944,7 +1012,7 @@ export function FinancialPage() {
                 <span className="text-xs font-medium uppercase tracking-wide">Total Procedimentos</span>
               </div>
               <div className="text-2xl font-bold text-slate-800">
-                {doctorsReport.totalProcedimentos}
+                {filteredDoctors.reduce((s, d) => s + d.totalProcedimentos, 0)}
               </div>
             </div>
           </div>
@@ -952,13 +1020,13 @@ export function FinancialPage() {
           {/* Doctors list */}
           {loadingDoctors ? (
             <div className="bg-white rounded-lg border border-slate-200 p-6 text-sm text-slate-400">Carregando...</div>
-          ) : doctorsReport.doctors.length === 0 ? (
+          ) : filteredDoctors.length === 0 ? (
             <div className="bg-white rounded-lg border border-slate-200 p-8 text-sm text-slate-400 text-center">
               Nenhum procedimento registrado no período.
             </div>
           ) : (
             <div className="space-y-3">
-              {doctorsReport.doctors.map((doc) => {
+              {filteredDoctors.map((doc) => {
                 const expanded = !!expandedDoctorIds[doc.id];
                 return (
                   <div key={doc.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden">

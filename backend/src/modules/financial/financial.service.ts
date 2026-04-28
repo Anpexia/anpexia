@@ -370,6 +370,13 @@ export const financialService = {
               },
             },
           },
+          privateProcedureCalls: {
+            include: {
+              privateProcedure: {
+                select: { id: true, name: true, type: true, value: true },
+              },
+            },
+          },
         },
       }),
     ]);
@@ -430,6 +437,16 @@ export const financialService = {
         const pct = repasseMap[call.doctorId]?.[tp.type] ?? 0;
         valorRepasse += value * (pct / 100);
         descs.push(tp.description || tp.code);
+      }
+
+      for (const ppc of (call as any).privateProcedureCalls || []) {
+        const pp = ppc.privateProcedure;
+        if (!pp) continue;
+        const value = Number(pp.value) || 0;
+        valorFaturado += value;
+        const pct = repasseMap[call.doctorId]?.[pp.type] ?? 0;
+        valorRepasse += value * (pct / 100);
+        descs.push(pp.name);
       }
 
       const patientName = call.customer?.name || call.name || 'Paciente';
