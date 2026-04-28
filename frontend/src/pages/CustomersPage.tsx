@@ -924,7 +924,7 @@ export function CustomersPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 px-6 border-b border-slate-200">
+            <div className="flex gap-1 px-6 border-b border-slate-200 overflow-x-auto">
               {([
                 { key: 'info', label: 'Informacoes', icon: User },
                 { key: 'prontuario', label: 'Prontuario', icon: Heart },
@@ -934,7 +934,7 @@ export function CustomersPage() {
                 { key: 'appointments', label: 'Consultas', icon: Calendar },
               ] as const).map((tab) => (
                 <button key={tab.key} onClick={() => setDetailTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${detailTab === tab.key ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 ${detailTab === tab.key ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                   <tab.icon size={14} />{tab.label}
                   {tab.key === 'prescricoes' && prescricoes.length > 0 && (
                     <span className="bg-blue-50 text-blue-600 text-xs px-1.5 py-0.5 rounded">{prescricoes.length}</span>
