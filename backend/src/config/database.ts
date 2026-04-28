@@ -1,8 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { tenantStore } from '../shared/middleware/tenantContext';
 
+// Only models that have a direct tenant_id column
 const TENANT_SCOPED_MODELS = new Set([
-  'Customer', 'CustomerTag', 'CustomerTagAssignment',
+  'Customer', 'CustomerTag',
   'Product', 'ProductCategory', 'InventoryMovement',
   'MessageTemplate', 'MessageSent',
   'AuditLog', 'ChatbotConfig', 'ChatbotFaq', 'ChatMessage',
@@ -14,9 +15,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'Convenio', 'Autorizacao', 'TussProcedure', 'DoctorRepasse',
   'ProcedureTemplate', 'RepasseType', 'PrivateProcedure',
   'TenantSettings', 'TenantModule', 'PatientDocument',
-  'MedicalRecord', 'MedicalEntry',
-  'ScheduledCallProcedure', 'PrivateProcedureCall',
-  'GoogleCalendarToken', 'ScheduleConfig',
+  'MedicalRecord',
 ]);
 
 const READ_ACTIONS = new Set(['findUnique', 'findFirst', 'findMany', 'count', 'aggregate', 'groupBy']);
