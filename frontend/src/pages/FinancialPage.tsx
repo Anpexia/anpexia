@@ -227,6 +227,9 @@ export function FinancialPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [expandedDoctorIds, setExpandedDoctorIds] = useState<Record<string, boolean>>({});
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('all');
+  const [dlStart, setDlStart] = useState(new Date().toISOString().split('T')[0]);
+  const [dlEnd, setDlEnd] = useState(new Date().toISOString().split('T')[0]);
+  const [downloading, setDownloading] = useState(false);
 
   // --- Fetchers ---
 
@@ -958,30 +961,32 @@ export function FinancialPage() {
                 <option key={d.id} value={d.id}>{d.name}{d.especialidade ? ` — ${d.especialidade}` : ''}</option>
               ))}
             </select>
-            {selectedDoctorId !== 'all' && filteredDoctors.length > 0 && (
-              <div className="flex items-center gap-1.5 ml-auto">
-                <span className="text-xs text-slate-500">Baixar:</span>
-                {([
-                  { key: 'hoje' as PeriodChip, label: 'Diario' },
-                  { key: 'semana' as PeriodChip, label: 'Semanal' },
-                  { key: 'mes' as PeriodChip, label: 'Mensal' },
-                ]).map((dl) => (
-                  <button
-                    key={dl.key}
-                    onClick={() => {
-                      const range = computeRange(dl.key);
-                      api.get('/financial/doctors-report', { params: { dataInicio: range.start, dataFim: range.end } })
-                        .then(({ data }) => {
-                          const doc = (data.data as DoctorsReport).doctors.find((d: DoctorReportItem) => d.id === selectedDoctorId);
-                          if (doc) downloadDoctorCSV(doc, dl.label.toLowerCase());
-                          else alert('Nenhum dado para este período');
-                        });
-                    }}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
-                  >
-                    <Download size={12} /> {dl.label}
-                  </button>
-                ))}
+            {selectedDoctorId !== 'all' && (
+              <div className="flex items-center gap-2 ml-auto flex-wrap">
+                <span className="text-xs text-slate-500">De</span>
+                <input type="date" value={dlStart} onChange={(e) => setDlStart(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                <span className="text-xs text-slate-500">ate</span>
+                <input type="date" value={dlEnd} onChange={(e) => setDlEnd(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                <button
+                  disabled={downloading}
+                  onClick={() => {
+                    setDownloading(true);
+                    const s = new Date(dlStart + 'T00:00:00').toISOString();
+                    const e = new Date(dlEnd + 'T23:59:59').toISOString();
+                    api.get('/financial/doctors-report', { params: { dataInicio: s, dataFim: e } })
+                      .then(({ data }) => {
+                        const doc = (data.data as DoctorsReport).doctors.find((d: DoctorReportItem) => d.id === selectedDoctorId);
+                        if (doc) downloadDoctorCSV(doc, `${dlStart}_a_${dlEnd}`);
+                        else alert('Nenhum dado para este período');
+                      })
+                      .finally(() => setDownloading(false));
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-[#1E3A5F] text-white rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50"
+                >
+                  <Download size={14} /> {downloading ? 'Baixando...' : 'Baixar CSV'}
+                </button>
               </div>
             )}
           </div>
