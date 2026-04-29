@@ -8,6 +8,7 @@ import {
   DollarSign, Bot, UsersRound, PenLine,
 } from 'lucide-react';
 import SchedulingPage from './pages/SchedulingPage';
+import { LeadsPage } from './pages/LeadsPage';
 
 const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '';
 const contactEmail = import.meta.env.VITE_CONTACT_EMAIL || 'contato@anpexia.com.br';
@@ -504,6 +505,7 @@ function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/agendar" element={<SchedulingPage />} />
+      <Route path="/leads" element={<LeadsPage />} />
     </Routes>
   );
 }
