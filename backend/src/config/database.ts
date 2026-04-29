@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { tenantStore } from '../shared/middleware/tenantContext';
+import { ENCRYPTED_MODELS, encryptModelFields, decryptResultData } from '../shared/utils/encryption';
 
 // Only models that have a direct tenant_id column
 const TENANT_SCOPED_MODELS = new Set([
@@ -81,13 +82,33 @@ const basePrisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
+const WRITE_OPS = new Set(['create', 'update', 'upsert', 'createMany']);
+
 const prisma = basePrisma.$extends({
   query: {
-    $allOperations({ model, operation, args, query }) {
+    async $allOperations({ model, operation, args, query }) {
       if (model && TENANT_SCOPED_MODELS.has(model)) {
         args = enforceIsolation(model, operation, args);
       }
-      return query(args);
+
+      if (model && ENCRYPTED_MODELS[model] && WRITE_OPS.has(operation)) {
+        if (operation === 'upsert') {
+          if (args.create) encryptModelFields(model, args.create);
+          if (args.update) encryptModelFields(model, args.update);
+        } else if (operation === 'createMany' && Array.isArray(args.data)) {
+          for (const item of args.data) encryptModelFields(model, item);
+        } else if (args.data) {
+          encryptModelFields(model, args.data);
+        }
+      }
+
+      const result = await query(args);
+
+      if (model && ENCRYPTED_MODELS[model] && result) {
+        decryptResultData(model, result);
+      }
+
+      return result;
     },
   },
 }) as unknown as PrismaClient;
