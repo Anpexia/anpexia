@@ -555,9 +555,13 @@ export function TeamPage() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-amber-600 w-12">Almoco</span>
-                                <span className="text-xs text-slate-400">{d.manha.fim}</span>
+                                <input type="time" value={d.manha.fim}
+                                  onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, manha: { ...d.manha, fim: e.target.value } } }))}
+                                  className="px-2 py-1 border border-amber-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50" />
                                 <span className="text-slate-400 text-xs">ate</span>
-                                <span className="text-xs text-slate-400">{d.tarde.inicio}</span>
+                                <input type="time" value={d.tarde.inicio}
+                                  onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, tarde: { ...d.tarde, inicio: e.target.value } } }))}
+                                  className="px-2 py-1 border border-amber-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50" />
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-slate-500 w-12">Tarde</span>
