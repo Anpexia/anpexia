@@ -7,6 +7,7 @@ import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { DictationTextarea } from '../components/DictationTextarea';
 import { useCepLookup, formatarCep } from '../hooks/useCepLookup';
+import { getSegmentConfig } from '../config/segmentConfig';
 
 interface ScheduledCall {
   id: string;
@@ -104,7 +105,7 @@ function populateForm(c: Customer) {
 }
 
 export function CustomersPage() {
-  useAuth();
+  const { user } = useAuth();
   const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
   const numberInputRef = useCallback((node: HTMLInputElement | null) => { if (node) node.dataset.numberInput = 'true'; }, []);
 
@@ -158,7 +159,7 @@ export function CustomersPage() {
   const [evolucoes, setEvolucoes] = useState<any[]>([]);
   const [loadingEvolucoes, setLoadingEvolucoes] = useState(false);
   const [showNewEvolucao, setShowNewEvolucao] = useState(false);
-  const [evolucaoForm, setEvolucaoForm] = useState({ subjective: '', objective: '', exams: '', returnDate: '' });
+  const [evolucaoForm, setEvolucaoForm] = useState<Record<string, string>>({ subjective: '', objective: '', exams: '', returnDate: '' });
   const [savingEvolucao, setSavingEvolucao] = useState(false);
 
   // Prescricoes state
@@ -384,7 +385,7 @@ export function CustomersPage() {
     setSavingEvolucao(true);
     try {
       await api.post(`/patient-evolution/${selectedCustomer.id}`, evolucaoForm);
-      setEvolucaoForm({ subjective: '', objective: '', exams: '', returnDate: '' });
+      setEvolucaoForm({});
       setShowNewEvolucao(false);
       await fetchEvolucoes(selectedCustomer.id);
       showToast('Evolucao registrada!');
@@ -1191,19 +1192,10 @@ export function CustomersPage() {
                         <p className="text-sm text-slate-500 text-center py-8">Carregando anamnese...</p>
                       ) : (
                         <>
-                          {[
-                            { key: 'queixa', label: 'Queixas Principais', field: 'queixaPrincipal', placeholder: 'Descreva as queixas do paciente...' },
-                            { key: 'historiaDoenca', label: 'Historico de Doenca Atual', field: 'historiaDoencaAtual', placeholder: 'Descreva o historico da doenca atual, inicio, evolucao...' },
-                            { key: 'historicoPassado', label: 'Historico Medico Passado', field: 'historicoMedicoPassado', placeholder: 'Cirurgias, internacoes, doencas previas...' },
-                            { key: 'medicamentos', label: 'Medicamentos em Uso', field: 'medicamentos', placeholder: 'Liste os medicamentos, dosagens e frequencia...' },
-                            { key: 'alergias', label: 'Alergias', field: 'alergias', placeholder: 'Alergias a medicamentos, alimentos, substancias...' },
-                            { key: 'historiaFamiliar', label: 'Historico Familiar', field: 'historicoFamiliar', placeholder: 'Doencas na familia: diabetes, hipertensao, cancer, cardiopatias...' },
-                            { key: 'historiaSocial', label: 'Historico Social', field: 'historicoSocial', placeholder: 'Tabagismo, etilismo, atividade fisica, profissao, moradia...' },
-                            { key: 'observacoes', label: 'Observacoes', field: 'observacoesAnamnese', placeholder: 'Observacoes adicionais...' },
-                          ].map(section => (
-                            <div key={section.key}>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">{section.label}</label>
-                              <DictationTextarea value={anamneseData[section.field] || ''} onChange={(v) => setAnamneseData({ ...anamneseData, [section.field]: v })} className={inputCls + ' h-24 resize-none'} placeholder={section.placeholder} />
+                          {getSegmentConfig(user?.tenant?.segment).anamnese.map(field => (
+                            <div key={field.key}>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
+                              <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => setAnamneseData({ ...anamneseData, [field.key]: v })} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
                             </div>
                           ))}
 
@@ -1227,22 +1219,12 @@ export function CustomersPage() {
 
                       {showNewEvolucao && (
                         <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Descricao / Subjetivo</label>
-                            <DictationTextarea value={evolucaoForm.subjective} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, subjective: v })} className={inputCls + ' h-24 resize-none'} placeholder="Queixas do paciente, relato, sintomas..." />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Conduta / Objetivo</label>
-                            <DictationTextarea value={evolucaoForm.objective} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, objective: v })} className={inputCls + ' h-24 resize-none'} placeholder="Achados do exame, conduta adotada, tratamento..." />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Exames Solicitados</label>
-                            <DictationTextarea value={evolucaoForm.exams} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, exams: v })} className={inputCls + ' h-20 resize-none'} placeholder="Exames laboratoriais, imagem, outros..." />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Retorno Previsto</label>
-                            <DictationTextarea value={evolucaoForm.returnDate} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, returnDate: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Retorno em 30 dias, apos resultado dos exames..." />
-                          </div>
+                          {getSegmentConfig(user?.tenant?.segment).evolucao.map(field => (
+                            <div key={field.key}>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
+                              <DictationTextarea value={evolucaoForm[field.key] || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, [field.key]: v })} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
+                            </div>
+                          ))}
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setShowNewEvolucao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
                             <button type="button" onClick={handleAddEvolucao} disabled={savingEvolucao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
@@ -1264,10 +1246,9 @@ export function CustomersPage() {
                                 <span className="text-xs font-medium text-[#1E3A5F]">{format(new Date(ev.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
                               </div>
                               <div className="space-y-2 text-sm">
-                                {ev.subjective && <div><span className="font-medium text-slate-600">Descricao: </span><span className="text-slate-700">{ev.subjective}</span></div>}
-                                {ev.objective && <div><span className="font-medium text-slate-600">Conduta: </span><span className="text-slate-700">{ev.objective}</span></div>}
-                                {(ev.assessment || ev.exams) && <div><span className="font-medium text-slate-600">Exames: </span><span className="text-slate-700">{ev.exams || ev.assessment}</span></div>}
-                                {(ev.plan || ev.returnDate) && <div><span className="font-medium text-slate-600">Retorno: </span><span className="text-slate-700">{ev.returnDate || ev.plan}</span></div>}
+                                {getSegmentConfig(user?.tenant?.segment).evolucao.map(field => (
+                                  ev[field.key] ? <div key={field.key}><span className="font-medium text-slate-600">{field.label}: </span><span className="text-slate-700">{ev[field.key]}</span></div> : null
+                                ))}
                               </div>
                               {ev.notes && <p className="text-xs text-slate-400 mt-1">{ev.notes}</p>}
                             </div>
