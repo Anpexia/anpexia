@@ -35,7 +35,7 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid #E5E7EB',
   borderRadius: 12,
   fontSize: '0.9rem',
-  color: '#1C1208',
+  color: '#1E3A5F',
   outline: 'none',
   boxSizing: 'border-box' as const,
   fontFamily: 'inherit',
@@ -110,14 +110,14 @@ export function LeadsPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FFFBEB', fontFamily: 'Sora, system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFC', fontFamily: 'Sora, system-ui, sans-serif' }}>
       {/* Navbar */}
       <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', maxWidth: 1200, margin: '0 auto' }}>
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#F97316', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>A</span>
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1C1208' }}>Anpexia</span>
+          <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1E3A5F' }}>Anpexia</span>
         </a>
         <a href="/" style={{ fontSize: '0.85rem', fontWeight: 500, color: '#6B7280', textDecoration: 'none' }}>
           Voltar ao site
@@ -128,13 +128,13 @@ export function LeadsPage() {
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px 80px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 48, alignItems: 'start' }}>
         {/* Left — info */}
         <div style={{ paddingTop: 20 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 999, padding: '6px 16px', marginBottom: 24 }}>
-            <Stethoscope size={14} style={{ color: '#F97316' }} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Demonstracao gratuita</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: '#E2E8F0', borderRadius: 999, padding: '6px 16px', marginBottom: 24 }}>
+            <Stethoscope size={14} style={{ color: '#2563EB' }} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Demonstracao gratuita</span>
           </div>
 
-          <h1 style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', fontWeight: 800, color: '#1C1208', lineHeight: 1.15, marginBottom: 20 }}>
-            Automatize sua clinica com a <span style={{ color: '#F97316' }}>Anpexia</span>
+          <h1 style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', fontWeight: 800, color: '#1E3A5F', lineHeight: 1.15, marginBottom: 20 }}>
+            Automatize sua clinica com a <span style={{ color: '#2563EB' }}>Anpexia</span>
           </h1>
 
           <p style={{ fontSize: '1rem', color: '#6B7280', lineHeight: 1.7, marginBottom: 32 }}>
@@ -159,8 +159,8 @@ export function LeadsPage() {
 
           <div style={{ marginTop: 40, padding: 20, backgroundColor: '#fff', borderRadius: 16, border: '1px solid #F3F4F6' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <Building2 size={16} style={{ color: '#F97316' }} />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1C1208' }}>Para clinicas de todos os portes</span>
+              <Building2 size={16} style={{ color: '#2563EB' }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1E3A5F' }}>Para clinicas de todos os portes</span>
             </div>
             <p style={{ fontSize: '0.85rem', color: '#6B7280', lineHeight: 1.6, margin: 0 }}>
               Medicas, esteticas, odontologicas e mais. O sistema se adapta ao seu segmento.
@@ -175,20 +175,20 @@ export function LeadsPage() {
               <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                 <CheckCircle size={32} style={{ color: '#059669' }} />
               </div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1C1208', marginBottom: 12 }}>Solicitacao enviada!</h2>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1E3A5F', marginBottom: 12 }}>Solicitacao enviada!</h2>
               <p style={{ fontSize: '0.95rem', color: '#6B7280', lineHeight: 1.6, marginBottom: 24 }}>
                 Obrigado pelo interesse! Nossa equipe entrara em contato em breve para agendar sua demonstracao.
               </p>
               <button
                 onClick={() => { setSubmitted(false); setForm({ name: '', clinic: '', phone: '', email: '', city: '', state: '', specialty: '', message: '' }); }}
-                style={{ backgroundColor: 'transparent', border: 'none', color: '#F97316', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}
+                style={{ backgroundColor: 'transparent', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}
               >
                 Enviar outra solicitacao
               </button>
             </div>
           ) : (
             <>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1C1208', marginBottom: 4 }}>Solicite uma demonstracao gratuita</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1E3A5F', marginBottom: 4 }}>Solicite uma demonstracao gratuita</h2>
               <p style={{ fontSize: '0.85rem', color: '#9CA3AF', marginBottom: 24 }}>Campos com * sao obrigatorios</p>
 
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -255,7 +255,7 @@ export function LeadsPage() {
                     <select
                       value={form.state}
                       onChange={e => setForm({ ...form, state: e.target.value })}
-                      style={{ ...inputStyle, color: form.state ? '#1C1208' : '#9CA3AF', appearance: 'auto' as const }}
+                      style={{ ...inputStyle, color: form.state ? '#1E3A5F' : '#9CA3AF', appearance: 'auto' as const }}
                     >
                       <option value="">Selecione</option>
                       {ESTADOS.map(uf => (
@@ -270,7 +270,7 @@ export function LeadsPage() {
                   <select
                     value={form.specialty}
                     onChange={e => setForm({ ...form, specialty: e.target.value })}
-                    style={{ ...inputStyle, color: form.specialty ? '#1C1208' : '#9CA3AF', appearance: 'auto' as const }}
+                    style={{ ...inputStyle, color: form.specialty ? '#1E3A5F' : '#9CA3AF', appearance: 'auto' as const }}
                   >
                     <option value="">Selecione</option>
                     {ESPECIALIDADES.map(esp => (
@@ -293,7 +293,7 @@ export function LeadsPage() {
                   type="submit"
                   disabled={submitting}
                   style={{
-                    backgroundColor: '#F97316',
+                    backgroundColor: '#2563EB',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 12,
@@ -321,7 +321,7 @@ export function LeadsPage() {
       </main>
 
       {/* Footer */}
-      <footer style={{ textAlign: 'center', padding: '24px', borderTop: '1px solid #FDE68A' }}>
+      <footer style={{ textAlign: 'center', padding: '24px', borderTop: '1px solid #CBD5E1' }}>
         <p style={{ fontSize: '0.8rem', color: '#9CA3AF', margin: 0 }}>
           &copy; {new Date().getFullYear()} Anpexia. Todos os direitos reservados.
         </p>
