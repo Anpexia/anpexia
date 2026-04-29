@@ -1362,7 +1362,7 @@ export function SchedulingPage() {
           {view === 'calendar' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Monthly calendar — spans 2 cols */}
-              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6">
+              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                 {/* Month navigation */}
                 <div className="flex items-center justify-between mb-4">
                   <button onClick={() => setCalMonth(subMonths(calMonth, 1))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"><ChevronLeft size={20} /></button>
@@ -1403,7 +1403,7 @@ export function SchedulingPage() {
                         key={dayStr}
                         onClick={() => { if (!past && inMonth) handleDateClick(dayStr); }}
                         disabled={past || !inMonth}
-                        className={`relative aspect-square flex flex-col items-center justify-center rounded-lg text-sm transition-colors
+                        className={`relative h-12 flex flex-col items-center justify-center rounded-lg text-sm transition-colors
                           ${!inMonth ? 'text-slate-300 cursor-default' : ''}
                           ${inMonth && past ? 'text-slate-300 cursor-not-allowed' : ''}
                           ${inMonth && !past && !selected ? 'text-slate-700 hover:bg-slate-50 cursor-pointer' : ''}
