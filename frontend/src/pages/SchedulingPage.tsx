@@ -1113,8 +1113,8 @@ export function SchedulingPage() {
                                 <span className="flex items-center gap-1"><Clock size={14} />{format(new Date(a.date), 'HH:mm')}</span>
                                 <span className="flex items-center gap-1"><Phone size={14} />{a.phone}</span>
                               </div>
-                              {/* Authorization badge — only when patient has convenio */}
-                              {a.customerId && convenioMap[a.customerId] && (
+                              {/* Authorization badge — only for convenio appointments */}
+                              {a.paymentType === 'CONVENIO' && a.customerId && convenioMap[a.customerId] && (
                                 <div className="mt-2">
                                   {authEditingId === a.id ? (
                                     <div className="flex items-center gap-1.5">
@@ -1269,7 +1269,7 @@ export function SchedulingPage() {
                             >
                               <UserCog size={12} />
                             </button>
-                            {a.customerId && convenioMap[a.customerId] && (
+                            {a.paymentType === 'CONVENIO' && a.customerId && convenioMap[a.customerId] && (
                               authEditingId === a.id ? (
                                 <div className="flex items-center gap-1.5">
                                   <input
