@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -157,6 +157,11 @@ export function SchedulingPage() {
 
   // Doctors
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+
+  // Booking modal: mini-calendar + slot picker
+  const [bookCalMonth, setBookCalMonth] = useState(() => startOfMonth(new Date()));
+  const [bookSlots, setBookSlots] = useState<{ time: string; available: boolean }[]>([]);
+  const [loadingBookSlots, setLoadingBookSlots] = useState(false);
 
   // Confirmar Realizacao (ao clicar em "Realizado")
   const [tussModalCall, setTussModalCall] = useState<Appointment | null>(null);
@@ -392,6 +397,34 @@ export function SchedulingPage() {
     loadPatientConvenios(bookForm.customerId);
   }, [showBookModal, bookPaymentType, bookForm.customerId, loadPatientConvenios]);
 
+  // Fetch available slots when doctor + date are both selected
+  useEffect(() => {
+    if (!showBookModal || !bookForm.doctorId || !bookForm.date) {
+      setBookSlots([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingBookSlots(true);
+    api.get(`/scheduling/available-slots/${bookForm.date}`, {
+      params: { doctorId: bookForm.doctorId, tenantId: user?.tenant?.id },
+    })
+      .then(({ data }) => { if (!cancelled) setBookSlots(data.data || []); })
+      .catch(() => { if (!cancelled) setBookSlots([]); })
+      .finally(() => { if (!cancelled) setLoadingBookSlots(false); });
+    return () => { cancelled = true; };
+  }, [showBookModal, bookForm.doctorId, bookForm.date, user?.tenant?.id]);
+
+  // Reset date + time when doctor changes in booking modal
+  const bookDoctorRef = useRef(bookForm.doctorId);
+  useEffect(() => {
+    if (!showBookModal) return;
+    if (bookDoctorRef.current === bookForm.doctorId) return;
+    bookDoctorRef.current = bookForm.doctorId;
+    setBookForm(prev => ({ ...prev, date: '', time: '' }));
+    setBookSlots([]);
+    setBookCalMonth(startOfMonth(new Date()));
+  }, [showBookModal, bookForm.doctorId]);
+
   const selectCustomerForBooking = (c: CustomerSearch) => {
     setSelectedBookCustomer(c);
     setBookForm(prev => ({
@@ -420,6 +453,14 @@ export function SchedulingPage() {
     e.preventDefault();
     if (!bookForm.doctorId) {
       showToast('Selecione o medico responsavel pela consulta');
+      return;
+    }
+    if (!bookForm.date) {
+      showToast('Selecione a data da consulta');
+      return;
+    }
+    if (!bookForm.time) {
+      showToast('Selecione o horario da consulta');
       return;
     }
     if (bookPaymentType === 'CONVENIO' && !bookConvenioId) {
@@ -1657,16 +1698,105 @@ export function SchedulingPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
                 <input type="email" value={bookForm.email} onChange={(e) => setBookForm({ ...bookForm, email: e.target.value })} className={inputCls} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Data *</label>
-                  <input type="date" value={bookForm.date} onChange={(e) => setBookForm({ ...bookForm, date: e.target.value })} className={inputCls} required />
+              {/* Mini-calendar for date selection */}
+              {bookForm.doctorId ? (() => {
+                const selectedDoc = doctors.find(d => d.id === bookForm.doctorId);
+                const docHorarios = selectedDoc?.horarios || null;
+                const DAY_MAP: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+                const calStart = startOfWeek(startOfMonth(bookCalMonth), { weekStartsOn: 0 });
+                const calEnd = endOfWeek(endOfMonth(bookCalMonth), { weekStartsOn: 0 });
+                const calDays: Date[] = [];
+                let d = calStart;
+                while (d <= calEnd) { calDays.push(d); d = addDays(d, 1); }
+                const today = new Date();
+
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Data *</label>
+                    <div className="border border-slate-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <button type="button" onClick={() => setBookCalMonth(m => subMonths(m, 1))} className="p-1 hover:bg-slate-100 rounded"><ChevronLeft size={16} /></button>
+                        <span className="text-sm font-semibold text-slate-700 capitalize">{format(bookCalMonth, 'MMMM yyyy', { locale: ptBR })}</span>
+                        <button type="button" onClick={() => setBookCalMonth(m => addMonths(m, 1))} className="p-1 hover:bg-slate-100 rounded"><ChevronRight size={16} /></button>
+                      </div>
+                      <div className="grid grid-cols-7 text-center text-xs text-slate-400 mb-1">
+                        {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((l, i) => <span key={i}>{l}</span>)}
+                      </div>
+                      <div className="grid grid-cols-7 gap-0.5">
+                        {calDays.map((day, i) => {
+                          const dateStr = format(day, 'yyyy-MM-dd');
+                          const inMonth = isSameMonth(day, bookCalMonth);
+                          const isPast = isBefore(day, today) && !isToday(day);
+                          const isSelected = bookForm.date === dateStr;
+                          const dayKey = DAY_MAP[day.getDay()];
+                          const doctorWorksThisDay = docHorarios ? !!(docHorarios[dayKey] as DoctorHorario | undefined)?.ativo : false;
+
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              disabled={isPast}
+                              onClick={() => setBookForm(prev => ({ ...prev, date: dateStr, time: '' }))}
+                              className={`text-xs py-1.5 rounded transition-colors ${
+                                !inMonth ? 'text-slate-300' :
+                                isPast ? 'text-slate-300 cursor-not-allowed' :
+                                isSelected ? 'bg-[#1E3A5F] text-white font-bold' :
+                                doctorWorksThisDay ? 'bg-blue-100 text-blue-800 font-medium hover:bg-blue-200' :
+                                'text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              {format(day, 'd')}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {bookForm.date && (
+                        <p className="text-xs text-slate-500 mt-2 text-center">
+                          Selecionado: {format(new Date(bookForm.date + 'T12:00:00'), 'dd/MM/yyyy')}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-2 justify-center">
+                        <span className="inline-block w-3 h-3 rounded bg-blue-100 border border-blue-200" /> Dia com expediente do medico
+                      </p>
+                    </div>
+
+                    {/* Slot picker */}
+                    {bookForm.date && (
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Horario *</label>
+                        {loadingBookSlots ? (
+                          <p className="text-xs text-slate-500">Carregando horarios...</p>
+                        ) : bookSlots.length === 0 ? (
+                          <p className="text-xs text-amber-600">Nenhum horario disponivel neste dia para este medico.</p>
+                        ) : (
+                          <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
+                            {bookSlots.map(slot => (
+                              <button
+                                key={slot.time}
+                                type="button"
+                                disabled={!slot.available}
+                                onClick={() => setBookForm(prev => ({ ...prev, time: slot.time }))}
+                                className={`text-xs py-1.5 px-1 rounded transition-colors ${
+                                  !slot.available ? 'bg-slate-100 text-slate-400 line-through cursor-not-allowed' :
+                                  bookForm.time === slot.time ? 'bg-[#1E3A5F] text-white font-bold' :
+                                  'bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300'
+                                }`}
+                              >
+                                {slot.time}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })() : (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center">
+                  <Calendar size={20} className="mx-auto text-slate-400 mb-1" />
+                  <p className="text-xs text-slate-500">Selecione o medico para ver datas e horarios disponiveis</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Horario</label>
-                  <input type="time" value={bookForm.time} onChange={(e) => setBookForm({ ...bookForm, time: e.target.value })} className={inputCls} />
-                </div>
-              </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Observacoes</label>
                 <textarea value={bookForm.notes} onChange={(e) => setBookForm({ ...bookForm, notes: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Retorno, primeira consulta..." />

@@ -196,22 +196,71 @@ async function updateConfig(data: UpdateConfigInput) {
 async function getAvailableSlots(date: string, doctorId?: string | null, tenantId?: string | null) {
   const config = await getConfig();
   const dayOfWeek = new Date(`${date}T12:00:00${SP_OFFSET}`).getDay();
+  const dayKey = DAY_KEYS[dayOfWeek];
 
-  if (!config.availableDays.includes(dayOfWeek)) {
+  // Determine working hours: doctor-specific → tenant → global defaults
+  let startHour = config.startHour;
+  let endHour = config.endHour;
+  let slotDuration = config.slotDuration;
+  let breakStart = config.breakStart;
+  let breakEnd = config.breakEnd;
+  let isDayActive = config.availableDays.includes(dayOfWeek);
+
+  // Try doctor-specific hours first
+  if (doctorId) {
+    const doctor = await prisma.user.findUnique({
+      where: { id: doctorId },
+      select: { horarios: true, duracaoConsulta: true },
+    });
+    if (doctor?.horarios && typeof doctor.horarios === 'object') {
+      const dh = (doctor.horarios as any)[dayKey];
+      if (dh && typeof dh === 'object') {
+        isDayActive = Boolean(dh.ativo);
+        if (isDayActive) {
+          const dInicio = dh.inicio || '08:00';
+          const dFim = dh.fim || '18:00';
+          startHour = parseInt(dInicio.split(':')[0], 10);
+          endHour = parseInt(dFim.split(':')[0], 10);
+          const endMin = parseInt(dInicio.split(':')[1] || '0', 10);
+          if (endMin > 0) startHour = startHour + endMin / 60;
+          const fimMin = parseInt(dFim.split(':')[1] || '0', 10);
+          if (fimMin > 0) endHour = endHour + fimMin / 60;
+        }
+      }
+    }
+    if (doctor?.duracaoConsulta) slotDuration = doctor.duracaoConsulta;
+  } else if (tenantId) {
+    // Fall back to tenant hours
+    const tenantHours = await loadTenantHours(tenantId);
+    const th = tenantHours.days[dayKey];
+    if (th) {
+      isDayActive = th.ativo;
+      if (isDayActive) {
+        startHour = parseInt(th.inicio.split(':')[0], 10);
+        endHour = parseInt(th.fim.split(':')[0], 10);
+      }
+    }
+    slotDuration = tenantHours.durationMin;
+  }
+
+  if (!isDayActive) {
     return [];
   }
 
-  // Generate all possible slots
+  // Generate all possible slots using resolved hours
   const slots: { time: string; available: boolean }[] = [];
-  const totalMinutes = (config.endHour - config.startHour) * 60;
+  const startMinutes = Math.round(startHour * 60);
+  const endMinutes = Math.round(endHour * 60);
+  const totalMinutes = endMinutes - startMinutes;
 
-  for (let offset = 0; offset < totalMinutes; offset += config.slotDuration) {
-    const hour = config.startHour + Math.floor(offset / 60);
-    const minute = offset % 60;
+  for (let offset = 0; offset < totalMinutes; offset += slotDuration) {
+    const totalMins = startMinutes + offset;
+    const hour = Math.floor(totalMins / 60);
+    const minute = totalMins % 60;
 
     // Skip break period
-    if (config.breakStart != null && config.breakEnd != null) {
-      if (hour >= config.breakStart && hour < config.breakEnd) continue;
+    if (breakStart != null && breakEnd != null) {
+      if (hour >= breakStart && hour < breakEnd) continue;
     }
 
     const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
