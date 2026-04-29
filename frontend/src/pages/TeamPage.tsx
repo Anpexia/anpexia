@@ -60,6 +60,7 @@ interface TeamMember {
   especialidade?: string | null;
   rqe?: string | null;
   horarios?: Horarios | null;
+  duracaoConsulta?: number | null;
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
@@ -91,6 +92,7 @@ export function TeamPage() {
 
   // Doctor schedule
   const [horarios, setHorarios] = useState<Horarios>(DEFAULT_HORARIOS);
+  const [duracaoConsulta, setDuracaoConsulta] = useState<number>(30);
   const [savingHorarios, setSavingHorarios] = useState(false);
 
   // Repasse (only visible when editing a DOCTOR)
@@ -231,9 +233,11 @@ export function TeamPage() {
     if (m.role === 'DOCTOR') {
       loadRepasse(m.id);
       setHorarios(m.horarios ? migrateHorarios(m.horarios) : { ...DEFAULT_HORARIOS });
+      setDuracaoConsulta(m.duracaoConsulta || 30);
     } else {
       setRepasse({});
       setHorarios({ ...DEFAULT_HORARIOS });
+      setDuracaoConsulta(30);
     }
   };
 
@@ -241,7 +245,7 @@ export function TeamPage() {
     if (!editMember) return;
     setSavingHorarios(true);
     try {
-      await api.put(`/team/${editMember.id}/horarios`, { horarios });
+      await api.put(`/team/${editMember.id}/horarios`, { horarios, duracaoConsulta });
       showToast('Horarios atualizados!');
     } catch (err: any) {
       showToast(err.response?.data?.error?.message || 'Erro ao salvar horarios');
@@ -514,9 +518,18 @@ export function TeamPage() {
                     <Clock size={18} className="text-slate-600" />
                     <div>
                       <h3 className="text-sm font-semibold text-slate-800">Dias e horarios de atendimento</h3>
-                      <p className="text-xs text-slate-500">Configure os dias e horarios em que este medico atende.</p>
+                      <p className="text-xs text-slate-500">Configure os dias, horarios e duracao de consulta deste medico.</p>
                     </div>
                   </div>
+
+                  <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50 mb-1">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Duracao da consulta (minutos)</label>
+                    <input type="number" min="5" max="240" step="5"
+                      value={duracaoConsulta}
+                      onChange={e => setDuracaoConsulta(Number(e.target.value) || 30)}
+                      className="w-32 px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                  </div>
+
                   <div className="space-y-3">
                     {DAY_KEYS.map(day => {
                       const d = horarios[day] || DEFAULT_HORARIOS[day];
@@ -539,6 +552,12 @@ export function TeamPage() {
                                 <input type="time" value={d.manha.fim}
                                   onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, manha: { ...d.manha, fim: e.target.value } } }))}
                                   className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-amber-600 w-12">Almoco</span>
+                                <span className="text-xs text-slate-400">{d.manha.fim}</span>
+                                <span className="text-slate-400 text-xs">ate</span>
+                                <span className="text-xs text-slate-400">{d.tarde.inicio}</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-slate-500 w-12">Tarde</span>

@@ -28,6 +28,7 @@ export const teamService = {
         especialidade: true,
         rqe: true,
         horarios: true,
+        duracaoConsulta: true,
         isActive: true,
         lastLoginAt: true,
         createdAt: true,
@@ -117,7 +118,7 @@ export const teamService = {
     return user;
   },
 
-  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'; especialidade?: string; rqe?: string; horarios?: any }) {
+  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'; especialidade?: string; rqe?: string; horarios?: any; duracaoConsulta?: number }) {
     const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario nao encontrado');
 
@@ -133,6 +134,7 @@ export const teamService = {
         especialidade: true,
         rqe: true,
         horarios: true,
+        duracaoConsulta: true,
         isActive: true,
         createdAt: true,
       },

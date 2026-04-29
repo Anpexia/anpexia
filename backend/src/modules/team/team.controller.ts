@@ -100,7 +100,11 @@ teamRouter.put('/:id', requireRole('OWNER'), async (req: Request, res: Response,
 // Update doctor schedule — OWNER and MANAGER
 teamRouter.put('/:id/horarios', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await teamService.update(req.auth!.tenantId!, req.params.id as string, { horarios: req.body.horarios });
+    const updateData: any = { horarios: req.body.horarios };
+    if (req.body.duracaoConsulta !== undefined) {
+      updateData.duracaoConsulta = Number(req.body.duracaoConsulta) || null;
+    }
+    const user = await teamService.update(req.auth!.tenantId!, req.params.id as string, updateData);
     return success(res, user);
   } catch (err) {
     next(err);
