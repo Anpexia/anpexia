@@ -23,12 +23,27 @@ interface Doctor {
 interface CallProcedure {
   id: string;
   authorizationNumber: string | null;
+  doctorId?: string | null;
+  doctor?: { id: string; name: string } | null;
   tussProcedure: {
     id: string;
     code: string;
     description: string;
     type: string;
     value: number;
+  };
+}
+
+interface CallPrivateProcedure {
+  id: string;
+  doctorId?: string | null;
+  doctor?: { id: string; name: string } | null;
+  notes?: string | null;
+  privateProcedure: {
+    id: string;
+    name: string;
+    type: string;
+    value: number | null;
   };
 }
 
@@ -72,6 +87,7 @@ interface Appointment {
   doctor: { id: string; name: string } | null;
   convenio?: { id: string; nome: string } | null;
   procedures?: CallProcedure[];
+  privateProcedureCalls?: CallPrivateProcedure[];
   createdAt: string;
 }
 
@@ -172,12 +188,10 @@ export function SchedulingPage() {
   const [tussModalCall, setTussModalCall] = useState<Appointment | null>(null);
   const [tussModalProcedures, setTussModalProcedures] = useState<TussProc[]>([]);
   const [tussLoadingList, setTussLoadingList] = useState(false);
-  // Single-select: id of chosen TUSS procedure
-  const [tussChosenId, setTussChosenId] = useState<string>('');
-  const [tussAuthNumber, setTussAuthNumber] = useState<string>('');
+  // Multi-select: array of chosen TUSS procedures with per-procedure doctorId
+  interface TussItem { procedureId: string; authNumber: string; doctorId: string }
+  const [tussItems, setTussItems] = useState<TussItem[]>([{ procedureId: '', authNumber: '', doctorId: '' }]);
   const [tussSaving, setTussSaving] = useState(false);
-  // Doctor repasse percentages keyed by procedureType
-  const [tussDoctorRepasse, setTussDoctorRepasse] = useState<Record<string, number> | null>(null);
   // When true, saving the TUSS modal REPLACES procedures (edit mode) instead of
   // registering + marking completed.
   const [tussEditMode, setTussEditMode] = useState(false);
@@ -192,22 +206,21 @@ export function SchedulingPage() {
   const [procedureTemplates, setProcedureTemplates] = useState<ProcedureTpl[] | null>(null);
   const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[] | null>(null);
   const [tussTab, setTussTab] = useState<'tuss' | 'estoque'>('tuss');
-  const [tplMaterials, setTplMaterials] = useState<MaterialRow[]>([]);
-  const [extraMaterials, setExtraMaterials] = useState<MaterialRow[]>([]);
-  const [matchedTemplate, setMatchedTemplate] = useState<ProcedureTpl | null>(null);
+  // Per-procedure materials: keyed by tussItem row index
+  const [tussAllMaterials, setTussAllMaterials] = useState<Record<number, { tpl: MaterialRow[]; extra: MaterialRow[] }>>({});
   const [tussModalError, setTussModalError] = useState<string>('');
   // Tracks whether the modal was opened via the "Registrar TUSS" badge (retro flow)
   const [tussRetroMode, setTussRetroMode] = useState(false);
 
   // ---- PARTICULAR procedure modal (completely separate from TUSS) ----
   interface PrivProc { id: string; name: string; description: string | null; value: number | null; duration: number | null; isActive: boolean }
+  interface PartItem { procedureId: string; doctorId: string; notes: string }
   const [partModalCall, setPartModalCall] = useState<Appointment | null>(null);
   const [partProcedures, setPartProcedures] = useState<PrivProc[]>([]);
-  const [partSelectedId, setPartSelectedId] = useState<string>('');
-  const [partNotes, setPartNotes] = useState<string>('');
+  const [partItems, setPartItems] = useState<PartItem[]>([{ procedureId: '', doctorId: '', notes: '' }]);
   const [partTab, setPartTab] = useState<'procedimento' | 'estoque'>('procedimento');
-  const [partTplMaterials, setPartTplMaterials] = useState<MaterialRow[]>([]);
-  const [partExtraMaterials, setPartExtraMaterials] = useState<MaterialRow[]>([]);
+  // Per-procedure materials: keyed by procedure row index
+  const [partAllMaterials, setPartAllMaterials] = useState<Record<number, { tpl: MaterialRow[]; extra: MaterialRow[] }>>({});
   const [partError, setPartError] = useState<string>('');
   const [partSubmitting, setPartSubmitting] = useState(false);
   const [partRetro, setPartRetro] = useState(false);
@@ -571,59 +584,54 @@ export function SchedulingPage() {
 
   // Recompute matched template + prefilled materials when TUSS selection changes
   useEffect(() => {
-    if (!tussModalCall) return;
-    if (!tussChosenId || procedureTemplates === null) {
-      setMatchedTemplate(null);
-      setTplMaterials([]);
-      return;
-    }
-    const chosen = tussModalProcedures.find((p) => p.id === tussChosenId);
-    if (!chosen) {
-      setMatchedTemplate(null);
-      setTplMaterials([]);
-      return;
-    }
-    const target = chosen.description.trim().toLowerCase();
-    const tpl = (procedureTemplates || []).find(
-      (t) => t.name.trim().toLowerCase() === target && (!t.procedureType || t.procedureType === 'TUSS'),
-    ) || null;
-    setMatchedTemplate(tpl);
-    if (tpl) {
-      const products = inventoryProducts || [];
-      const rows: MaterialRow[] = tpl.materials.map((m) => {
-        const prod = products.find((p) => p.id === m.productId);
-        return {
-          productId: m.productId,
-          productName: m.productName || prod?.name || '',
-          unit: m.unit || prod?.unit || 'un',
-          quantity: m.quantity,
-          available: prod?.quantity ?? 0,
+    if (!tussModalCall || procedureTemplates === null) return;
+    const products = inventoryProducts || [];
+    const newMats: Record<number, { tpl: MaterialRow[]; extra: MaterialRow[] }> = {};
+    for (let i = 0; i < tussItems.length; i++) {
+      const item = tussItems[i];
+      if (!item.procedureId) continue;
+      const chosen = tussModalProcedures.find((p) => p.id === item.procedureId);
+      if (!chosen) continue;
+      const target = chosen.description.trim().toLowerCase();
+      const tpl = (procedureTemplates || []).find(
+        (t) => t.name.trim().toLowerCase() === target && (!t.procedureType || t.procedureType === 'TUSS'),
+      );
+      const existing = tussAllMaterials[i];
+      if (tpl) {
+        newMats[i] = {
+          tpl: tpl.materials.map((m) => {
+            const prod = products.find((p) => p.id === m.productId);
+            return {
+              productId: m.productId,
+              productName: m.productName || prod?.name || '',
+              unit: m.unit || prod?.unit || 'un',
+              quantity: m.quantity,
+              available: prod?.quantity ?? 0,
+            };
+          }),
+          extra: existing?.extra || [],
         };
-      });
-      setTplMaterials(rows);
-    } else {
-      setTplMaterials([]);
+      } else {
+        newMats[i] = { tpl: [], extra: existing?.extra || [] };
+      }
     }
-  }, [tussChosenId, tussModalCall, tussModalProcedures, procedureTemplates, inventoryProducts]);
+    setTussAllMaterials(newMats);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tussItems.map(i => i.procedureId).join(','), tussModalCall, tussModalProcedures, procedureTemplates, inventoryProducts]);
 
   const openTussModalForCall = async (a: Appointment, editMode: boolean, retroMode = false) => {
     setTussModalCall(a);
     setTussEditMode(editMode);
     setTussAlreadyCompleted(a.status === 'completed');
     setTussRetroMode(retroMode);
-    setTussChosenId('');
-    setTussAuthNumber('');
-    setTussDoctorRepasse(null);
+    const defaultDocId = a.doctorId || '';
+    setTussItems([{ procedureId: '', authNumber: '', doctorId: defaultDocId }]);
     setTussLoadingList(true);
     setTussTab('tuss');
-    setTplMaterials([]);
-    setExtraMaterials([]);
-    setMatchedTemplate(null);
+    setTussAllMaterials({});
     setTussModalError('');
-    // Kick off templates + products fetch in parallel (non-blocking for the TUSS list)
     ensureTemplatesAndProducts();
     try {
-      // Load procedures for the patient's convenio (if known), otherwise all
       let convenioId: string | null = null;
       if (a.customerId) {
         try {
@@ -636,7 +644,6 @@ export function SchedulingPage() {
       const { data } = await api.get('/tuss/procedures', { params });
       const list: TussProc[] = data.data || [];
 
-      // In edit mode, ensure pre-existing procedures are visible in the list
       if (editMode && a.procedures && a.procedures.length > 0) {
         const listIds = new Set(list.map((l) => l.id));
         const extras: TussProc[] = [];
@@ -653,25 +660,13 @@ export function SchedulingPage() {
           }
         }
         setTussModalProcedures([...extras, ...list]);
-        // Pre-select first existing procedure
-        const first = a.procedures[0];
-        setTussChosenId(first.tussProcedure.id);
-        setTussAuthNumber(first.authorizationNumber || '');
+        setTussItems(a.procedures.map(p => ({
+          procedureId: p.tussProcedure.id,
+          authNumber: p.authorizationNumber || '',
+          doctorId: (p as any).doctor?.id || a.doctorId || '',
+        })));
       } else {
         setTussModalProcedures(list);
-      }
-
-      // Fetch doctor repasse percentages (one row per type)
-      if (a.doctorId) {
-        try {
-          const { data: repasseData } = await api.get(`/doctors/${a.doctorId}/repasse`);
-          const rows: Array<{ procedureType: string; percentage: number }> = repasseData.data || [];
-          const map: Record<string, number> = {};
-          for (const r of rows) map[r.procedureType] = Number(r.percentage) || 0;
-          setTussDoctorRepasse(map);
-        } catch {
-          setTussDoctorRepasse({});
-        }
       }
     } catch {
       setTussModalProcedures([]);
@@ -680,50 +675,47 @@ export function SchedulingPage() {
     }
   };
 
-  // Combined materials (template rows + extras), filtered by valid productId + qty > 0
-  const combinedMaterials = (): { productId: string; quantity: number }[] => {
-    const all = [...tplMaterials, ...extraMaterials];
+  const tussCombinedMaterials = (): { productId: string; quantity: number }[] => {
+    const all: MaterialRow[] = [];
+    Object.values(tussAllMaterials).forEach(({ tpl, extra }) => { all.push(...tpl, ...extra); });
     return all
       .filter((m) => m.productId && Number(m.quantity) > 0)
       .map((m) => ({ productId: m.productId, quantity: Number(m.quantity) }));
   };
 
+  const tussHasMaterials = Object.values(tussAllMaterials).some(({ tpl, extra }) => tpl.length > 0 || extra.length > 0);
+
   const submitTussModal = async () => {
     if (!tussModalCall) return;
 
-    // If we are on the TUSS tab and a template match exists, "Próximo: Estoque" navigates instead of saving
-    if (tussTab === 'tuss' && matchedTemplate && tplMaterials.length > 0) {
-      if (!tussChosenId) {
-        showToast('Selecione um procedimento TUSS');
-        return;
-      }
+    const validItems = tussItems.filter(it => it.procedureId);
+    if (validItems.length === 0) {
+      showToast('Selecione ao menos um procedimento TUSS');
+      return;
+    }
+
+    if (tussTab === 'tuss' && tussHasMaterials) {
       setTussTab('estoque');
       return;
     }
 
-    if (!tussChosenId) {
-      showToast('Selecione um procedimento TUSS');
-      return;
-    }
-    const selected = [{ tussProcedureId: tussChosenId, authorizationNumber: tussAuthNumber.trim() || null }];
-    const materials = combinedMaterials();
+    const selected = validItems.map(it => ({
+      tussProcedureId: it.procedureId,
+      authorizationNumber: it.authNumber.trim() || null,
+      doctorId: it.doctorId || null,
+    }));
+    const materials = tussCombinedMaterials();
 
     setTussSaving(true);
     setTussModalError('');
     try {
-      if (tussEditMode) {
-        // Replace-all endpoint re-syncs financials automatically for completed calls
-        await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
-      } else if (tussAlreadyCompleted) {
-        // Legacy "Registrar TUSS" flow: call is already completed, just attach procedure.
-        // PUT replaces and re-syncs financials (idempotent — dedup by call tag in notes).
+      if (tussEditMode || tussAlreadyCompleted) {
         await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
       } else {
         await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
         await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
       }
 
-      // Stock withdrawal — only if we collected materials
       if (materials.length > 0) {
         try {
           await api.post(`/scheduling/calls/${tussModalCall.id}/inventory`, { materials });
@@ -733,7 +725,6 @@ export function SchedulingPage() {
           if (code === 'INSUFFICIENT_STOCK') {
             setTussModalError(msg);
             setTussTab('estoque');
-            // Keep modal open + refresh available stock view
             try {
               const { data } = await api.get('/inventory/products', { params: { limit: 500 } });
               setInventoryProducts(data.data || []);
@@ -746,9 +737,9 @@ export function SchedulingPage() {
 
       showToast(
         tussEditMode
-          ? 'Procedimento atualizado!'
+          ? 'Procedimentos atualizados!'
           : tussAlreadyCompleted
-            ? 'Procedimento registrado!'
+            ? 'Procedimentos registrados!'
             : 'Realizacao confirmada!',
       );
       setTussModalCall(null);
@@ -760,10 +751,9 @@ export function SchedulingPage() {
     }
   };
 
-  // Retro-only inventory submission (used when TUSS is already attached)
   const submitInventoryOnly = async () => {
     if (!tussModalCall) return;
-    const materials = combinedMaterials();
+    const materials = tussCombinedMaterials();
     if (materials.length === 0) {
       showToast('Adicione pelo menos um material');
       return;
@@ -800,11 +790,10 @@ export function SchedulingPage() {
   const openPartModalForCall = async (a: Appointment, retro: boolean) => {
     setPartModalCall(a);
     setPartRetro(retro);
-    setPartSelectedId('');
-    setPartNotes('');
+    const defaultDocId = a.doctorId || '';
+    setPartItems([{ procedureId: '', doctorId: defaultDocId, notes: '' }]);
     setPartTab('procedimento');
-    setPartTplMaterials([]);
-    setPartExtraMaterials([]);
+    setPartAllMaterials({});
     setPartError('');
     setPartSubmitting(false);
     setPartLoading(true);
@@ -814,7 +803,6 @@ export function SchedulingPage() {
         .then(({ data }) => setPartProcedures((data.data || []).filter((p: PrivProc) => p.isActive)))
         .catch(() => setPartProcedures([])),
     );
-    // Reuse cached templates/products from TUSS flow or fetch fresh
     if (procedureTemplates === null) {
       tasks.push(
         api.get('/procedure-templates')
@@ -833,72 +821,74 @@ export function SchedulingPage() {
     setPartLoading(false);
   };
 
-  // Match selected private procedure against templates to prefill materials
   useEffect(() => {
-    if (!partModalCall || !partSelectedId) {
-      setPartTplMaterials([]);
-      return;
+    if (!partModalCall || procedureTemplates === null) return;
+    const products = inventoryProducts || [];
+    const newMats: Record<number, { tpl: MaterialRow[]; extra: MaterialRow[] }> = {};
+    for (let i = 0; i < partItems.length; i++) {
+      const item = partItems[i];
+      if (!item.procedureId) continue;
+      const proc = partProcedures.find((p) => p.id === item.procedureId);
+      if (!proc) continue;
+      const target = proc.name.trim().toLowerCase();
+      const tpl = (procedureTemplates || []).find((t) => t.name.trim().toLowerCase() === target && (!t.procedureType || t.procedureType === 'PARTICULAR'));
+      const existing = partAllMaterials[i];
+      if (tpl) {
+        newMats[i] = {
+          tpl: tpl.materials.map((m) => {
+            const prod = products.find((p) => p.id === m.productId);
+            return {
+              productId: m.productId,
+              productName: m.productName || prod?.name || '',
+              unit: m.unit || prod?.unit || 'un',
+              quantity: m.quantity,
+              available: prod?.quantity ?? 0,
+            };
+          }),
+          extra: existing?.extra || [],
+        };
+      } else {
+        newMats[i] = { tpl: [], extra: existing?.extra || [] };
+      }
     }
-    const proc = partProcedures.find((p) => p.id === partSelectedId);
-    if (!proc || !procedureTemplates) {
-      setPartTplMaterials([]);
-      return;
-    }
-    const target = proc.name.trim().toLowerCase();
-    const tpl = (procedureTemplates || []).find((t) => t.name.trim().toLowerCase() === target && (!t.procedureType || t.procedureType === 'PARTICULAR')) || null;
-    if (tpl) {
-      const products = inventoryProducts || [];
-      setPartTplMaterials(
-        tpl.materials.map((m) => {
-          const prod = products.find((p) => p.id === m.productId);
-          return {
-            productId: m.productId,
-            productName: m.productName || prod?.name || '',
-            unit: m.unit || prod?.unit || 'un',
-            quantity: m.quantity,
-            available: prod?.quantity ?? 0,
-          };
-        }),
-      );
-    } else {
-      setPartTplMaterials([]);
-    }
-  }, [partSelectedId, partModalCall, partProcedures, procedureTemplates, inventoryProducts]);
+    setPartAllMaterials(newMats);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partItems.map(i => i.procedureId).join(','), partModalCall, partProcedures, procedureTemplates, inventoryProducts]);
 
   const partCombinedMaterials = (): { productId: string; quantity: number }[] => {
-    return [...partTplMaterials, ...partExtraMaterials]
+    const all: MaterialRow[] = [];
+    Object.values(partAllMaterials).forEach(({ tpl, extra }) => { all.push(...tpl, ...extra); });
+    return all
       .filter((m) => m.productId && Number(m.quantity) > 0)
       .map((m) => ({ productId: m.productId, quantity: Number(m.quantity) }));
   };
 
+  const partHasMaterials = Object.values(partAllMaterials).some(({ tpl, extra }) => tpl.length > 0 || extra.length > 0);
+
   const submitPartModal = async () => {
     if (!partModalCall) return;
 
-    // If on procedimento tab and template materials exist, navigate to estoque first
-    if (partTab === 'procedimento' && (partTplMaterials.length > 0 || partExtraMaterials.length > 0)) {
-      if (!partSelectedId) {
-        showToast('Selecione um procedimento');
-        return;
-      }
-      setPartTab('estoque');
+    const validItems = partItems.filter(it => it.procedureId);
+    if (validItems.length === 0) {
+      showToast('Selecione ao menos um procedimento');
       return;
     }
 
-    if (!partSelectedId) {
-      showToast('Selecione um procedimento');
+    if (partTab === 'procedimento' && partHasMaterials) {
+      setPartTab('estoque');
       return;
     }
 
     setPartSubmitting(true);
     setPartError('');
     try {
-      // 1. Attach private procedure
-      await api.post(`/scheduling/calls/${partModalCall.id}/private-procedure`, {
-        privateProcedureId: partSelectedId,
-        notes: partNotes.trim() || null,
-      });
+      const procedures = validItems.map(it => ({
+        privateProcedureId: it.procedureId,
+        doctorId: it.doctorId || null,
+        notes: it.notes.trim() || null,
+      }));
+      await api.put(`/scheduling/calls/${partModalCall.id}/private-procedures`, { procedures });
 
-      // 2. Inventory withdrawal
       const materials = partCombinedMaterials();
       if (materials.length > 0) {
         try {
@@ -919,12 +909,11 @@ export function SchedulingPage() {
         }
       }
 
-      // 3. Mark as completed (unless retro — already completed)
       if (!partRetro) {
         await api.patch(`/scheduling/calls/${partModalCall.id}`, { status: 'completed' });
       }
 
-      showToast(partRetro ? 'Procedimento registrado!' : 'Realizacao confirmada!');
+      showToast(partRetro ? 'Procedimentos registrados!' : 'Realizacao confirmada!');
       setPartModalCall(null);
       fetchAppointments();
     } catch (err: any) {
@@ -1334,7 +1323,7 @@ export function SchedulingPage() {
                               Registrar TUSS
                             </button>
                           )}
-                          {isRealized && a.paymentType === 'PARTICULAR' && !(a as any)._count?.privateProcedureCalls && (
+                          {isRealized && a.paymentType === 'PARTICULAR' && !((a as any).privateProcedureCalls?.length || (a as any)._count?.privateProcedureCalls) && (
                             <button
                               onClick={() => openPartModalForCall(a, true)}
                               className="px-2 py-1 text-xs font-medium rounded bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200"
@@ -1828,30 +1817,17 @@ export function SchedulingPage() {
 
       {/* Confirmar Realizacao Modal — triggered by "Realizado" button */}
       {tussModalCall && (() => {
-        const chosen = tussModalProcedures.find((p) => p.id === tussChosenId) || null;
-        const valorTotal = chosen ? Number(chosen.value) : 0;
-        // Pick repasse pct by TUSS type (fallback OUTROS)
-        let pct = 0;
-        if (chosen && tussDoctorRepasse) {
-          pct = tussDoctorRepasse[chosen.type] ?? tussDoctorRepasse['OUTROS'] ?? 0;
-        }
-        const repasse = (valorTotal * pct) / 100;
-        const receitaClinica = valorTotal - repasse;
-        const hasDoctor = !!tussModalCall.doctorId;
+        const totalMaterialCount = Object.values(tussAllMaterials).reduce((sum, { tpl, extra }) => sum + tpl.length + extra.length, 0);
+        const validItems = tussItems.filter(it => it.procedureId);
         return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
+          <div className="bg-white rounded-xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold text-slate-800">
-                {tussEditMode ? 'Editar procedimento TUSS' : 'Confirmar Realização'}
+                {tussEditMode ? 'Editar procedimentos TUSS' : 'Confirmar Realização'}
               </h3>
               <button onClick={() => setTussModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
-            <p className="text-xs text-slate-500 mb-4">
-              {tussEditMode
-                ? 'Altere o procedimento TUSS vinculado a esta consulta.'
-                : 'Selecione o procedimento TUSS realizado para registrar o financeiro automaticamente.'}
-            </p>
             <p className="text-xs text-slate-500 mb-4">
               Paciente: <strong>{tussModalCall.customer?.name || tussModalCall.name}</strong> — {format(new Date(tussModalCall.date), 'dd/MM/yyyy HH:mm')}
               {tussModalCall.doctor && <> · Medico: <strong>{tussModalCall.doctor.name}</strong></>}
@@ -1863,22 +1839,15 @@ export function SchedulingPage() {
               </div>
             )}
 
-            {/* Tabs — second tab only visible when a template matched */}
-            {(matchedTemplate || tplMaterials.length > 0 || extraMaterials.length > 0) && (
+            {tussHasMaterials && (
               <div className="flex border-b border-slate-200 mb-4 -mx-1">
-                <button
-                  type="button"
-                  onClick={() => setTussTab('tuss')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'tuss' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                >
+                <button type="button" onClick={() => setTussTab('tuss')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'tuss' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                   TUSS
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setTussTab('estoque')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                >
-                  Estoque ({tplMaterials.length + extraMaterials.length})
+                <button type="button" onClick={() => setTussTab('estoque')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                  Estoque ({totalMaterialCount})
                 </button>
               </div>
             )}
@@ -1889,196 +1858,188 @@ export function SchedulingPage() {
               </div>
             ) : tussModalProcedures.length === 0 ? (
               <div className="text-center py-8 text-sm text-slate-500">
-                Nenhum procedimento TUSS cadastrado.
-                <br />
+                Nenhum procedimento TUSS cadastrado.<br />
                 Cadastre em Configuracoes &gt; Procedimentos TUSS.
               </div>
             ) : tussTab === 'tuss' ? (
               <>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Procedimento TUSS <span className="text-red-500">*</span></label>
-                  <select
-                    value={tussChosenId}
-                    onChange={(e) => setTussChosenId(e.target.value)}
-                    className={inputCls}
-                  >
-                    <option value="">Selecione um procedimento...</option>
-                    {tussModalProcedures.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.code} — {p.description} — R$ {Number(p.value).toFixed(2)}
-                      </option>
-                    ))}
-                  </select>
-                  {matchedTemplate && (
-                    <p className="text-xs text-emerald-700 mt-1.5">
-                      Template encontrado: <strong>{matchedTemplate.name}</strong> · {matchedTemplate.materials.length} material(is) sera(ao) baixado(s) do estoque.
-                    </p>
-                  )}
-                </div>
-
-                {chosen && (
-                  <>
-                    <div className="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Valor total:</span>
-                        <span className="font-semibold text-slate-800">R$ {valorTotal.toFixed(2)}</span>
+                <div className="space-y-3 mb-4">
+                  {tussItems.map((item, idx) => (
+                    <div key={idx} className="border border-slate-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Procedimento {idx + 1}</span>
+                        {tussItems.length > 1 && (
+                          <button type="button" onClick={() => setTussItems(items => items.filter((_, i) => i !== idx))}
+                            className="ml-auto text-slate-400 hover:text-red-500" title="Remover">
+                            <X size={14} />
+                          </button>
+                        )}
                       </div>
-                      {hasDoctor && (
-                        <>
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">Repasse médico:</span>
-                            <span className="font-semibold text-indigo-700">
-                              R$ {repasse.toFixed(2)} <span className="text-xs text-slate-500">({pct}%)</span>
-                            </span>
-                          </div>
-                          <div className="flex justify-between pt-1.5 border-t border-slate-200">
-                            <span className="text-slate-600">Receita clínica:</span>
-                            <span className="font-semibold text-emerald-700">R$ {receitaClinica.toFixed(2)}</span>
-                          </div>
-                        </>
-                      )}
-                      {!hasDoctor && (
-                        <p className="text-xs text-amber-600 pt-1">
-                          Sem medico vinculado — nenhum repasse sera lancado.
-                        </p>
-                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Procedimento TUSS <span className="text-red-500">*</span></label>
+                          <select value={item.procedureId}
+                            onChange={(e) => setTussItems(items => items.map((it, i) => i === idx ? { ...it, procedureId: e.target.value } : it))}
+                            className={inputCls}>
+                            <option value="">Selecione...</option>
+                            {tussModalProcedures.map((p) => (
+                              <option key={p.id} value={p.id}>{p.code} — {p.description} — R$ {Number(p.value).toFixed(2)}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Medico responsavel</label>
+                          <select value={item.doctorId}
+                            onChange={(e) => setTussItems(items => items.map((it, i) => i === idx ? { ...it, doctorId: e.target.value } : it))}
+                            className={inputCls}>
+                            <option value="">Medico do agendamento</option>
+                            {doctors.map(d => (
+                              <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Num. autorizacao (opcional)</label>
+                        <input type="text" value={item.authNumber}
+                          onChange={(e) => setTussItems(items => items.map((it, i) => i === idx ? { ...it, authNumber: e.target.value } : it))}
+                          placeholder="Ex.: 123456" className={inputCls} />
+                      </div>
                     </div>
-
-                    <div className="mb-4">
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Numero de autorizacao (opcional)</label>
-                      <input
-                        type="text"
-                        value={tussAuthNumber}
-                        onChange={(e) => setTussAuthNumber(e.target.value)}
-                        placeholder="Ex.: 123456"
-                        className={inputCls}
-                      />
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Estoque tab content */}
-                {tplMaterials.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais do template</h4>
-                    <div className="space-y-2">
-                      {tplMaterials.map((m, i) => {
-                        const insufficient = m.available < m.quantity;
-                        return (
-                          <div key={`tpl-${m.productId}-${i}`} className="flex items-center gap-2 text-sm">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-slate-800 truncate">{m.productName}</div>
-                              <div className={`text-xs ${insufficient ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
-                                Disponivel: {m.available} {m.unit}
-                              </div>
-                            </div>
-                            <input
-                              type="number"
-                              min={0}
-                              step="any"
-                              value={m.quantity}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                setTplMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
-                              }}
-                              className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                            />
-                            <span className="text-xs text-slate-500 w-10">{m.unit}</span>
-                          </div>
-                        );
-                      })}
+                  ))}
+                </div>
+                <button type="button"
+                  onClick={() => setTussItems(items => [...items, { procedureId: '', authNumber: '', doctorId: tussModalCall?.doctorId || '' }])}
+                  className="text-sm font-medium text-[#1E3A5F] hover:underline mb-4">
+                  + Procedimento
+                </button>
+                {validItems.length > 0 && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Total ({validItems.length} procedimento{validItems.length > 1 ? 's' : ''}):</span>
+                      <span className="font-semibold text-slate-800">
+                        R$ {validItems.reduce((sum, it) => {
+                          const proc = tussModalProcedures.find(p => p.id === it.procedureId);
+                          return sum + (proc ? Number(proc.value) : 0);
+                        }, 0).toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 )}
-
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais extras</h4>
-                  {extraMaterials.length > 0 && (
-                    <div className="space-y-2 mb-2">
-                      {extraMaterials.map((m, i) => (
-                        <div key={`extra-${i}`} className="flex items-center gap-2 text-sm">
-                          <select
-                            value={m.productId}
-                            onChange={(e) => {
-                              const productId = e.target.value;
-                              const prod = (inventoryProducts || []).find((p) => p.id === productId);
-                              setExtraMaterials((rows) => rows.map((r, idx) => idx === i ? {
-                                ...r,
-                                productId,
-                                productName: prod?.name || '',
-                                unit: prod?.unit || 'un',
-                                available: prod?.quantity ?? 0,
-                              } : r));
-                            }}
-                            className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                          >
-                            <option value="">Selecione um produto...</option>
-                            {(inventoryProducts || []).map((p) => (
-                              <option key={p.id} value={p.id}>{p.name} (estoque: {p.quantity} {p.unit})</option>
-                            ))}
-                          </select>
-                          <input
-                            type="number"
-                            min={0}
-                            step="any"
-                            value={m.quantity}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              setExtraMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
-                            }}
-                            className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setExtraMaterials((rows) => rows.filter((_, idx) => idx !== i))}
-                            className="text-slate-400 hover:text-red-500"
-                            title="Remover"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setExtraMaterials((rows) => [...rows, { productId: '', productName: '', unit: 'un', quantity: 1, available: 0 }])}
-                    className="text-xs font-medium text-[#1E3A5F] hover:underline"
-                  >
-                    + Adicionar material
-                  </button>
-                </div>
               </>
+            ) : (
+              <div className="space-y-4">
+                {tussItems.map((item, idx) => {
+                  if (!item.procedureId) return null;
+                  const proc = tussModalProcedures.find(p => p.id === item.procedureId);
+                  if (!proc) return null;
+                  const mats = tussAllMaterials[idx] || { tpl: [], extra: [] };
+                  if (mats.tpl.length === 0 && mats.extra.length === 0) return null;
+                  const docName = item.doctorId ? doctors.find(d => d.id === item.doctorId)?.name : tussModalCall?.doctor?.name;
+                  return (
+                    <div key={idx} className="border border-slate-200 rounded-lg p-3">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-2">
+                        {proc.description}{docName ? ` (${docName})` : ''}
+                      </h4>
+                      {mats.tpl.length > 0 && (
+                        <div className="space-y-2 mb-2">
+                          {mats.tpl.map((m, mi) => {
+                            const insufficient = m.available < m.quantity;
+                            return (
+                              <div key={`tpl-${idx}-${mi}`} className="flex items-center gap-2 text-sm">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-slate-800 truncate">{m.productName}</div>
+                                  <div className={`text-xs ${insufficient ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                    Disponivel: {m.available} {m.unit}
+                                  </div>
+                                </div>
+                                <input type="number" min={0} step="any" value={m.quantity}
+                                  onChange={(e) => {
+                                    const v = Number(e.target.value);
+                                    setTussAllMaterials(prev => ({
+                                      ...prev,
+                                      [idx]: { ...prev[idx], tpl: prev[idx].tpl.map((r, ri) => ri === mi ? { ...r, quantity: isNaN(v) ? 0 : v } : r) },
+                                    }));
+                                  }}
+                                  className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm" />
+                                <span className="text-xs text-slate-500 w-10">{m.unit}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {mats.extra.length > 0 && (
+                        <div className="space-y-2 mb-2">
+                          {mats.extra.map((m, mi) => (
+                            <div key={`extra-${idx}-${mi}`} className="flex items-center gap-2 text-sm">
+                              <select value={m.productId}
+                                onChange={(e) => {
+                                  const productId = e.target.value;
+                                  const prod = (inventoryProducts || []).find(p => p.id === productId);
+                                  setTussAllMaterials(prev => ({
+                                    ...prev,
+                                    [idx]: { ...prev[idx], extra: prev[idx].extra.map((r, ri) => ri === mi ? { ...r, productId, productName: prod?.name || '', unit: prod?.unit || 'un', available: prod?.quantity ?? 0 } : r) },
+                                  }));
+                                }}
+                                className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded text-sm">
+                                <option value="">Selecione...</option>
+                                {(inventoryProducts || []).map(p => (
+                                  <option key={p.id} value={p.id}>{p.name} ({p.quantity} {p.unit})</option>
+                                ))}
+                              </select>
+                              <input type="number" min={0} step="any" value={m.quantity}
+                                onChange={(e) => {
+                                  const v = Number(e.target.value);
+                                  setTussAllMaterials(prev => ({
+                                    ...prev,
+                                    [idx]: { ...prev[idx], extra: prev[idx].extra.map((r, ri) => ri === mi ? { ...r, quantity: isNaN(v) ? 0 : v } : r) },
+                                  }));
+                                }}
+                                className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm" />
+                              <button type="button"
+                                onClick={() => setTussAllMaterials(prev => ({
+                                  ...prev,
+                                  [idx]: { ...prev[idx], extra: prev[idx].extra.filter((_, ri) => ri !== mi) },
+                                }))}
+                                className="text-slate-400 hover:text-red-500"><X size={16} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button type="button"
+                        onClick={() => setTussAllMaterials(prev => ({
+                          ...prev,
+                          [idx]: { ...prev[idx], extra: [...(prev[idx]?.extra || []), { productId: '', productName: '', unit: 'un', quantity: 1, available: 0 }] },
+                        }))}
+                        className="text-xs font-medium text-[#1E3A5F] hover:underline">
+                        + Adicionar material
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             )}
 
             <div className="flex gap-2 pt-4 mt-2 border-t border-slate-100">
-              <button
-                onClick={() => setTussModalCall(null)}
-                className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
+              <button onClick={() => setTussModalCall(null)}
+                className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">
                 Cancelar
               </button>
               {tussRetroMode && tussAlreadyCompleted && (tussModalCall.procedures?.length || 0) > 0 && tussTab === 'estoque' && (
-                <button
-                  onClick={submitInventoryOnly}
-                  disabled={tussSaving || (tplMaterials.length + extraMaterials.length) === 0}
+                <button onClick={submitInventoryOnly}
+                  disabled={tussSaving || totalMaterialCount === 0}
                   className="flex-1 py-2.5 border border-amber-300 bg-amber-50 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-100 disabled:opacity-50"
-                  title="Registrar somente a baixa de estoque (sem mexer no TUSS)"
-                >
+                  title="Registrar somente a baixa de estoque (sem mexer no TUSS)">
                   {tussSaving ? 'Salvando...' : 'Registrar retro'}
                 </button>
               )}
-              <button
-                onClick={submitTussModal}
-                disabled={tussSaving || tussLoadingList || !tussChosenId}
-                className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
-              >
+              <button onClick={submitTussModal}
+                disabled={tussSaving || tussLoadingList || validItems.length === 0}
+                className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
                 {tussSaving
                   ? 'Salvando...'
-                  : tussTab === 'tuss' && matchedTemplate && tplMaterials.length > 0
-                    ? 'Próximo: Estoque'
+                  : tussTab === 'tuss' && tussHasMaterials
+                    ? 'Proximo: Estoque'
                     : tussEditMode ? 'Salvar' : 'Registrar procedimentos'}
               </button>
             </div>
@@ -2088,12 +2049,15 @@ export function SchedulingPage() {
       })()}
 
       {/* PARTICULAR procedure modal — separate from TUSS */}
-      {partModalCall && (
+      {partModalCall && (() => {
+        const totalPartMaterialCount = Object.values(partAllMaterials).reduce((sum, { tpl, extra }) => sum + tpl.length + extra.length, 0);
+        const validPartItems = partItems.filter(it => it.procedureId);
+        return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
+          <div className="bg-white rounded-xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold text-slate-800">
-                {partRetro ? 'Registrar Procedimento Particular' : 'Confirmar Realizacao — Particular'}
+                {partRetro ? 'Registrar Procedimentos Particulares' : 'Confirmar Realizacao — Particular'}
               </h3>
               <button onClick={() => setPartModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
@@ -2103,32 +2067,25 @@ export function SchedulingPage() {
             </p>
 
             {partError && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {partError}
-              </div>
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{partError}</div>
             )}
 
-            {/* Tabs */}
-            <div className="flex border-b border-slate-200 mb-4 -mx-1">
-              <button
-                type="button"
-                onClick={() => setPartTab('procedimento')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'procedimento' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-              >
-                Procedimento
-              </button>
-              <button
-                type="button"
-                onClick={() => setPartTab('estoque')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-              >
-                Estoque {(partTplMaterials.length + partExtraMaterials.length) > 0 && (
-                  <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-[#1E3A5F] text-white rounded-full">
-                    {partTplMaterials.length + partExtraMaterials.length}
-                  </span>
-                )}
-              </button>
-            </div>
+            {partHasMaterials && (
+              <div className="flex border-b border-slate-200 mb-4 -mx-1">
+                <button type="button" onClick={() => setPartTab('procedimento')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'procedimento' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                  Procedimentos
+                </button>
+                <button type="button" onClick={() => setPartTab('estoque')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                  Estoque {totalPartMaterialCount > 0 && (
+                    <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-[#1E3A5F] text-white rounded-full">
+                      {totalPartMaterialCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
 
             {partLoading ? (
               <div className="flex items-center justify-center py-10">
@@ -2138,169 +2095,189 @@ export function SchedulingPage() {
               <>
                 {partProcedures.length === 0 ? (
                   <div className="text-center py-8 text-sm text-slate-500">
-                    Nenhum procedimento particular cadastrado.
-                    <br />
+                    Nenhum procedimento particular cadastrado.<br />
                     Cadastre em Configuracoes &rarr; Procedimentos.
                   </div>
                 ) : (
-                  <div className="mb-4">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Procedimento</label>
-                    <select
-                      value={partSelectedId}
-                      onChange={(e) => setPartSelectedId(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                    >
-                      <option value="">Selecione um procedimento...</option>
-                      {partProcedures.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}{p.value != null ? ` — R$ ${Number(p.value).toFixed(2)}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    {(() => {
-                      const sel = partProcedures.find((p) => p.id === partSelectedId);
-                      if (!sel) return null;
-                      return (
-                        <div className="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                          {sel.description && <p className="text-xs text-slate-500 mb-1">{sel.description}</p>}
-                          <div className="flex gap-3 text-xs text-slate-600">
-                            {sel.value != null && <span>Valor: <strong>R$ {Number(sel.value).toFixed(2)}</strong></span>}
-                            {sel.duration != null && <span>Duracao: <strong>{sel.duration} min</strong></span>}
+                  <div className="space-y-3 mb-4">
+                    {partItems.map((item, idx) => (
+                      <div key={idx} className="border border-slate-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-semibold text-slate-500">Procedimento {idx + 1}</span>
+                          {partItems.length > 1 && (
+                            <button type="button" onClick={() => setPartItems(items => items.filter((_, i) => i !== idx))}
+                              className="ml-auto text-slate-400 hover:text-red-500" title="Remover">
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Procedimento <span className="text-red-500">*</span></label>
+                            <select value={item.procedureId}
+                              onChange={(e) => setPartItems(items => items.map((it, i) => i === idx ? { ...it, procedureId: e.target.value } : it))}
+                              className={inputCls}>
+                              <option value="">Selecione...</option>
+                              {partProcedures.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}{p.value != null ? ` — R$ ${Number(p.value).toFixed(2)}` : ''}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Medico responsavel</label>
+                            <select value={item.doctorId}
+                              onChange={(e) => setPartItems(items => items.map((it, i) => i === idx ? { ...it, doctorId: e.target.value } : it))}
+                              className={inputCls}>
+                              <option value="">Medico do agendamento</option>
+                              {doctors.map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </select>
                           </div>
                         </div>
-                      );
-                    })()}
+                        <div className="mt-2">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes (opcional)</label>
+                          <input type="text" value={item.notes}
+                            onChange={(e) => setPartItems(items => items.map((it, i) => i === idx ? { ...it, notes: e.target.value } : it))}
+                            placeholder="Observacoes..." className={inputCls} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-                <div className="mb-4">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes (opcional)</label>
-                  <textarea
-                    value={partNotes}
-                    onChange={(e) => setPartNotes(e.target.value)}
-                    rows={2}
-                    placeholder="Observacoes sobre o procedimento..."
-                    className={inputCls}
-                  />
-                </div>
+                {partProcedures.length > 0 && (
+                  <button type="button"
+                    onClick={() => setPartItems(items => [...items, { procedureId: '', doctorId: partModalCall?.doctorId || '', notes: '' }])}
+                    className="text-sm font-medium text-[#1E3A5F] hover:underline mb-4">
+                    + Procedimento
+                  </button>
+                )}
+                {validPartItems.length > 0 && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Total ({validPartItems.length} procedimento{validPartItems.length > 1 ? 's' : ''}):</span>
+                      <span className="font-semibold text-slate-800">
+                        R$ {validPartItems.reduce((sum, it) => {
+                          const proc = partProcedures.find(p => p.id === it.procedureId);
+                          return sum + (proc ? Number(proc.value || 0) : 0);
+                        }, 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
-              <>
-                {/* Estoque tab */}
-                {partTplMaterials.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais do template</h4>
-                    <div className="space-y-2">
-                      {partTplMaterials.map((m, i) => {
-                        const insufficient = m.available < m.quantity;
-                        return (
-                          <div key={`part-tpl-${m.productId}-${i}`} className="flex items-center gap-2 text-sm">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-slate-800 truncate">{m.productName}</div>
-                              <div className={`text-xs ${insufficient ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
-                                Disponivel: {m.available} {m.unit}
+              <div className="space-y-4">
+                {partItems.map((item, idx) => {
+                  if (!item.procedureId) return null;
+                  const proc = partProcedures.find(p => p.id === item.procedureId);
+                  if (!proc) return null;
+                  const mats = partAllMaterials[idx] || { tpl: [], extra: [] };
+                  if (mats.tpl.length === 0 && mats.extra.length === 0) return null;
+                  const docName = item.doctorId ? doctors.find(d => d.id === item.doctorId)?.name : partModalCall?.doctor?.name;
+                  return (
+                    <div key={idx} className="border border-slate-200 rounded-lg p-3">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-2">
+                        {proc.name}{docName ? ` (${docName})` : ''}
+                      </h4>
+                      {mats.tpl.length > 0 && (
+                        <div className="space-y-2 mb-2">
+                          {mats.tpl.map((m, mi) => {
+                            const insufficient = m.available < m.quantity;
+                            return (
+                              <div key={`pt-${idx}-${mi}`} className="flex items-center gap-2 text-sm">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-slate-800 truncate">{m.productName}</div>
+                                  <div className={`text-xs ${insufficient ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                    Disponivel: {m.available} {m.unit}
+                                  </div>
+                                </div>
+                                <input type="number" min={0} step="any" value={m.quantity}
+                                  onChange={(e) => {
+                                    const v = Number(e.target.value);
+                                    setPartAllMaterials(prev => ({
+                                      ...prev,
+                                      [idx]: { ...prev[idx], tpl: prev[idx].tpl.map((r, ri) => ri === mi ? { ...r, quantity: isNaN(v) ? 0 : v } : r) },
+                                    }));
+                                  }}
+                                  className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm" />
+                                <span className="text-xs text-slate-500 w-10">{m.unit}</span>
                               </div>
-                            </div>
-                            <input
-                              type="number"
-                              min={0}
-                              step="any"
-                              value={m.quantity}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                setPartTplMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
-                              }}
-                              className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                            />
-                            <span className="text-xs text-slate-500 w-10">{m.unit}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-slate-700 mb-2">Materiais extras</h4>
-                  {partExtraMaterials.length > 0 && (
-                    <div className="space-y-2 mb-2">
-                      {partExtraMaterials.map((m, i) => (
-                        <div key={`part-extra-${i}`} className="flex items-center gap-2 text-sm">
-                          <select
-                            value={m.productId}
-                            onChange={(e) => {
-                              const productId = e.target.value;
-                              const prod = (inventoryProducts || []).find((p) => p.id === productId);
-                              setPartExtraMaterials((rows) => rows.map((r, idx) => idx === i ? {
-                                ...r,
-                                productId,
-                                productName: prod?.name || '',
-                                unit: prod?.unit || 'un',
-                                available: prod?.quantity ?? 0,
-                              } : r));
-                            }}
-                            className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                          >
-                            <option value="">Selecione um produto...</option>
-                            {(inventoryProducts || []).map((p) => (
-                              <option key={p.id} value={p.id}>{p.name} (estoque: {p.quantity} {p.unit})</option>
-                            ))}
-                          </select>
-                          <input
-                            type="number"
-                            min={0}
-                            step="any"
-                            value={m.quantity}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              setPartExtraMaterials((rows) => rows.map((r, idx) => idx === i ? { ...r, quantity: isNaN(v) ? 0 : v } : r));
-                            }}
-                            className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setPartExtraMaterials((rows) => rows.filter((_, idx) => idx !== i))}
-                            className="text-slate-400 hover:text-red-500"
-                            title="Remover"
-                          >
-                            <X size={16} />
-                          </button>
+                            );
+                          })}
                         </div>
-                      ))}
+                      )}
+                      {mats.extra.length > 0 && (
+                        <div className="space-y-2 mb-2">
+                          {mats.extra.map((m, mi) => (
+                            <div key={`pe-${idx}-${mi}`} className="flex items-center gap-2 text-sm">
+                              <select value={m.productId}
+                                onChange={(e) => {
+                                  const productId = e.target.value;
+                                  const prod = (inventoryProducts || []).find(p => p.id === productId);
+                                  setPartAllMaterials(prev => ({
+                                    ...prev,
+                                    [idx]: { ...prev[idx], extra: prev[idx].extra.map((r, ri) => ri === mi ? { ...r, productId, productName: prod?.name || '', unit: prod?.unit || 'un', available: prod?.quantity ?? 0 } : r) },
+                                  }));
+                                }}
+                                className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded text-sm">
+                                <option value="">Selecione...</option>
+                                {(inventoryProducts || []).map(p => (
+                                  <option key={p.id} value={p.id}>{p.name} ({p.quantity} {p.unit})</option>
+                                ))}
+                              </select>
+                              <input type="number" min={0} step="any" value={m.quantity}
+                                onChange={(e) => {
+                                  const v = Number(e.target.value);
+                                  setPartAllMaterials(prev => ({
+                                    ...prev,
+                                    [idx]: { ...prev[idx], extra: prev[idx].extra.map((r, ri) => ri === mi ? { ...r, quantity: isNaN(v) ? 0 : v } : r) },
+                                  }));
+                                }}
+                                className="w-20 px-2 py-1.5 border border-slate-300 rounded text-sm" />
+                              <button type="button"
+                                onClick={() => setPartAllMaterials(prev => ({
+                                  ...prev,
+                                  [idx]: { ...prev[idx], extra: prev[idx].extra.filter((_, ri) => ri !== mi) },
+                                }))}
+                                className="text-slate-400 hover:text-red-500"><X size={16} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button type="button"
+                        onClick={() => setPartAllMaterials(prev => ({
+                          ...prev,
+                          [idx]: { ...prev[idx], extra: [...(prev[idx]?.extra || []), { productId: '', productName: '', unit: 'un', quantity: 1, available: 0 }] },
+                        }))}
+                        className="text-xs font-medium text-[#1E3A5F] hover:underline">
+                        + Adicionar material
+                      </button>
                     </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setPartExtraMaterials((rows) => [...rows, { productId: '', productName: '', unit: 'un', quantity: 1, available: 0 }])}
-                    className="text-xs font-medium text-[#1E3A5F] hover:underline"
-                  >
-                    + Adicionar material
-                  </button>
-                </div>
-              </>
+                  );
+                })}
+              </div>
             )}
 
             <div className="flex gap-2 pt-4 mt-2 border-t border-slate-100">
-              <button
-                onClick={() => setPartModalCall(null)}
-                className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
+              <button onClick={() => setPartModalCall(null)}
+                className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">
                 Cancelar
               </button>
-              <button
-                onClick={submitPartModal}
-                disabled={partSubmitting || partLoading || !partSelectedId}
-                className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
-              >
+              <button onClick={submitPartModal}
+                disabled={partSubmitting || partLoading || validPartItems.length === 0}
+                className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
                 {partSubmitting
                   ? 'Salvando...'
-                  : partTab === 'procedimento' && (partTplMaterials.length > 0 || partExtraMaterials.length > 0)
+                  : partTab === 'procedimento' && partHasMaterials
                     ? 'Proximo: Estoque'
                     : partRetro ? 'Registrar' : 'Confirmar Realizacao'}
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Doctor edit modal */}
       {doctorEditCall && (

@@ -81,7 +81,7 @@ privateProcedureCallsRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const callId = req.params.id as string;
-      const { privateProcedureId, notes } = req.body || {};
+      const { privateProcedureId, notes, doctorId } = req.body || {};
       if (!privateProcedureId || typeof privateProcedureId !== 'string') {
         throw new AppError(400, 'PROCEDURE_ID_REQUIRED', 'privateProcedureId e obrigatorio');
       }
@@ -90,6 +90,7 @@ privateProcedureCallsRouter.post(
         callId,
         privateProcedureId,
         notes,
+        doctorId,
       );
       await createAuditLog({
         req,
@@ -98,6 +99,30 @@ privateProcedureCallsRouter.post(
         entityId: link.id,
       });
       return created(res, link);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+privateProcedureCallsRouter.put(
+  '/calls/:id/private-procedures',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const callId = req.params.id as string;
+      const procedures = Array.isArray(req.body?.procedures) ? req.body.procedures : [];
+      const result = await privateProceduresService.replaceForCall(
+        req.auth!.tenantId!,
+        callId,
+        procedures,
+      );
+      await createAuditLog({
+        req,
+        action: 'privateProcedure.replace',
+        entity: 'PrivateProcedureCall',
+        entityId: callId,
+      });
+      return success(res, result);
     } catch (err) {
       next(err);
     }

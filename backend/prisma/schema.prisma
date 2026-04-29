@@ -146,6 +146,8 @@ model User {
   scheduledCalls ScheduledCall[] @relation("DoctorScheduledCalls")
   repasses       DoctorRepasse[]
   trustedDevices TrustedDevice[]
+  procedureDoctorLinks  ScheduledCallProcedure[] @relation("ProcedureDoctor")
+  privateProcDoctorLinks PrivateProcedureCall[]   @relation("PrivateProcedureDoctor")
 
   @@unique([email, tenantId])
   @@map("users")
@@ -1269,10 +1271,12 @@ model ScheduledCallProcedure {
   scheduledCallId     String   @map("scheduled_call_id")
   tussProcedureId     String   @map("tuss_procedure_id")
   authorizationNumber String?  @map("authorization_number")
+  doctorId            String?  @map("doctor_id")
   createdAt           DateTime @default(now()) @map("created_at")
 
   scheduledCall ScheduledCall @relation(fields: [scheduledCallId], references: [id], onDelete: Cascade)
   tussProcedure TussProcedure @relation(fields: [tussProcedureId], references: [id], onDelete: Restrict)
+  doctor        User?         @relation("ProcedureDoctor", fields: [doctorId], references: [id])
 
   @@index([scheduledCallId])
   @@index([tussProcedureId])
@@ -1364,6 +1368,8 @@ model PrivateProcedureCall {
   scheduledCall      ScheduledCall    @relation(fields: [scheduledCallId], references: [id], onDelete: Cascade)
   privateProcedureId String           @map("private_procedure_id")
   privateProcedure   PrivateProcedure @relation(fields: [privateProcedureId], references: [id])
+  doctorId           String?          @map("doctor_id")
+  doctor             User?            @relation("PrivateProcedureDoctor", fields: [doctorId], references: [id])
   notes              String?
   createdAt          DateTime         @default(now()) @map("created_at")
 

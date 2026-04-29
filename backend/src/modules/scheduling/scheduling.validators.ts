@@ -17,6 +17,7 @@ export const linkProceduresSchema = z.object({
   procedures: z.array(z.object({
     tussProcedureId: z.string().min(1),
     authorizationNumber: z.string().optional().nullable(),
+    doctorId: z.string().optional().nullable(),
   })).min(1, 'Informe ao menos um procedimento'),
 });
 
@@ -48,6 +49,7 @@ export const replaceProceduresSchema = z.object({
   procedures: z.array(z.object({
     tussProcedureId: z.string().min(1),
     authorizationNumber: z.string().optional().nullable(),
+    doctorId: z.string().optional().nullable(),
   })),
 });
 

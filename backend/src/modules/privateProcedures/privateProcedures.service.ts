@@ -141,7 +141,7 @@ export const privateProceduresService = {
     await prisma.privateProcedure.delete({ where: { id } });
   },
 
-  async attachToCall(tenantId: string, scheduledCallId: string, privateProcedureId: string, notes?: string | null) {
+  async attachToCall(tenantId: string, scheduledCallId: string, privateProcedureId: string, notes?: string | null, doctorId?: string | null) {
     const call = await prisma.scheduledCall.findUnique({ where: { id: scheduledCallId } });
     if (!call) {
       throw new AppError(404, 'CALL_NOT_FOUND', 'Agendamento nao encontrado');
@@ -162,8 +162,53 @@ export const privateProceduresService = {
       data: {
         scheduledCallId,
         privateProcedureId,
+        doctorId: doctorId || null,
         notes: notes?.toString().trim() || null,
       },
     });
+  },
+
+  async replaceForCall(tenantId: string, scheduledCallId: string, procedures: Array<{ privateProcedureId: string; doctorId?: string | null; notes?: string | null }>) {
+    const call = await prisma.scheduledCall.findUnique({ where: { id: scheduledCallId } });
+    if (!call) {
+      throw new AppError(404, 'CALL_NOT_FOUND', 'Agendamento nao encontrado');
+    }
+    if (call.tenantId !== tenantId) {
+      throw new AppError(403, 'FORBIDDEN', 'Agendamento nao pertence ao tenant');
+    }
+
+    if (procedures.length > 0) {
+      const procIds = procedures.map(p => p.privateProcedureId);
+      const procs = await prisma.privateProcedure.findMany({
+        where: { id: { in: procIds }, tenantId },
+      });
+      if (procs.length !== procIds.length) {
+        throw new AppError(400, 'INVALID_PROCEDURE', 'Procedimento particular invalido');
+      }
+    }
+
+    const schedulingService = await import('../scheduling/scheduling.service');
+
+    await prisma.$transaction(async (tx) => {
+      await tx.privateProcedureCall.deleteMany({ where: { scheduledCallId } });
+
+      for (const p of procedures) {
+        await tx.privateProcedureCall.create({
+          data: {
+            scheduledCallId,
+            privateProcedureId: p.privateProcedureId,
+            doctorId: p.doctorId || null,
+            notes: p.notes?.toString().trim() || null,
+          },
+        });
+      }
+
+      if (call.status === 'completed' && call.tenantId) {
+        await schedulingService.revertFinancialsForCall(tx, scheduledCallId, call.tenantId);
+        await schedulingService.applyFinancialsForCompletedCall(tx, scheduledCallId, call.tenantId);
+      }
+    });
+
+    return { scheduledCallId, count: procedures.length };
   },
 };

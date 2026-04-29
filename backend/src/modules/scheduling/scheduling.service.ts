@@ -529,7 +529,8 @@ async function listCalls(tenantId: string, filters: {
         lead: { select: { id: true, name: true, stage: true, company: true } },
         customer: { select: { id: true, name: true, phone: true, email: true } },
         doctor: { select: { id: true, name: true } },
-        procedures: { include: { tussProcedure: { select: { id: true, code: true, description: true, type: true, value: true } } } },
+        procedures: { include: { tussProcedure: { select: { id: true, code: true, description: true, type: true, value: true } }, doctor: { select: { id: true, name: true } } } },
+        privateProcedureCalls: { include: { privateProcedure: { select: { id: true, name: true, type: true, value: true } }, doctor: { select: { id: true, name: true } } } },
         _count: { select: { privateProcedureCalls: true } },
       },
       // checkinAt and calledAt are included automatically (no explicit select = all scalar fields)
@@ -602,6 +603,7 @@ async function linkProcedures(id: string, tenantId: string, data: LinkProcedures
           scheduledCallId: id,
           tussProcedureId: p.tussProcedureId,
           authorizationNumber: p.authorizationNumber || null,
+          doctorId: p.doctorId || null,
         },
       });
     }
@@ -609,7 +611,7 @@ async function linkProcedures(id: string, tenantId: string, data: LinkProcedures
 
   return prisma.scheduledCall.findUnique({
     where: { id },
-    include: { procedures: { include: { tussProcedure: true } } },
+    include: { procedures: { include: { tussProcedure: true, doctor: { select: { id: true, name: true } } } } },
   });
 }
 
@@ -643,6 +645,7 @@ async function replaceProcedures(id: string, tenantId: string, data: ReplaceProc
           scheduledCallId: id,
           tussProcedureId: p.tussProcedureId,
           authorizationNumber: p.authorizationNumber || null,
+          doctorId: p.doctorId || null,
         },
       });
     }
@@ -656,7 +659,7 @@ async function replaceProcedures(id: string, tenantId: string, data: ReplaceProc
 
   return prisma.scheduledCall.findUnique({
     where: { id },
-    include: { procedures: { include: { tussProcedure: true } } },
+    include: { procedures: { include: { tussProcedure: true, doctor: { select: { id: true, name: true } } } } },
   });
 }
 
@@ -711,6 +714,7 @@ async function updateCallAuthorization(id: string, tenantId: string, authorizati
 
 // Create financial transactions (revenue + doctor repasse expenses) for a completed call.
 // Idempotent: if entries already exist for this call, does nothing.
+// Uses per-procedure doctorId when available, falling back to call.doctorId.
 async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, callId: string, tenantId: string) {
   const existing = await tx.financialTransaction.count({
     where: {
@@ -725,8 +729,8 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
     include: {
       customer: { select: { id: true, name: true } },
       doctor: { select: { id: true, name: true } },
-      procedures: { include: { tussProcedure: true } },
-      privateProcedureCalls: { include: { privateProcedure: true } },
+      procedures: { include: { tussProcedure: true, doctor: { select: { id: true, name: true } } } },
+      privateProcedureCalls: { include: { privateProcedure: true, doctor: { select: { id: true, name: true } } } },
     },
   });
   if (!call || (call.procedures.length === 0 && call.privateProcedureCalls.length === 0)) return;
@@ -734,18 +738,35 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
   const dateIso = call.date.toISOString().slice(0, 10);
   const patientName = call.customer?.name || call.name;
 
-  // Load doctor repasse percentages (if a doctor is assigned)
-  let repasseMap = new Map<string, number>();
-  if (call.doctorId) {
+  // Collect all unique doctor IDs involved (per-procedure + call-level fallback)
+  const doctorIds = new Set<string>();
+  if (call.doctorId) doctorIds.add(call.doctorId);
+  for (const p of call.procedures) { if (p.doctorId) doctorIds.add(p.doctorId); }
+  for (const pp of call.privateProcedureCalls) { if (pp.doctorId) doctorIds.add(pp.doctorId); }
+
+  // Load repasse maps for ALL involved doctors
+  const repasseMaps = new Map<string, Map<string, number>>();
+  if (doctorIds.size > 0) {
     const repasses = await tx.doctorRepasse.findMany({
-      where: { tenantId, doctorId: call.doctorId },
+      where: { tenantId, doctorId: { in: [...doctorIds] } },
     });
-    repasseMap = new Map(repasses.map((r) => [r.procedureType, r.percentage]));
+    for (const r of repasses) {
+      if (!repasseMaps.has(r.doctorId)) repasseMaps.set(r.doctorId, new Map());
+      repasseMaps.get(r.doctorId)!.set(r.procedureType, r.percentage);
+    }
   }
+
+  // Load doctor names for all involved doctors
+  const doctorNames = new Map<string, string>();
+  if (call.doctor) doctorNames.set(call.doctorId!, call.doctor.name);
+  for (const p of call.procedures) { if (p.doctor) doctorNames.set(p.doctorId!, p.doctor.name); }
+  for (const pp of call.privateProcedureCalls) { if (pp.doctor) doctorNames.set(pp.doctorId!, pp.doctor.name); }
 
   for (const p of call.procedures) {
     const proc = p.tussProcedure;
     const valor = Number(proc.value);
+    const effectiveDoctorId = p.doctorId || call.doctorId;
+    const effectiveDoctorName = effectiveDoctorId ? doctorNames.get(effectiveDoctorId) : null;
 
     // Revenue entry
     await tx.financialTransaction.create({
@@ -763,9 +784,10 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
       },
     });
 
-    // Doctor repasse expense
-    if (call.doctorId && call.doctor) {
-      const pct = repasseMap.get(proc.type) ?? 0;
+    // Doctor repasse expense (using per-procedure doctor)
+    if (effectiveDoctorId && effectiveDoctorName) {
+      const docRepasse = repasseMaps.get(effectiveDoctorId);
+      const pct = docRepasse?.get(proc.type) ?? 0;
       if (pct > 0) {
         const repasse = (valor * pct) / 100;
         await tx.financialTransaction.create({
@@ -773,12 +795,12 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
             tenantId,
             type: 'EXPENSE',
             category: 'Repasse Médico',
-            description: `Repasse Dr. ${call.doctor.name} - ${proc.description} - ${dateIso}`,
+            description: `Repasse Dr. ${effectiveDoctorName} - ${proc.description} - ${dateIso}`,
             amount: new Prisma.Decimal(repasse),
             date: call.date,
             paymentMethod: 'TRANSFERENCIA',
             status: 'PENDENTE',
-            notes: `${AGENDAMENTO_TAG(callId)} [REPASSE:${p.id}] [DOCTOR:${call.doctorId}]`,
+            notes: `${AGENDAMENTO_TAG(callId)} [REPASSE:${p.id}] [DOCTOR:${effectiveDoctorId}]`,
           },
         });
       }
@@ -790,6 +812,8 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
     const proc = pp.privateProcedure;
     const valor = Number(proc.value) || 0;
     if (valor <= 0) continue;
+    const effectiveDoctorId = pp.doctorId || call.doctorId;
+    const effectiveDoctorName = effectiveDoctorId ? doctorNames.get(effectiveDoctorId) : null;
 
     await tx.financialTransaction.create({
       data: {
@@ -806,8 +830,9 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
       },
     });
 
-    if (call.doctorId && call.doctor) {
-      const pct = repasseMap.get(proc.type) ?? repasseMap.get('OUTROS') ?? 0;
+    if (effectiveDoctorId && effectiveDoctorName) {
+      const docRepasse = repasseMaps.get(effectiveDoctorId);
+      const pct = docRepasse?.get(proc.type) ?? docRepasse?.get('OUTROS') ?? 0;
       if (pct > 0) {
         const repasse = (valor * pct) / 100;
         await tx.financialTransaction.create({
@@ -815,12 +840,12 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
             tenantId,
             type: 'EXPENSE',
             category: 'Repasse Médico',
-            description: `Repasse Dr. ${call.doctor.name} - ${proc.name} - ${dateIso}`,
+            description: `Repasse Dr. ${effectiveDoctorName} - ${proc.name} - ${dateIso}`,
             amount: new Prisma.Decimal(repasse),
             date: call.date,
             paymentMethod: 'TRANSFERENCIA',
             status: 'PENDENTE',
-            notes: `${AGENDAMENTO_TAG(callId)} [REPASSE-PART:${pp.id}] [DOCTOR:${call.doctorId}]`,
+            notes: `${AGENDAMENTO_TAG(callId)} [REPASSE-PART:${pp.id}] [DOCTOR:${effectiveDoctorId}]`,
           },
         });
       }
@@ -1040,6 +1065,8 @@ async function withdrawInventoryForCall(
 
   return { alreadyProcessed: false as const, movements };
 }
+
+export { applyFinancialsForCompletedCall, revertFinancialsForCall };
 
 export const schedulingService = {
   getConfig,
