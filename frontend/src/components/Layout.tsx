@@ -24,8 +24,10 @@ const defaultRoleAllowedPaths: Record<string, string[]> = {
   OWNER: allNavItems.map(i => i.path),
   MANAGER: allNavItems.map(i => i.path),
   DOCTOR: ['/pacientes', '/agendamentos', '/scripts', '/perfil'],
+  NURSE: ['/pacientes', '/agendamentos', '/scripts', '/perfil'],
   RECEPTIONIST: ['/pacientes', '/agendamentos', '/scripts', '/perfil'],
   FINANCIAL: ['/financeiro', '/perfil'],
+  STOCK: ['/estoque', '/perfil'],
   EMPLOYEE: ['/estoque', '/perfil'],
 };
 
@@ -74,6 +76,7 @@ export function Layout() {
   };
 
   const navItems = allNavItems.filter(item => {
+    if (item.path === '/perfil') return true;
     const role = user?.role || 'EMPLOYEE';
     const defaults = defaultRoleAllowedPaths[role] || defaultRoleAllowedPaths.EMPLOYEE;
     const allowed = customPerms?.[role] || defaults;

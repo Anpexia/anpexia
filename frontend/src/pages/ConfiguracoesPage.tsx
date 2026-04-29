@@ -482,16 +482,22 @@ export function ConfiguracoesPage() {
   ];
 
   const CONFIGURABLE_ROLES = [
+    { key: 'MANAGER', label: 'Gerente' },
     { key: 'DOCTOR', label: 'Medico' },
-    { key: 'RECEPTIONIST', label: 'Secretaria' },
+    { key: 'NURSE', label: 'Enfermeira' },
+    { key: 'RECEPTIONIST', label: 'Recepcionista' },
     { key: 'FINANCIAL', label: 'Financeiro' },
+    { key: 'STOCK', label: 'Estoque' },
     { key: 'EMPLOYEE', label: 'Funcionario' },
   ];
 
   const DEFAULT_ROLE_PERMS: Record<string, string[]> = {
+    MANAGER: ['/dashboard', '/pacientes', '/estoque', '/financeiro', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/configuracoes'],
     DOCTOR: ['/pacientes', '/agendamentos', '/scripts'],
+    NURSE: ['/pacientes', '/agendamentos', '/scripts'],
     RECEPTIONIST: ['/pacientes', '/agendamentos', '/scripts'],
     FINANCIAL: ['/financeiro'],
+    STOCK: ['/estoque'],
     EMPLOYEE: ['/estoque'],
   };
 
