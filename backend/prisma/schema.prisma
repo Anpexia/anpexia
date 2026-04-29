@@ -852,6 +852,7 @@ model ScheduledCall {
   @@index([date])
   @@index([customerId])
   @@index([doctorId])
+  @@index([checkinAt])
   @@map("scheduled_calls")
 }
 

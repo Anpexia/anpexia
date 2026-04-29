@@ -285,7 +285,7 @@ router.delete('/calls/:id/permanent', authenticate, requireTenant, requireRole('
   } catch (err) { next(err); }
 });
 
-// GET /queue — today's queue for a doctor (patients with status "present")
+// GET /queue — today's queue (patients checked in today, regardless of appointment date)
 router.get('/queue', authenticate, requireTenant, async (req: Request, res: Response, next) => {
   try {
     const tenantId = req.auth!.tenantId!;
@@ -297,7 +297,7 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
 
     const where: any = {
       tenantId,
-      date: { gte: dayStart, lte: dayEnd },
+      checkinAt: { gte: dayStart, lte: dayEnd },
       status: { in: ['present'] },
     };
     if (doctorId) where.doctorId = doctorId;
