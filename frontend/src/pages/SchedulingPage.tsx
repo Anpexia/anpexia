@@ -7,8 +7,10 @@ import { useAuth } from '../hooks/useAuth';
 
 interface DoctorHorario {
   ativo: boolean;
-  inicio: string;
-  fim: string;
+  manha?: { inicio: string; fim: string };
+  tarde?: { inicio: string; fim: string };
+  inicio?: string;
+  fim?: string;
 }
 
 interface Doctor {
@@ -1536,7 +1538,11 @@ export function SchedulingPage() {
                         <div className="space-y-3">
                           <p className="text-xs text-slate-500">{doctorsToday.length} medico{doctorsToday.length > 1 ? 's' : ''} neste dia</p>
                           {doctorsToday.map(d => {
-                            const h = d.horarios![dayKey];
+                            const h = d.horarios![dayKey] as DoctorHorario;
+                            const shifts: string[] = [];
+                            if (h.manha) shifts.push(`${h.manha.inicio} - ${h.manha.fim}`);
+                            if (h.tarde) shifts.push(`${h.tarde.inicio} - ${h.tarde.fim}`);
+                            if (shifts.length === 0 && h.inicio && h.fim) shifts.push(`${h.inicio} - ${h.fim}`);
                             return (
                               <div key={d.id} className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                                 <div className="flex items-center gap-2 mb-1">
@@ -1546,10 +1552,12 @@ export function SchedulingPage() {
                                 {d.especialidade && (
                                   <p className="text-xs text-slate-500 ml-5 mb-1">{d.especialidade}</p>
                                 )}
-                                <div className="flex items-center gap-1.5 ml-5">
-                                  <Clock size={12} className="text-slate-400" />
-                                  <span className="text-xs text-slate-600">{h.inicio} - {h.fim}</span>
-                                </div>
+                                {shifts.map((s, i) => (
+                                  <div key={i} className="flex items-center gap-1.5 ml-5">
+                                    <Clock size={12} className="text-slate-400" />
+                                    <span className="text-xs text-slate-600">{s}</span>
+                                  </div>
+                                ))}
                               </div>
                             );
                           })}

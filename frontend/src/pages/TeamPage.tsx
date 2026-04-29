@@ -3,10 +3,15 @@ import { Users, Plus, X, CheckCircle, UserCheck, UserX, Shield, Edit2, Trash2, C
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
-interface DaySchedule {
-  ativo: boolean;
+interface ShiftRange {
   inicio: string;
   fim: string;
+}
+
+interface DaySchedule {
+  ativo: boolean;
+  manha: ShiftRange;
+  tarde: ShiftRange;
 }
 
 type Horarios = Record<string, DaySchedule>;
@@ -18,8 +23,33 @@ const DAY_LABELS: Record<string, string> = {
 const DAY_KEYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
 
 const DEFAULT_HORARIOS: Horarios = Object.fromEntries(
-  DAY_KEYS.map(k => [k, { ativo: ['seg', 'ter', 'qua', 'qui', 'sex'].includes(k), inicio: '08:00', fim: '18:00' }])
+  DAY_KEYS.map(k => [k, {
+    ativo: ['seg', 'ter', 'qua', 'qui', 'sex'].includes(k),
+    manha: { inicio: '08:00', fim: '12:00' },
+    tarde: { inicio: '14:00', fim: '18:00' },
+  }])
 );
+
+function migrateDaySchedule(raw: any): DaySchedule {
+  if (!raw || typeof raw !== 'object') return { ativo: false, manha: { inicio: '08:00', fim: '12:00' }, tarde: { inicio: '14:00', fim: '18:00' } };
+  if (raw.manha && raw.tarde) return raw as DaySchedule;
+  const inicio = raw.inicio || '08:00';
+  const fim = raw.fim || '18:00';
+  const inicioH = parseInt(inicio.split(':')[0], 10);
+  const fimH = parseInt(fim.split(':')[0], 10);
+  if (fimH <= 13) return { ativo: Boolean(raw.ativo), manha: { inicio, fim }, tarde: { inicio: '14:00', fim: '18:00' } };
+  if (inicioH >= 12) return { ativo: Boolean(raw.ativo), manha: { inicio: '08:00', fim: '12:00' }, tarde: { inicio, fim } };
+  return { ativo: Boolean(raw.ativo), manha: { inicio, fim: '12:00' }, tarde: { inicio: '14:00', fim } };
+}
+
+function migrateHorarios(raw: any): Horarios {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_HORARIOS };
+  const result: Horarios = {};
+  for (const key of DAY_KEYS) {
+    result[key] = raw[key] ? migrateDaySchedule(raw[key]) : DEFAULT_HORARIOS[key];
+  }
+  return result;
+}
 
 interface TeamMember {
   id: string;
@@ -200,7 +230,7 @@ export function TeamPage() {
     setFormRqe(m.rqe || '');
     if (m.role === 'DOCTOR') {
       loadRepasse(m.id);
-      setHorarios(m.horarios && typeof m.horarios === 'object' ? { ...DEFAULT_HORARIOS, ...m.horarios } : { ...DEFAULT_HORARIOS });
+      setHorarios(m.horarios ? migrateHorarios(m.horarios) : { ...DEFAULT_HORARIOS });
     } else {
       setRepasse({});
       setHorarios({ ...DEFAULT_HORARIOS });
@@ -489,24 +519,37 @@ export function TeamPage() {
                   </div>
                   <div className="space-y-3">
                     {DAY_KEYS.map(day => {
-                      const d = horarios[day] || { ativo: false, inicio: '08:00', fim: '18:00' };
+                      const d = horarios[day] || DEFAULT_HORARIOS[day];
                       return (
-                        <div key={day} className={`flex items-center gap-3 p-3 rounded-lg border ${d.ativo ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50'}`}>
-                          <label className="flex items-center gap-2 min-w-[100px] cursor-pointer">
+                        <div key={day} className={`p-3 rounded-lg border ${d.ativo ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50'}`}>
+                          <label className="flex items-center gap-2 cursor-pointer mb-2">
                             <input type="checkbox" checked={d.ativo}
                               onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, ativo: e.target.checked } }))}
                               className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]" />
                             <span className={`text-sm font-medium ${d.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{DAY_LABELS[day]}</span>
                           </label>
                           {d.ativo && (
-                            <div className="flex items-center gap-2 ml-auto">
-                              <input type="time" value={d.inicio}
-                                onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, inicio: e.target.value } }))}
-                                className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
-                              <span className="text-slate-400 text-sm">ate</span>
-                              <input type="time" value={d.fim}
-                                onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, fim: e.target.value } }))}
-                                className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                            <div className="ml-6 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-slate-500 w-12">Manha</span>
+                                <input type="time" value={d.manha.inicio}
+                                  onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, manha: { ...d.manha, inicio: e.target.value } } }))}
+                                  className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                                <span className="text-slate-400 text-xs">ate</span>
+                                <input type="time" value={d.manha.fim}
+                                  onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, manha: { ...d.manha, fim: e.target.value } } }))}
+                                  className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-slate-500 w-12">Tarde</span>
+                                <input type="time" value={d.tarde.inicio}
+                                  onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, tarde: { ...d.tarde, inicio: e.target.value } } }))}
+                                  className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                                <span className="text-slate-400 text-xs">ate</span>
+                                <input type="time" value={d.tarde.fim}
+                                  onChange={e => setHorarios(h => ({ ...h, [day]: { ...d, tarde: { ...d.tarde, fim: e.target.value } } }))}
+                                  className="px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                              </div>
                             </div>
                           )}
                         </div>

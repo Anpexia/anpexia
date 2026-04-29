@@ -103,6 +103,30 @@ function timeToMinutes(hhmm: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
+interface Shift { inicio: string; fim: string }
+
+// Parse a day's schedule into shifts array (supports new manha/tarde format and legacy inicio/fim)
+function parseDayShifts(dh: any): { ativo: boolean; shifts: Shift[] } {
+  if (!dh || typeof dh !== 'object') return { ativo: false, shifts: [] };
+  const ativo = Boolean(dh.ativo);
+  if (!ativo) return { ativo, shifts: [] };
+
+  // New format: manha/tarde objects
+  if (dh.manha || dh.tarde) {
+    const shifts: Shift[] = [];
+    if (dh.manha && dh.manha.inicio && dh.manha.fim) shifts.push({ inicio: dh.manha.inicio, fim: dh.manha.fim });
+    if (dh.tarde && dh.tarde.inicio && dh.tarde.fim) shifts.push({ inicio: dh.tarde.inicio, fim: dh.tarde.fim });
+    return { ativo, shifts };
+  }
+
+  // Legacy format: single inicio/fim
+  if (dh.inicio && dh.fim) {
+    return { ativo, shifts: [{ inicio: dh.inicio, fim: dh.fim }] };
+  }
+
+  return { ativo, shifts: [] };
+}
+
 // Validate that a booking request fits within tenant working hours and has no
 // conflict with an existing call for the same doctor at the same datetime.
 async function validateBookingWithinHours(params: {
@@ -118,9 +142,9 @@ async function validateBookingWithinHours(params: {
   const dayOfWeek = new Date(`${params.date}T12:00:00${SP_OFFSET}`).getDay();
   const key = DAY_KEYS[dayOfWeek];
 
-  // Check doctor-specific hours first, fall back to tenant hours
-  let daySettings = hours.days[key];
   let durationMin = hours.durationMin;
+  let shifts: Shift[] = [];
+  let isDayActive = false;
 
   if (params.doctorId) {
     const doctor = await prisma.user.findUnique({
@@ -128,23 +152,34 @@ async function validateBookingWithinHours(params: {
       select: { horarios: true, duracaoConsulta: true },
     });
     if (doctor?.horarios && typeof doctor.horarios === 'object') {
-      const dh = (doctor.horarios as any)[key];
-      if (dh && typeof dh === 'object') {
-        daySettings = { ativo: Boolean(dh.ativo), inicio: String(dh.inicio || '08:00'), fim: String(dh.fim || '18:00') };
-      }
+      const parsed = parseDayShifts((doctor.horarios as any)[key]);
+      isDayActive = parsed.ativo;
+      shifts = parsed.shifts;
     }
     if (doctor?.duracaoConsulta) durationMin = doctor.duracaoConsulta;
   }
 
-  if (!daySettings || !daySettings.ativo) {
+  // Fall back to tenant hours if no doctor-specific schedule
+  if (shifts.length === 0 && !isDayActive) {
+    const daySettings = hours.days[key];
+    if (daySettings && daySettings.ativo) {
+      isDayActive = true;
+      shifts = [{ inicio: daySettings.inicio, fim: daySettings.fim }];
+    }
+  }
+
+  if (!isDayActive || shifts.length === 0) {
     throw new AppError(400, 'INVALID_DATE', 'Esta data não está disponível para agendamento');
   }
 
   const reqMin = timeToMinutes(params.time);
-  const startMin = timeToMinutes(daySettings.inicio);
-  const endMin = timeToMinutes(daySettings.fim);
+  const fitsInShift = shifts.some(s => {
+    const startMin = timeToMinutes(s.inicio);
+    const endMin = timeToMinutes(s.fim);
+    return reqMin >= startMin && reqMin + durationMin <= endMin;
+  });
 
-  if (reqMin < startMin || reqMin + durationMin > endMin) {
+  if (!fitsInShift) {
     throw new AppError(400, 'INVALID_TIME', 'Horário fora do expediente configurado');
   }
 
@@ -198,73 +233,60 @@ async function getAvailableSlots(date: string, doctorId?: string | null, tenantI
   const dayOfWeek = new Date(`${date}T12:00:00${SP_OFFSET}`).getDay();
   const dayKey = DAY_KEYS[dayOfWeek];
 
-  // Determine working hours: doctor-specific → tenant → global defaults
-  let startHour = config.startHour;
-  let endHour = config.endHour;
+  // Determine working shifts: doctor-specific → tenant → global defaults
   let slotDuration = config.slotDuration;
-  let breakStart = config.breakStart;
-  let breakEnd = config.breakEnd;
-  let isDayActive = config.availableDays.includes(dayOfWeek);
+  let shifts: Shift[] = [];
+  let isDayActive = false;
 
-  // Try doctor-specific hours first
   if (doctorId) {
     const doctor = await prisma.user.findUnique({
       where: { id: doctorId },
       select: { horarios: true, duracaoConsulta: true },
     });
     if (doctor?.horarios && typeof doctor.horarios === 'object') {
-      const dh = (doctor.horarios as any)[dayKey];
-      if (dh && typeof dh === 'object') {
-        isDayActive = Boolean(dh.ativo);
-        if (isDayActive) {
-          const dInicio = dh.inicio || '08:00';
-          const dFim = dh.fim || '18:00';
-          startHour = parseInt(dInicio.split(':')[0], 10);
-          endHour = parseInt(dFim.split(':')[0], 10);
-          const endMin = parseInt(dInicio.split(':')[1] || '0', 10);
-          if (endMin > 0) startHour = startHour + endMin / 60;
-          const fimMin = parseInt(dFim.split(':')[1] || '0', 10);
-          if (fimMin > 0) endHour = endHour + fimMin / 60;
-        }
-      }
+      const parsed = parseDayShifts((doctor.horarios as any)[dayKey]);
+      isDayActive = parsed.ativo;
+      shifts = parsed.shifts;
     }
     if (doctor?.duracaoConsulta) slotDuration = doctor.duracaoConsulta;
-  } else if (tenantId) {
-    // Fall back to tenant hours
-    const tenantHours = await loadTenantHours(tenantId);
-    const th = tenantHours.days[dayKey];
-    if (th) {
-      isDayActive = th.ativo;
-      if (isDayActive) {
-        startHour = parseInt(th.inicio.split(':')[0], 10);
-        endHour = parseInt(th.fim.split(':')[0], 10);
-      }
-    }
-    slotDuration = tenantHours.durationMin;
   }
 
-  if (!isDayActive) {
+  // Fall back to tenant hours or global config
+  if (shifts.length === 0 && !isDayActive) {
+    if (tenantId) {
+      const tenantHours = await loadTenantHours(tenantId);
+      const th = tenantHours.days[dayKey];
+      if (th && th.ativo) {
+        isDayActive = true;
+        shifts = [{ inicio: th.inicio, fim: th.fim }];
+      }
+      slotDuration = tenantHours.durationMin;
+    } else {
+      isDayActive = config.availableDays.includes(dayOfWeek);
+      if (isDayActive) {
+        const sH = String(config.startHour).padStart(2, '0');
+        const eH = String(config.endHour).padStart(2, '0');
+        shifts = [{ inicio: `${sH}:00`, fim: `${eH}:00` }];
+      }
+    }
+  }
+
+  if (!isDayActive || shifts.length === 0) {
     return [];
   }
 
-  // Generate all possible slots using resolved hours
+  // Generate slots from all shifts
   const slots: { time: string; available: boolean }[] = [];
-  const startMinutes = Math.round(startHour * 60);
-  const endMinutes = Math.round(endHour * 60);
-  const totalMinutes = endMinutes - startMinutes;
+  for (const shift of shifts) {
+    const startMinutes = timeToMinutes(shift.inicio);
+    const endMinutes = timeToMinutes(shift.fim);
 
-  for (let offset = 0; offset < totalMinutes; offset += slotDuration) {
-    const totalMins = startMinutes + offset;
-    const hour = Math.floor(totalMins / 60);
-    const minute = totalMins % 60;
-
-    // Skip break period
-    if (breakStart != null && breakEnd != null) {
-      if (hour >= breakStart && hour < breakEnd) continue;
+    for (let m = startMinutes; m < endMinutes; m += slotDuration) {
+      const hour = Math.floor(m / 60);
+      const minute = m % 60;
+      const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      slots.push({ time, available: true });
     }
-
-    const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    slots.push({ time, available: true });
   }
 
   // Fetch booked calls for this date (SP day boundaries)
