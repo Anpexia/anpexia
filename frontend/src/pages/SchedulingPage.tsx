@@ -5,10 +5,17 @@ import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
+interface DoctorHorario {
+  ativo: boolean;
+  inicio: string;
+  fim: string;
+}
+
 interface Doctor {
   id: string;
   name: string;
   especialidade?: string | null;
+  horarios?: Record<string, DoctorHorario> | null;
 }
 
 interface CallProcedure {
@@ -134,6 +141,7 @@ export function SchedulingPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'agendamentos' | 'medicos'>('agendamentos');
 
   // New appointment
   const [showBookModal, setShowBookModal] = useState(false);
@@ -1385,7 +1393,7 @@ export function SchedulingPage() {
                 )}
               </div>
 
-              {/* Right panel — Slots & day appointments */}
+              {/* Right panel — Tabbed sidebar */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 max-h-[600px] overflow-y-auto">
                 {!selectedDate ? (
                   <div className="text-center py-12">
@@ -1400,48 +1408,113 @@ export function SchedulingPage() {
                       {format(new Date(selectedDate + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                     </h3>
 
-                    {/* Day's existing appointments */}
-                    {(() => {
-                      const dayAppts = (appointmentsByDay.get(selectedDate) || []).filter(a => a.status !== 'cancelled');
-                      if (dayAppts.length === 0) return null;
-                      return (
-                        <div className="mb-4">
-                          <p className="text-xs text-slate-500 mb-2 mt-3">Agendados ({dayAppts.length})</p>
-                          <div className="space-y-1.5">
-                            {dayAppts.map(a => {
-                              const st = statusMap[a.status];
-                              return (
-                                <div key={a.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-[#1E3A5F] w-12">{format(new Date(a.date), 'HH:mm')}</span>
-                                    <span className="text-sm text-slate-700 truncate max-w-[120px]">{a.customer?.name || a.name}</span>
-                                  </div>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${st?.cls || ''}`}>{st?.label || a.status}</span>
-                                </div>
-                              );
-                            })}
+                    {/* Sidebar tabs */}
+                    <div className="flex gap-1 mt-3 mb-4 border-b border-slate-200">
+                      <button
+                        onClick={() => setSidebarTab('agendamentos')}
+                        className={`pb-2 px-3 text-xs font-medium border-b-2 transition-colors ${sidebarTab === 'agendamentos' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Agendamentos
+                      </button>
+                      <button
+                        onClick={() => setSidebarTab('medicos')}
+                        className={`pb-2 px-3 text-xs font-medium border-b-2 transition-colors ${sidebarTab === 'medicos' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Medicos do dia
+                      </button>
+                    </div>
+
+                    {/* Tab: Agendamentos */}
+                    {sidebarTab === 'agendamentos' && (
+                      <>
+                        {(() => {
+                          const dayAppts = (appointmentsByDay.get(selectedDate) || []).filter(a => a.status !== 'cancelled');
+                          if (dayAppts.length === 0) return null;
+                          return (
+                            <div className="mb-4">
+                              <p className="text-xs text-slate-500 mb-2">Agendados ({dayAppts.length})</p>
+                              <div className="space-y-1.5">
+                                {dayAppts.map(a => {
+                                  const st = statusMap[a.status];
+                                  return (
+                                    <div key={a.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-[#1E3A5F] w-12">{format(new Date(a.date), 'HH:mm')}</span>
+                                        <span className="text-sm text-slate-700 truncate max-w-[120px]">{a.customer?.name || a.name}</span>
+                                      </div>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${st?.cls || ''}`}>{st?.label || a.status}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        <p className="text-xs text-slate-500 mb-2">Horarios disponiveis</p>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {slots.map((s) => (
+                            <button
+                              key={s.time}
+                              onClick={() => s.available && openBookWithSlot(selectedDate, s.time)}
+                              disabled={!s.available}
+                              className={`py-2 rounded-lg text-xs font-medium transition-colors ${s.available ? 'border border-green-200 text-green-700 hover:bg-green-50' : 'bg-slate-100 text-slate-400 cursor-not-allowed line-through'}`}
+                            >
+                              {s.time}
+                            </button>
+                          ))}
+                        </div>
+                        {slots.filter(s => s.available).length === 0 && (
+                          <p className="text-xs text-red-500 mt-2 text-center">Sem vagas disponiveis</p>
+                        )}
+                      </>
+                    )}
+
+                    {/* Tab: Medicos do dia */}
+                    {sidebarTab === 'medicos' && (() => {
+                      const dayKeyMap: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+                      const dayOfWeek = new Date(selectedDate + 'T12:00:00').getDay();
+                      const dayKey = dayKeyMap[dayOfWeek];
+
+                      const doctorsToday = doctors.filter(d => {
+                        if (!d.horarios) return false;
+                        const h = d.horarios[dayKey];
+                        return h && h.ativo;
+                      });
+
+                      if (doctorsToday.length === 0) {
+                        return (
+                          <div className="text-center py-8">
+                            <Stethoscope size={28} className="mx-auto text-slate-300 mb-2" />
+                            <p className="text-sm text-slate-500">Nenhum medico neste dia</p>
                           </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-3">
+                          <p className="text-xs text-slate-500">{doctorsToday.length} medico{doctorsToday.length > 1 ? 's' : ''} neste dia</p>
+                          {doctorsToday.map(d => {
+                            const h = d.horarios![dayKey];
+                            return (
+                              <div key={d.id} className="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Stethoscope size={14} className="text-emerald-600" />
+                                  <span className="text-sm font-semibold text-slate-800">{d.name}</span>
+                                </div>
+                                {d.especialidade && (
+                                  <p className="text-xs text-slate-500 ml-5 mb-1">{d.especialidade}</p>
+                                )}
+                                <div className="flex items-center gap-1.5 ml-5">
+                                  <Clock size={12} className="text-slate-400" />
+                                  <span className="text-xs text-slate-600">{h.inicio} - {h.fim}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })()}
-
-                    {/* Available slots */}
-                    <p className="text-xs text-slate-500 mb-2">Horarios disponiveis</p>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {slots.map((s) => (
-                        <button
-                          key={s.time}
-                          onClick={() => s.available && openBookWithSlot(selectedDate, s.time)}
-                          disabled={!s.available}
-                          className={`py-2 rounded-lg text-xs font-medium transition-colors ${s.available ? 'border border-green-200 text-green-700 hover:bg-green-50' : 'bg-slate-100 text-slate-400 cursor-not-allowed line-through'}`}
-                        >
-                          {s.time}
-                        </button>
-                      ))}
-                    </div>
-                    {slots.filter(s => s.available).length === 0 && (
-                      <p className="text-xs text-red-500 mt-2 text-center">Sem vagas disponiveis</p>
-                    )}
                   </>
                 )}
               </div>

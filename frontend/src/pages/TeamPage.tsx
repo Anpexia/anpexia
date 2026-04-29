@@ -220,12 +220,13 @@ export function TeamPage() {
     }
   };
 
-  const roleLabel: Record<string, string> = { SUPER_ADMIN: 'Super Admin', OWNER: 'Proprietario', MANAGER: 'Gerente', DOCTOR: 'Medico', RECEPTIONIST: 'Recepcionista', FINANCIAL: 'Financeiro', STOCK: 'Estoque', EMPLOYEE: 'Funcionario' };
+  const roleLabel: Record<string, string> = { SUPER_ADMIN: 'Super Admin', OWNER: 'Proprietario', MANAGER: 'Gerente', DOCTOR: 'Medico', NURSE: 'Enfermeira', RECEPTIONIST: 'Recepcionista', FINANCIAL: 'Financeiro', STOCK: 'Estoque', EMPLOYEE: 'Funcionario' };
   const roleBadge: Record<string, string> = {
     SUPER_ADMIN: 'bg-purple-100 text-purple-700',
     OWNER: 'bg-blue-100 text-[#1E3A5F]',
     MANAGER: 'bg-blue-100 text-blue-700',
     DOCTOR: 'bg-emerald-100 text-emerald-700',
+    NURSE: 'bg-pink-100 text-pink-700',
     RECEPTIONIST: 'bg-amber-100 text-amber-700',
     FINANCIAL: 'bg-cyan-100 text-cyan-700',
     STOCK: 'bg-orange-100 text-orange-700',
@@ -354,6 +355,7 @@ export function TeamPage() {
                   {isOwner && <option value="OWNER">Admin</option>}
                   <option value="MANAGER">Gerente</option>
                   <option value="DOCTOR">Medico</option>
+                  <option value="NURSE">Enfermeira</option>
                   <option value="RECEPTIONIST">Recepcionista</option>
                   <option value="FINANCIAL">Financeiro</option>
                   <option value="STOCK">Estoque</option>
@@ -449,6 +451,7 @@ export function TeamPage() {
                       {isOwner && <option value="OWNER">Admin</option>}
                       <option value="MANAGER">Gerente</option>
                       <option value="DOCTOR">Medico</option>
+                      <option value="NURSE">Enfermeira</option>
                       <option value="RECEPTIONIST">Recepcionista</option>
                       <option value="FINANCIAL">Financeiro</option>
                       <option value="STOCK">Estoque</option>

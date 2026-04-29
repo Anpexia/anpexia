@@ -192,6 +192,7 @@ enum Role {
   OWNER // Dono da empresa cliente
   MANAGER // Gerente
   DOCTOR // Médico
+  NURSE // Enfermeira
   RECEPTIONIST // Recepcionista
   FINANCIAL // Financeiro
   STOCK // Estoque

@@ -9,7 +9,7 @@ interface CreateMemberData {
   email: string;
   password?: string;
   phone?: string;
-  role: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
+  role: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'NURSE' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
   especialidade?: string;
   rqe?: string;
   sendInvite?: boolean;
