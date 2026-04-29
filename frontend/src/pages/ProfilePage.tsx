@@ -41,7 +41,6 @@ export function ProfilePage() {
   const [rqe, setRqe] = useState('');
   const [tipoRegistro, setTipoRegistro] = useState('');
   const [numeroRegistro, setNumeroRegistro] = useState('');
-  const [duracaoConsulta, setDuracaoConsulta] = useState('');
   const [bio, setBio] = useState('');
 
   // Password change
@@ -81,7 +80,6 @@ export function ProfilePage() {
           if (p.rqe) setRqe(p.rqe);
           if (p.tipoRegistro) setTipoRegistro(p.tipoRegistro);
           if (p.numeroRegistro) setNumeroRegistro(p.numeroRegistro);
-          if (p.duracaoConsulta) setDuracaoConsulta(String(p.duracaoConsulta));
           if (p.bio) setBio(p.bio);
         }
       }).catch(() => {});
@@ -183,7 +181,6 @@ export function ProfilePage() {
       if (rqe) payload.rqe = rqe;
       if (tipoRegistro) payload.tipoRegistro = tipoRegistro;
       if (numeroRegistro) payload.numeroRegistro = numeroRegistro;
-      if (duracaoConsulta) payload.duracaoConsulta = parseInt(duracaoConsulta, 10) || undefined;
       if (bio) payload.bio = bio;
 
       await api.put('/team/me/profile', payload);
@@ -375,12 +372,6 @@ export function ProfilePage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Numero do registro</label>
                 <input value={numeroRegistro} onChange={e => setNumeroRegistro(e.target.value)} className={inputCls} placeholder="12345/BA" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Duracao da consulta (min)</label>
-                <input type="number" value={duracaoConsulta} onChange={e => setDuracaoConsulta(e.target.value)} className={inputCls} placeholder="30" />
               </div>
             </div>
             <div>
