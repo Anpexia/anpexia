@@ -532,6 +532,7 @@ async function listCalls(tenantId: string, filters: {
         procedures: { include: { tussProcedure: { select: { id: true, code: true, description: true, type: true, value: true } } } },
         _count: { select: { privateProcedureCalls: true } },
       },
+      // checkinAt and calledAt are included automatically (no explicit select = all scalar fields)
       orderBy: { date: 'asc' },
       skip: filters.skip,
       take: filters.limit,
@@ -846,12 +847,16 @@ async function updateCallStatus(id: string, data: UpdateCallStatusInput, tenantI
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    const updateData: any = {
+      status: data.status,
+      notes: data.notes ?? call.notes,
+    };
+    if (data.status === 'present' && !call.checkinAt) {
+      updateData.checkinAt = new Date();
+    }
     const updatedCall = await tx.scheduledCall.update({
       where: { id },
-      data: {
-        status: data.status,
-        notes: data.notes ?? call.notes,
-      },
+      data: updateData,
     });
 
     // If completed, create financial entries (revenue + repasse)

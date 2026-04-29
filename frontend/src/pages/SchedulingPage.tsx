@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2 } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -66,6 +66,8 @@ interface Appointment {
   authorizationNumber: string | null;
   paymentType: string | null;
   convenioId: string | null;
+  checkinAt: string | null;
+  calledAt: string | null;
   customer: { id: string; name: string; phone: string; email: string | null } | null;
   doctor: { id: string; name: string } | null;
   convenio?: { id: string; nome: string } | null;
@@ -87,6 +89,7 @@ type View = 'calendar' | 'list' | 'history';
 const statusMap: Record<string, { label: string; cls: string; icon: string; step: number }> = {
   scheduled: { label: 'Agendado', cls: 'bg-blue-100 text-blue-700', icon: '🔵', step: 1 },
   confirmed: { label: 'Confirmado', cls: 'bg-green-100 text-green-700', icon: '✅', step: 2 },
+  present: { label: 'Presente', cls: 'bg-purple-100 text-purple-700', icon: '🏥', step: 3 },
   completed: { label: 'Realizado', cls: 'bg-slate-100 text-slate-600', icon: '✅', step: 4 },
   cancelled: { label: 'Cancelado', cls: 'bg-red-100 text-red-700', icon: '❌', step: -1 },
   no_show: { label: 'Faltou', cls: 'bg-amber-100 text-amber-700', icon: '👻', step: -1 },
@@ -95,8 +98,8 @@ const statusMap: Record<string, { label: string; cls: string; icon: string; step
 const timelineSteps = [
   { key: 'scheduled', label: 'Agendado', icon: '🔵' },
   { key: 'confirmed', label: 'Confirmado', icon: '✅' },
-  { key: 'reminder', label: 'Lembrete', icon: '⏰' },
-  { key: 'completed', label: 'Concluido', icon: '🏥' },
+  { key: 'present', label: 'Presente', icon: '🏥' },
+  { key: 'completed', label: 'Concluido', icon: '✅' },
 ];
 
 function StatusTimeline({ status }: { status: string }) {
@@ -1029,8 +1032,8 @@ export function SchedulingPage() {
     }
   };
 
-  const upcomingAppointments = appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed');
-  const pastAppointments = appointments.filter(a => a.status !== 'scheduled' && a.status !== 'confirmed');
+  const upcomingAppointments = appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'present');
+  const pastAppointments = appointments.filter(a => a.status !== 'scheduled' && a.status !== 'confirmed' && a.status !== 'present');
 
   const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
@@ -1176,9 +1179,14 @@ export function SchedulingPage() {
                                 <Check size={14} />Confirmar
                               </button>
                             )}
-                            {canRevert && a.status === 'confirmed' && (
+                            {a.status === 'confirmed' && (
+                              <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1">
+                                <UserCheck size={14} />Presente
+                              </button>
+                            )}
+                            {canRevert && (a.status === 'confirmed' || a.status === 'present') && (
                               <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
-                                <Undo2 size={14} />Desconfirmar
+                                <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : 'Desconfirmar'}
                               </button>
                             )}
                             <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">
@@ -2351,6 +2359,8 @@ export function SchedulingPage() {
             <h3 className="text-lg font-semibold text-slate-800 mb-3">Reverter status</h3>
             <p className="text-sm text-slate-600 mb-1">
               {revertTarget.status === 'completed'
+                ? 'Deseja reverter este agendamento para Presente?'
+                : revertTarget.status === 'present'
                 ? 'Deseja reverter este agendamento para Confirmado?'
                 : 'Deseja reverter este agendamento para Aguardando confirmação?'}
             </p>

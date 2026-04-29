@@ -223,12 +223,19 @@ router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRol
     const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId } });
     if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
 
-    const revertMap: Record<string, string> = { confirmed: 'scheduled', completed: 'confirmed' };
+    const revertMap: Record<string, string> = { confirmed: 'scheduled', present: 'confirmed', completed: 'present' };
     const newStatus = revertMap[call.status];
     if (!newStatus) throw new AppError(400, 'INVALID_REVERT', 'Status não pode ser revertido');
 
     const updated = await prisma.$transaction(async (tx) => {
-      const u = await tx.scheduledCall.update({ where: { id }, data: { status: newStatus } });
+      const updateData: any = { status: newStatus };
+      if (call.status === 'present') {
+        updateData.checkinAt = null;
+      }
+      if (newStatus === 'confirmed' || newStatus === 'scheduled') {
+        updateData.calledAt = null;
+      }
+      const u = await tx.scheduledCall.update({ where: { id }, data: updateData });
 
       if (call.status === 'completed') {
         // Clean up procedure records and financial transactions
@@ -275,6 +282,72 @@ router.delete('/calls/:id/permanent', authenticate, requireTenant, requireRole('
     const result = await schedulingService.hardDeleteCall(req.params.id as string, req.auth!.tenantId!);
     await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'APPOINTMENT', entityId: req.params.id as string, metadata: { permanent: true } });
     return success(res, result);
+  } catch (err) { next(err); }
+});
+
+// GET /queue — today's queue for a doctor (patients with status "present")
+router.get('/queue', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const tenantId = req.auth!.tenantId!;
+    const doctorId = (req.query.doctorId as string) || null;
+
+    const todaySP = new Date(new Date().getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const dayStart = new Date(`${todaySP}T00:00:00-03:00`);
+    const dayEnd = new Date(`${todaySP}T23:59:59.999-03:00`);
+
+    const where: any = {
+      tenantId,
+      date: { gte: dayStart, lte: dayEnd },
+      status: { in: ['present'] },
+    };
+    if (doctorId) where.doctorId = doctorId;
+
+    const queue = await prisma.scheduledCall.findMany({
+      where,
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        doctor: { select: { id: true, name: true } },
+      },
+      orderBy: { checkinAt: 'asc' },
+    });
+
+    return success(res, queue);
+  } catch (err) { next(err); }
+});
+
+// PATCH /queue/:id/call — doctor marks patient as "called" (in attendance)
+router.patch('/queue/:id/call', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const tenantId = req.auth!.tenantId!;
+
+    const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId, status: 'present' } });
+    if (!call) throw new AppError(404, 'NOT_FOUND', 'Paciente não encontrado na fila');
+
+    const updated = await prisma.scheduledCall.update({
+      where: { id },
+      data: { calledAt: new Date() },
+    });
+
+    return success(res, updated);
+  } catch (err) { next(err); }
+});
+
+// PATCH /queue/:id/uncall — undo "call" (put back in waiting)
+router.patch('/queue/:id/uncall', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const tenantId = req.auth!.tenantId!;
+
+    const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId, status: 'present' } });
+    if (!call) throw new AppError(404, 'NOT_FOUND', 'Paciente não encontrado na fila');
+
+    const updated = await prisma.scheduledCall.update({
+      where: { id },
+      data: { calledAt: null },
+    });
+
+    return success(res, updated);
   } catch (err) { next(err); }
 });
 

@@ -475,6 +475,7 @@ export function ConfiguracoesPage() {
     { path: '/estoque', label: 'Estoque' },
     { path: '/financeiro', label: 'Financeiro' },
     { path: '/agendamentos', label: 'Agendamentos' },
+    { path: '/fila', label: 'Fila' },
     { path: '/scripts', label: 'Scripts' },
     { path: '/assinatura', label: 'Assinatura' },
     { path: '/equipe', label: 'Equipe' },
@@ -492,10 +493,10 @@ export function ConfiguracoesPage() {
   ];
 
   const DEFAULT_ROLE_PERMS: Record<string, string[]> = {
-    MANAGER: ['/dashboard', '/pacientes', '/estoque', '/financeiro', '/agendamentos', '/scripts', '/assinatura', '/equipe', '/configuracoes'],
-    DOCTOR: ['/pacientes', '/agendamentos', '/scripts'],
-    NURSE: ['/pacientes', '/agendamentos', '/scripts'],
-    RECEPTIONIST: ['/pacientes', '/agendamentos', '/scripts'],
+    MANAGER: ['/dashboard', '/pacientes', '/estoque', '/financeiro', '/agendamentos', '/fila', '/scripts', '/assinatura', '/equipe', '/configuracoes'],
+    DOCTOR: ['/pacientes', '/agendamentos', '/fila', '/scripts'],
+    NURSE: ['/pacientes', '/agendamentos', '/fila', '/scripts'],
+    RECEPTIONIST: ['/pacientes', '/agendamentos', '/fila', '/scripts'],
     FINANCIAL: ['/financeiro'],
     STOCK: ['/estoque'],
     EMPLOYEE: ['/estoque'],

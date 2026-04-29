@@ -11,6 +11,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { ConveniosPage } from './pages/ConveniosPage';
 import { ConfiguracoesPage } from './pages/ConfiguracoesPage';
 import { TeamPage } from './pages/TeamPage';
+import { FilaPage } from './pages/FilaPage';
 import { AssinaturaPage } from './pages/AssinaturaPage';
 import { LoginPage } from './pages/LoginPage';
 import { Verify2FAPage } from './pages/Verify2FAPage';
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="estoque" element={<InventoryPage />} />
         <Route path="mensagens" element={<MessagesPage />} />
         <Route path="agendamentos" element={<SchedulingPage />} />
+        <Route path="fila" element={<FilaPage />} />
         <Route path="scripts" element={<ScriptsPage />} />
         <Route path="financeiro" element={<FinancialPage />} />
         <Route path="equipe" element={<TeamPage />} />

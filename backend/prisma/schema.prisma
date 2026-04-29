@@ -825,8 +825,10 @@ model ScheduledCall {
   phone      String
   date       DateTime
   duration   Int      @default(30)
-  status     String   @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
+  status     String   @default("scheduled") // scheduled, confirmed, present, completed, cancelled, no_show
   notes      String?
+  checkinAt  DateTime? @map("checkin_at")
+  calledAt   DateTime? @map("called_at")
   meetLink   String?  @map("meet_link")
   authorizationNumber  String?  @map("authorization_number")
   paymentType          String?  @default("PARTICULAR") @map("payment_type")

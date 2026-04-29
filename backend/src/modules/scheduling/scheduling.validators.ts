@@ -32,7 +32,7 @@ export const updateConfigSchema = z.object({
 });
 
 export const updateCallStatusSchema = z.object({
-  status: z.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  status: z.enum(['scheduled', 'confirmed', 'present', 'completed', 'cancelled', 'no_show']),
   notes: z.string().max(1000).optional().nullable(),
 });
 

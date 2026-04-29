@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { LayoutDashboard, Users, Package, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Package, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings, ClipboardList } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
 import { useInactivityLogout } from '../hooks/useInactivityLogout';
@@ -12,6 +12,7 @@ const allNavItems = [
   { path: '/estoque', label: 'Estoque', icon: Package },
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { path: '/agendamentos', label: 'Agendamentos', icon: Calendar },
+  { path: '/fila', label: 'Fila', icon: ClipboardList },
   { path: '/scripts', label: 'Scripts', icon: BookOpen },
   { path: '/assinatura', label: 'Assinatura', icon: PenLine },
   { path: '/equipe', label: 'Equipe', icon: UsersRound },
@@ -23,9 +24,9 @@ const defaultRoleAllowedPaths: Record<string, string[]> = {
   SUPER_ADMIN: allNavItems.map(i => i.path),
   OWNER: allNavItems.map(i => i.path),
   MANAGER: allNavItems.map(i => i.path),
-  DOCTOR: ['/pacientes', '/agendamentos', '/scripts', '/perfil'],
-  NURSE: ['/pacientes', '/agendamentos', '/scripts', '/perfil'],
-  RECEPTIONIST: ['/pacientes', '/agendamentos', '/scripts', '/perfil'],
+  DOCTOR: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
+  NURSE: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
+  RECEPTIONIST: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
   FINANCIAL: ['/financeiro', '/perfil'],
   STOCK: ['/estoque', '/perfil'],
   EMPLOYEE: ['/estoque', '/perfil'],
