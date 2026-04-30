@@ -298,7 +298,7 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
     const where: any = {
       tenantId,
       checkinAt: { gte: dayStart, lte: dayEnd },
-      status: { in: ['present'] },
+      status: { in: ['present', 'in_attendance', 'completed'] },
     };
     if (doctorId) where.doctorId = doctorId;
 
@@ -346,6 +346,40 @@ router.patch('/queue/:id/uncall', authenticate, requireTenant, async (req: Reque
       where: { id },
       data: { calledAt: null },
     });
+
+    return success(res, updated);
+  } catch (err) { next(err); }
+});
+
+// PATCH /queue/:id/start — start attendance (status → in_attendance)
+router.patch('/queue/:id/start', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const tenantId = req.auth!.tenantId!;
+
+    const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId } });
+    if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento nao encontrado');
+    if (!call.calledAt) throw new AppError(400, 'NOT_CALLED', 'Paciente ainda nao foi chamado');
+
+    const updated = await prisma.scheduledCall.update({
+      where: { id },
+      data: { status: 'in_attendance' },
+    });
+
+    return success(res, updated);
+  } catch (err) { next(err); }
+});
+
+// PATCH /queue/:id/finish — finish attendance (status → completed)
+router.patch('/queue/:id/finish', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const tenantId = req.auth!.tenantId!;
+
+    const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId, status: 'in_attendance' } });
+    if (!call) throw new AppError(404, 'NOT_FOUND', 'Atendimento nao encontrado');
+
+    const updated = await schedulingService.updateCallStatus(id, { status: 'completed' }, tenantId);
 
     return success(res, updated);
   } catch (err) { next(err); }

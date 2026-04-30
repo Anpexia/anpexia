@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, UserCheck, Phone, Stethoscope, RefreshCw } from 'lucide-react';
+import { Clock, UserCheck, Phone, Stethoscope, RefreshCw, Play, CheckCircle2, X, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { PatientPanel } from '../components/PatientPanel';
 
 interface QueueItem {
   id: string;
   name: string;
   phone: string;
+  status: string;
   date: string;
   checkinAt: string | null;
   calledAt: string | null;
   doctorId: string | null;
+  customerId: string | null;
   customer: { id: string; name: string; phone: string } | null;
   doctor: { id: string; name: string } | null;
 }
@@ -58,6 +61,7 @@ export function FilaPage() {
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState('');
+  const [attendingItem, setAttendingItem] = useState<QueueItem | null>(null);
   const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
 
   const isDoctor = user?.role === 'DOCTOR';
@@ -94,7 +98,6 @@ export function FilaPage() {
     }
   }, [isDoctor, user?.id, fetchQueue]);
 
-  // Auto-refresh every 30 seconds
   useEffect(() => {
     autoRefreshRef.current = setInterval(() => fetchQueue(), 30000);
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
@@ -120,24 +123,49 @@ export function FilaPage() {
     setActionId(id);
     try {
       await api.patch(`/scheduling/queue/${id}/uncall`);
-      showToast('Paciente retornou a fila');
+      showToast('Paciente retornou à fila');
       fetchQueue();
     } catch { showToast('Erro ao desfazer chamada'); }
     finally { setActionId(null); }
   };
 
-  const waiting = queue.filter(q => !q.calledAt);
-  const inAttendance = queue.filter(q => !!q.calledAt);
+  const handleStartAttendance = async (item: QueueItem) => {
+    setActionId(item.id);
+    try {
+      await api.patch(`/scheduling/queue/${item.id}/start`);
+      setAttendingItem({ ...item, status: 'in_attendance' });
+      fetchQueue();
+    } catch { showToast('Erro ao iniciar atendimento'); }
+    finally { setActionId(null); }
+  };
 
-  // Sort waiting by checkinAt (longest wait first)
+  const handleFinishAttendance = async () => {
+    if (!attendingItem) return;
+    setActionId(attendingItem.id);
+    try {
+      await api.patch(`/scheduling/queue/${attendingItem.id}/finish`);
+      showToast('Atendimento finalizado!');
+      setAttendingItem(null);
+      fetchQueue();
+    } catch { showToast('Erro ao finalizar atendimento'); }
+    finally { setActionId(null); }
+  };
+
+  // Split queue into sections
+  const waiting = queue.filter(q => q.status === 'present' && !q.calledAt);
+  const called = queue.filter(q => q.status === 'present' && !!q.calledAt);
+  const inAttendance = queue.filter(q => q.status === 'in_attendance');
+  const completed = queue.filter(q => q.status === 'completed');
+
   waiting.sort((a, b) => {
     if (!a.checkinAt || !b.checkinAt) return 0;
     return new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime();
   });
 
+  const totalActive = waiting.length + called.length + inAttendance.length;
+
   return (
     <div>
-      {/* Toast */}
       {toastMsg && (
         <div className="fixed top-4 right-4 z-50 bg-[#1E3A5F] text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium animate-fade-in">
           {toastMsg}
@@ -147,7 +175,12 @@ export function FilaPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Fila de Atendimento</h1>
-          <p className="text-sm text-slate-500">Pacientes aguardando atendimento hoje</p>
+          <p className="text-sm text-slate-500">
+            {totalActive > 0
+              ? `${totalActive} paciente${totalActive !== 1 ? 's' : ''} em andamento · ${completed.length} finalizado${completed.length !== 1 ? 's' : ''}`
+              : 'Nenhum paciente na fila hoje'
+            }
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {!isDoctor && (
@@ -156,7 +189,7 @@ export function FilaPage() {
               onChange={e => handleDoctorFilter(e.target.value)}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]"
             >
-              <option value="">Todos os medicos</option>
+              <option value="">Todos os médicos</option>
               {doctors.map(d => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
@@ -186,14 +219,12 @@ export function FilaPage() {
       ) : (
         <div className="space-y-6">
           {/* Waiting */}
-          <div>
-            <h2 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
-              <Clock size={16} className="text-amber-500" />
-              Aguardando ({waiting.length})
-            </h2>
-            {waiting.length === 0 ? (
-              <p className="text-xs text-slate-400 bg-white rounded-lg border border-slate-200 p-4 text-center">Nenhum paciente aguardando</p>
-            ) : (
+          {waiting.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                <Clock size={16} className="text-amber-500" />
+                Aguardando ({waiting.length})
+              </h2>
               <div className="space-y-2">
                 {waiting.map((item, index) => (
                   <div key={item.id} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -206,7 +237,7 @@ export function FilaPage() {
                         <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                           <span className="flex items-center gap-1"><Clock size={11} /> Agendado: {formatTime(item.date)}</span>
                           {item.checkinAt && <span className="flex items-center gap-1"><UserCheck size={11} /> Chegou: {formatTime(item.checkinAt)}</span>}
-                          {item.phone && <span className="flex items-center gap-1 hidden sm:flex"><Phone size={11} /> {item.phone}</span>}
+                          {item.phone && <span className="items-center gap-1 hidden sm:flex"><Phone size={11} /> {item.phone}</span>}
                         </div>
                         {!isDoctor && item.doctor && (
                           <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
@@ -230,15 +261,64 @@ export function FilaPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* In attendance */}
+          {/* Called — waiting to start attendance */}
+          {called.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                <UserCheck size={16} className="text-blue-500" />
+                Chamados ({called.length})
+              </h2>
+              <div className="space-y-2">
+                {called.map(item => (
+                  <div key={item.id} className="bg-blue-50 rounded-xl border border-blue-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                        <UserCheck size={16} className="text-blue-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}</p>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+                          <span>Agendado: {formatTime(item.date)}</span>
+                          {item.checkinAt && <span>Chegou: {formatTime(item.checkinAt)}</span>}
+                          {item.calledAt && <span className="text-blue-600 font-medium">Chamado: {formatTime(item.calledAt)}</span>}
+                        </div>
+                        {!isDoctor && item.doctor && (
+                          <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleUncall(item.id)}
+                        disabled={actionId === item.id}
+                        className="px-3 py-2 border border-slate-300 bg-white text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Voltar para fila
+                      </button>
+                      <button
+                        onClick={() => handleStartAttendance(item)}
+                        disabled={actionId === item.id}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <Play size={14} />
+                        Iniciar Atendimento
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* In Attendance */}
           {inAttendance.length > 0 && (
             <div>
               <h2 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
                 <Stethoscope size={16} className="text-emerald-500" />
-                Em atendimento ({inAttendance.length})
+                Em Atendimento ({inAttendance.length})
               </h2>
               <div className="space-y-2">
                 {inAttendance.map(item => (
@@ -251,8 +331,7 @@ export function FilaPage() {
                         <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}</p>
                         <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                           <span>Agendado: {formatTime(item.date)}</span>
-                          {item.checkinAt && <span>Chegou: {formatTime(item.checkinAt)}</span>}
-                          {item.calledAt && <span className="text-emerald-600 font-medium">Chamado: {formatTime(item.calledAt)}</span>}
+                          {item.calledAt && <span className="text-emerald-600 font-medium">Iniciado: {formatTime(item.calledAt)}</span>}
                         </div>
                         {!isDoctor && item.doctor && (
                           <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
@@ -260,17 +339,120 @@ export function FilaPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => handleUncall(item.id)}
-                      disabled={actionId === item.id}
-                      className="px-3 py-1.5 border border-slate-300 bg-white text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                      onClick={() => setAttendingItem(item)}
+                      className="px-4 py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] flex items-center gap-1.5 shrink-0"
                     >
-                      Voltar para fila
+                      <Stethoscope size={14} />
+                      Abrir Atendimento
                     </button>
                   </div>
                 ))}
               </div>
             </div>
           )}
+
+          {/* Completed */}
+          {completed.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-slate-400" />
+                Finalizados ({completed.length})
+              </h2>
+              <div className="space-y-2">
+                {completed.map(item => (
+                  <div key={item.id} className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3 opacity-70">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                        <CheckCircle2 size={16} className="text-slate-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-600 text-sm truncate">{item.customer?.name || item.name}</p>
+                        <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                          <span>Agendado: {formatTime(item.date)}</span>
+                          {item.checkinAt && <span>Chegou: {formatTime(item.checkinAt)}</span>}
+                        </div>
+                        {!isDoctor && item.doctor && (
+                          <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2.5 py-1 rounded-full">Concluído</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Patient Panel Popup */}
+      {attendingItem && attendingItem.customer?.id && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-4 relative flex flex-col max-h-[calc(100vh-2rem)]">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">
+                  Atendimento — {attendingItem.customer?.name || attendingItem.name}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Agendado: {formatTime(attendingItem.date)}
+                  {attendingItem.calledAt && ` · Chamado: ${formatTime(attendingItem.calledAt)}`}
+                  {attendingItem.doctor && ` · Dr(a). ${attendingItem.doctor.name}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {attendingItem.status === 'in_attendance' && (
+                  <button
+                    onClick={handleFinishAttendance}
+                    disabled={actionId === attendingItem.id}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 size={14} />
+                    Finalizar Atendimento
+                  </button>
+                )}
+                <button
+                  onClick={() => setAttendingItem(null)}
+                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            {/* PatientPanel */}
+            <div className="overflow-y-auto flex-1 p-6">
+              <PatientPanel
+                customerId={attendingItem.customer.id}
+                initialTab="prontuario"
+                onPatientUpdated={() => fetchQueue()}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning popup when attending item has no customer linked */}
+      {attendingItem && !attendingItem.customer?.id && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle size={24} className="text-amber-500" />
+              <h3 className="text-lg font-bold text-slate-800">Paciente não vinculado</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              Este agendamento não está vinculado a nenhum paciente cadastrado.
+              Para abrir o prontuário, vincule o paciente primeiro na página de Agendamentos.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setAttendingItem(null)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
