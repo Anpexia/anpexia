@@ -1120,6 +1120,7 @@ model PatientEvolution {
   acuity_od     String?  @map("acuity_od")
   acuity_oe     String?  @map("acuity_oe")
   notes         String?
+  data          Json?
   createdAt     DateTime @default(now()) @map("created_at")
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

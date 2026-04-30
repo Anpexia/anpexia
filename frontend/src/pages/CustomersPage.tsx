@@ -1205,7 +1205,11 @@ export function CustomersPage() {
                           {getSegmentConfig(user?.tenant?.segment).anamnese.map(field => (
                             <div key={field.key}>
                               <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
-                              <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => setAnamneseData({ ...anamneseData, [field.key]: v })} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
+                              {field.type === 'textarea' ? (
+                                <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => setAnamneseData({ ...anamneseData, [field.key]: v })} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
+                              ) : (
+                                <input type={field.type === 'number' ? 'number' : 'text'} value={anamneseData[field.key] || ''} onChange={(e) => setAnamneseData({ ...anamneseData, [field.key]: e.target.value })} className={inputCls} placeholder={field.placeholder} />
+                              )}
                             </div>
                           ))}
 
@@ -1232,7 +1236,11 @@ export function CustomersPage() {
                           {getSegmentConfig(user?.tenant?.segment).evolucao.map(field => (
                             <div key={field.key}>
                               <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
-                              <DictationTextarea value={evolucaoForm[field.key] || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, [field.key]: v })} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
+                              {field.type === 'textarea' ? (
+                                <DictationTextarea value={evolucaoForm[field.key] || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, [field.key]: v })} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
+                              ) : (
+                                <input type={field.type === 'number' ? 'number' : 'text'} value={evolucaoForm[field.key] || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, [field.key]: e.target.value })} className={inputCls} placeholder={field.placeholder} />
+                              )}
                             </div>
                           ))}
                           <div className="flex gap-2">

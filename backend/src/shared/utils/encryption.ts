@@ -68,7 +68,7 @@ export const ENCRYPTED_MODELS: Record<string, EncryptedModelConfig> = {
   MedicalRecord: { string: ['allergies', 'medications', 'chronicDiseases', 'clinicalNotes'] },
   MedicalEntry: { string: ['content'] },
   Anamnesis: { json: ['data'] },
-  PatientEvolution: { string: ['subjective', 'objective', 'assessment', 'plan', 'exams', 'notes', 'acuity_od', 'acuity_oe'] },
+  PatientEvolution: { string: ['subjective', 'objective', 'assessment', 'plan', 'exams', 'notes', 'acuity_od', 'acuity_oe'], json: ['data'] },
   Prescription: { json: ['data'] },
   MedicalCertificate: { string: ['reason', 'cid', 'observations'] },
   PatientDocument: { string: ['fileData', 'description'] },

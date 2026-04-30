@@ -22,10 +22,12 @@ evolutionsRouter.get('/patient-evolution/:patientId', async (req: Request, res: 
 
 evolutionsRouter.post('/patient-evolution/:patientId', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const body = { ...req.body };
+    if (!body.doctorId) body.doctorId = req.auth!.userId;
     const evolution = await evolutionsService.create(
       req.auth!.tenantId!,
       req.params.patientId as string,
-      req.body,
+      body,
     );
     return created(res, evolution);
   } catch (err) {
