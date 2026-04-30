@@ -428,7 +428,29 @@ function TenantsPage() {
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-gray-500">Segmento:</span> <select value={showDetail.segment || 'OUTROS'} onChange={async (e) => { try { await api.put(`/tenants/${showDetail.id}`, { segment: e.target.value }); setShowDetail({ ...showDetail, segment: e.target.value }); } catch {} }} className="ml-1 text-sm border border-gray-300 rounded px-1 py-0.5"><option value="CLINICA_GERAL">Clinica Geral</option><option value="CLINICA_MEDICA">Clinica Medica</option><option value="CLINICA_OFTALMOLOGICA">Clinica Oftalmologica</option><option value="CLINICA_ESTETICA">Clinica Estetica</option><option value="CLINICA_ODONTOLOGICA">Clinica Odontologica</option><option value="SALAO_BELEZA">Salao de Beleza</option><option value="OUTROS">Outros</option></select></div>
+                <div className="col-span-2">
+                  <span className="text-gray-500">Segmento:</span>
+                  <select
+                    value={showDetail.segment || 'OUTROS'}
+                    onChange={async (e) => {
+                      const newSegment = e.target.value;
+                      try {
+                        await api.put(`/tenants/${showDetail.id}`, { segment: newSegment });
+                        setShowDetail({ ...showDetail, segment: newSegment });
+                        setTenants(ts => ts.map(t => t.id === showDetail.id ? { ...t, segment: newSegment } : t));
+                      } catch {}
+                    }}
+                    className="ml-2 text-sm border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="CLINICA_GERAL">Clinica Geral</option>
+                    <option value="CLINICA_MEDICA">Clinica Medica</option>
+                    <option value="CLINICA_OFTALMOLOGICA">Clinica Oftalmologica</option>
+                    <option value="CLINICA_ESTETICA">Clinica Estetica</option>
+                    <option value="CLINICA_ODONTOLOGICA">Clinica Odontologica</option>
+                    <option value="SALAO_BELEZA">Salao de Beleza</option>
+                    <option value="OUTROS">Outros</option>
+                  </select>
+                </div>
                 <div><span className="text-gray-500">Mensalidade:</span> <span className="ml-1 font-medium text-green-700">{formatBRL(calcMonthly(showDetail.users?.length || 0))}/mes</span>{(showDetail.users?.length || 0) > 10 && <span className="text-xs text-gray-400 ml-1">({showDetail.users.length} usuarios)</span>}</div>
                 <div><span className="text-gray-500">Telefone:</span> <span className="ml-1">{showDetail.phone || '-'}</span></div>
                 <div><span className="text-gray-500">E-mail:</span> <span className="ml-1">{showDetail.email || '-'}</span></div>
