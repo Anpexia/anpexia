@@ -434,6 +434,18 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     ? await prisma.customer.findFirst({ where: { id: data.customerId, isActive: true, ...(tenantId ? { tenantId } : {}) } })
     : await prisma.customer.findFirst({ where: customerWhere, orderBy: { createdAt: 'desc' } });
 
+  // Auto-create customer if not found and we have a tenantId
+  if (!customer && tenantId) {
+    customer = await prisma.customer.create({
+      data: {
+        tenantId,
+        name: data.name,
+        phone: data.phone,
+        email: data.email ?? undefined,
+      },
+    });
+  }
+
   const call = await prisma.$transaction(async (tx) => {
     // Create the scheduled call
     // Resolve tenantId: explicit param > customer's tenant > null
@@ -460,6 +472,18 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
         convenioId: convenioId ?? undefined,
       },
     });
+
+    // Auto-link convenio to patient if CONVENIO and customer exists
+    if (paymentType === 'CONVENIO' && convenioId && customer?.id) {
+      const existing = await tx.patientConvenio.findUnique({
+        where: { patientId_convenioId: { patientId: customer.id, convenioId } },
+      });
+      if (!existing) {
+        await tx.patientConvenio.create({
+          data: { patientId: customer.id, convenioId },
+        });
+      }
+    }
 
     // If lead exists, update stage and log activity
     if (lead) {

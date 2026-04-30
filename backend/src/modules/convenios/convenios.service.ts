@@ -63,7 +63,7 @@ export const conveniosService = {
 
   async upsertPatientConvenio(tenantId: string, patientId: string, data: {
     convenioId: string;
-    numeroCarteirinha: string;
+    numeroCarteirinha?: string | null;
     validade?: string | null;
     titular?: string;
     nomeTitular?: string | null;
@@ -83,7 +83,7 @@ export const conveniosService = {
           data: {
             patientId,
             convenioId: data.convenioId,
-            numeroCarteirinha: data.numeroCarteirinha,
+            numeroCarteirinha: data.numeroCarteirinha || null,
             validade: data.validade ? new Date(data.validade) : null,
             titular: data.titular || 'PROPRIO',
             nomeTitular: data.nomeTitular || null,

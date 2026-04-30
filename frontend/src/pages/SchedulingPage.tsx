@@ -171,9 +171,7 @@ export function SchedulingPage() {
   // Payment type for new appointment
   const [bookPaymentType, setBookPaymentType] = useState<'PARTICULAR' | 'CONVENIO'>('PARTICULAR');
   const [bookConvenioId, setBookConvenioId] = useState<string>('');
-  const [patientConvenios, setPatientConvenios] = useState<ConvenioOption[]>([]);
-  const [loadingPatientConvenios, setLoadingPatientConvenios] = useState(false);
-  // Tenant-wide convenios lookup (for rendering badges in the list)
+  // Tenant-wide convenios lookup (for rendering badges and booking modal)
   const [conveniosLookup, setConveniosLookup] = useState<Record<string, ConvenioOption>>({});
 
   // Doctors
@@ -378,43 +376,6 @@ export function SchedulingPage() {
     setShowBookModal(true);
   };
 
-  // Load the patient's active convenio(s) when entering CONVENIO mode or switching patient.
-  // The backend stores a single patient-convenio link (see convenios.service.getPatientConvenio),
-  // so we fetch that and expose it as a single-option dropdown when active.
-  const loadPatientConvenios = useCallback(async (customerId: string) => {
-    setLoadingPatientConvenios(true);
-    try {
-      const { data } = await api.get(`/convenios/patients/${customerId}`);
-      const pc = data.data;
-      if (pc && pc.convenio && pc.convenio.id) {
-        // Enrich with the `ativo` flag from the tenant-wide lookup
-        const tenantConv = conveniosLookup[pc.convenio.id];
-        setPatientConvenios([{
-          id: pc.convenio.id,
-          nome: pc.convenio.nome,
-          ativo: tenantConv ? tenantConv.ativo : true,
-        }].filter((c) => c.ativo));
-      } else {
-        setPatientConvenios([]);
-      }
-    } catch {
-      setPatientConvenios([]);
-    } finally {
-      setLoadingPatientConvenios(false);
-    }
-  }, [conveniosLookup]);
-
-  // Whenever the user switches to CONVENIO and has a patient selected, load the list
-  useEffect(() => {
-    if (!showBookModal) return;
-    if (bookPaymentType !== 'CONVENIO') return;
-    if (!bookForm.customerId) {
-      setPatientConvenios([]);
-      return;
-    }
-    loadPatientConvenios(bookForm.customerId);
-  }, [showBookModal, bookPaymentType, bookForm.customerId, loadPatientConvenios]);
-
   // Fetch available slots when doctor + date are both selected
   useEffect(() => {
     if (!showBookModal || !bookForm.doctorId || !bookForm.date) {
@@ -454,17 +415,13 @@ export function SchedulingPage() {
     }));
     setCustomerSearch('');
     setCustomerResults([]);
-    // Reset convenio selection whenever patient changes
     setBookConvenioId('');
-    setPatientConvenios([]);
   };
 
   const clearSelectedCustomer = () => {
     setSelectedBookCustomer(null);
     setBookForm(prev => ({ ...prev, customerId: '' }));
-    // Reset convenio selection whenever patient is cleared
     setBookConvenioId('');
-    setPatientConvenios([]);
   };
 
   const handleBook = async (e: React.FormEvent) => {
@@ -1649,12 +1606,8 @@ export function SchedulingPage() {
                 </div>
                 {bookPaymentType === 'CONVENIO' && (
                   <div className="mt-2">
-                    {!bookForm.customerId ? (
-                      <p className="text-xs text-amber-600">Selecione um paciente para ver os convenios.</p>
-                    ) : loadingPatientConvenios ? (
-                      <p className="text-xs text-slate-500">Carregando convenios...</p>
-                    ) : patientConvenios.length === 0 ? (
-                      <p className="text-xs text-amber-600">Paciente sem convenios cadastrados</p>
+                    {Object.keys(conveniosLookup).length === 0 ? (
+                      <p className="text-xs text-amber-600">Nenhum convenio cadastrado. Cadastre em Configuracoes.</p>
                     ) : (
                       <select
                         value={bookConvenioId}
@@ -1663,7 +1616,7 @@ export function SchedulingPage() {
                         required
                       >
                         <option value="">Selecione o convenio</option>
-                        {patientConvenios.map((c) => (
+                        {Object.values(conveniosLookup).filter(c => c.ativo).map((c) => (
                           <option key={c.id} value={c.id}>{c.nome}</option>
                         ))}
                       </select>

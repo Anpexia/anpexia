@@ -1154,7 +1154,7 @@ model PatientConvenio {
   id                String    @id @default(cuid())
   patientId         String    @map("patient_id")
   convenioId        String    @map("convenio_id")
-  numeroCarteirinha String    @map("numero_carteirinha")
+  numeroCarteirinha String?   @map("numero_carteirinha")
   validade          DateTime?
   titular           String    @default("PROPRIO")
   nomeTitular       String?   @map("nome_titular")

@@ -526,8 +526,8 @@ export function CustomersPage() {
 
   // Convenio handlers
   const handleSaveConvenio = async () => {
-    if (!selectedCustomer || !convenioForm.convenioId || !convenioForm.numeroCarteirinha) {
-      showToast('Selecione o convenio e informe a carteirinha');
+    if (!selectedCustomer || !convenioForm.convenioId) {
+      showToast('Selecione o convenio');
       return;
     }
     setSavingConvenio(true);
