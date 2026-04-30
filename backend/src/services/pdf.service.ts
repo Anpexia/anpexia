@@ -120,6 +120,12 @@ export async function generateCertificatePdf(tenantId: string, certificateId: st
 
   doc.font('Helvetica-Bold').text('Motivo: ', { continued: true });
   doc.font('Helvetica').text(certificate.reason);
+
+  if (certificate.cid) {
+    doc.font('Helvetica-Bold').text('CID-10: ', { continued: true });
+    doc.font('Helvetica').text(certificate.cid);
+  }
+
   doc.moveDown(0.5);
 
   doc.font('Helvetica-Bold').text('Período: ', { continued: true });

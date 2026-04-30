@@ -6,6 +6,7 @@ interface CreateCertificateData {
   doctorId: string;
   type: 'ATESTADO' | 'DECLARACAO';
   reason: string;
+  cid?: string;
   daysOff?: number;
   startDate: string;
   endDate: string;
@@ -30,6 +31,7 @@ export const certificatesService = {
         doctorId: data.doctorId,
         type: data.type,
         reason: data.reason,
+        cid: data.cid || null,
         daysOff: data.daysOff,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),

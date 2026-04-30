@@ -79,6 +79,18 @@ prescriptionsRouter.post('/prescriptions', async (req: Request, res: Response, n
   }
 });
 
+prescriptionsRouter.delete('/prescriptions/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.auth!.tenantId!;
+    const id = req.params.id as string;
+    await prescriptionsService.remove(tenantId, id);
+    await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'PRESCRIPTION', entityId: id as string });
+    return success(res, { deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 prescriptionsRouter.get('/prescriptions/:id/pdf', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.auth!.tenantId!;

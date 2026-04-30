@@ -74,4 +74,16 @@ export const prescriptionsService = {
 
     return prescription;
   },
+
+  async remove(tenantId: string, id: string) {
+    const prescription = await prisma.prescription.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!prescription) {
+      throw new AppError(404, 'PRESCRIPTION_NOT_FOUND', 'Prescricao nao encontrada');
+    }
+
+    await prisma.prescription.delete({ where: { id } });
+  },
 };

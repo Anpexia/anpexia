@@ -175,7 +175,7 @@ export function CustomersPage() {
   const [atestados, setAtestados] = useState<any[]>([]);
   const [loadingAtestados, setLoadingAtestados] = useState(false);
   const [showNewAtestado, setShowNewAtestado] = useState(false);
-  const [atestadoForm, setAtestadoForm] = useState({ type: 'ATESTADO', reason: '', daysOff: '', startDate: '', endDate: '', observations: '' });
+  const [atestadoForm, setAtestadoForm] = useState({ type: 'ATESTADO', reason: '', cid: '', daysOff: '', startDate: '', endDate: '', observations: '' });
   const [savingAtestado, setSavingAtestado] = useState(false);
 
   // Documents state
@@ -423,6 +423,15 @@ export function CustomersPage() {
     finally { setSavingPrescricao(false); }
   };
 
+  const handleDeletePrescricao = async (id: string) => {
+    if (!selectedCustomer) return;
+    try {
+      await api.delete(`/prescriptions/${id}`);
+      await fetchPrescricoes(selectedCustomer.id);
+      showToast('Prescricao excluida!');
+    } catch { showToast('Erro ao excluir prescricao'); }
+  };
+
   const handleDownloadPdf = async (type: 'prescriptions' | 'medical-certificates', id: string) => {
     try {
       const { data } = await api.get(`/${type}/${id}/pdf`, { responseType: 'blob' });
@@ -453,7 +462,7 @@ export function CustomersPage() {
     try {
       await api.post(`/medical-certificates`, { ...atestadoForm, patientId: selectedCustomer.id, daysOff: atestadoForm.daysOff ? Number(atestadoForm.daysOff) : undefined });
       setShowNewAtestado(false);
-      setAtestadoForm({ type: 'ATESTADO', reason: '', daysOff: '', startDate: '', endDate: '', observations: '' });
+      setAtestadoForm({ type: 'ATESTADO', reason: '', cid: '', daysOff: '', startDate: '', endDate: '', observations: '' });
       await fetchAtestados(selectedCustomer.id);
       showToast('Atestado emitido!');
     } catch { showToast('Erro ao emitir atestado'); }
@@ -1280,6 +1289,8 @@ export function CustomersPage() {
                         <select value={prescricaoType} onChange={(e) => { setPrescricaoType(e.target.value); setPrescricaoItems([]); }} className={inputCls}>
                           <option value="MEDICAMENTO">Medicamento</option>
                           <option value="EXAME_EXTERNO">Exame Externo</option>
+                          <option value="EXAME_INTERNO">Exame Interno</option>
+                          <option value="OCULOS">Oculos</option>
                         </select>
                       </div>
 
@@ -1408,6 +1419,9 @@ export function CustomersPage() {
                                 <button onClick={() => handleDownloadPdf('prescriptions', p.id)} className="flex items-center gap-1 text-sm text-[#1E3A5F] hover:text-[#2A4D7A] font-medium" title="Baixar PDF">
                                   <Download size={14} /> PDF
                                 </button>
+                                <button onClick={() => handleDeletePrescricao(p.id)} className="text-red-400 hover:text-red-600" title="Excluir prescricao">
+                                  <Trash2 size={14} />
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1448,6 +1462,10 @@ export function CustomersPage() {
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">Motivo</label>
                         <DictationTextarea value={atestadoForm.reason} onChange={(v) => setAtestadoForm({ ...atestadoForm, reason: v })} className={inputCls + ' h-16 resize-none'} placeholder="Motivo do atestado..." />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">CID-10 (opcional)</label>
+                        <input type="text" value={atestadoForm.cid || ''} onChange={(e) => setAtestadoForm({ ...atestadoForm, cid: e.target.value })} className={inputCls} placeholder="Ex: J06.9 - Infeccao aguda das vias aereas" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -1490,6 +1508,7 @@ export function CustomersPage() {
                               <div className="flex items-center gap-3 flex-1 min-w-0">
                                 <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${at.cls}`}>{at.label}</span>
                                 <span className="text-sm text-slate-700 truncate">{a.reason}</span>
+                                {a.cid && <span className="text-xs text-slate-500 shrink-0">CID: {a.cid}</span>}
                                 {a.daysOff && <span className="text-xs text-slate-500 shrink-0">{a.daysOff} dia(s) de afastamento</span>}
                               </div>
                               <div className="flex items-center gap-3 shrink-0 ml-3">

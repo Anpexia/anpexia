@@ -1024,6 +1024,7 @@ model MedicalCertificate {
   doctorId     String          @map("doctor_id")
   type         CertificateType
   reason       String
+  cid          String?
   daysOff      Int?            @map("days_off")
   startDate    DateTime        @map("start_date")
   endDate      DateTime        @map("end_date")
