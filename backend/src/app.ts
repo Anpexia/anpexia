@@ -142,6 +142,7 @@ async function loadRoutes() {
     const { procedureTemplatesRouter } = await import('./modules/procedureTemplates/procedureTemplates.controller');
     const { repasseTypesRouter } = await import('./modules/repasseTypes/repasseTypes.controller');
     const { privateProceduresRouter, privateProcedureCallsRouter } = await import('./modules/privateProcedures/privateProcedures.controller');
+    const { examTypesRouter } = await import('./modules/examTypes/examTypes.controller');
     const { auditLogRouter } = await import('./modules/admin/auditLog.controller');
     const { adminUsersRouter } = await import('./modules/admin/adminUsers.controller');
     const { autoAudit } = await import('./shared/middleware/autoAudit');
@@ -203,6 +204,7 @@ async function loadRoutes() {
     app.use('/api/v1/procedure-templates', procedureTemplatesRouter);
     app.use('/api/v1/repasse-types', repasseTypesRouter);
     app.use('/api/v1/private-procedures', privateProceduresRouter);
+    app.use('/api/v1/exam-types', examTypesRouter);
     app.use('/api/google', googleRouter);
     app.use('/api/v1/google', googleRouter);
 

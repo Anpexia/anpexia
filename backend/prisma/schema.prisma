@@ -69,6 +69,7 @@ model Tenant {
   privateProcedures     PrivateProcedure[]
   settings              TenantSettings?
   patientDocuments      PatientDocument[]
+  examTypes             ExamType[]
 
   @@map("tenants")
 }
@@ -1377,4 +1378,23 @@ model PrivateProcedureCall {
   createdAt          DateTime         @default(now()) @map("created_at")
 
   @@map("private_procedure_calls")
+}
+
+// ==========================================
+// TIPOS DE EXAME
+// ==========================================
+
+model ExamType {
+  id        String  @id @default(cuid())
+  tenantId  String  @map("tenant_id")
+  name      String
+  category  String  @default("GERAL")
+  ativo     Boolean @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("exam_types")
 }

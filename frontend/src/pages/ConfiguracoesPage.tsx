@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X, List, Lock, CheckCircle, XCircle, RefreshCw, Loader2, QrCode, Unplug } from 'lucide-react';
+import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X, List, Lock, CheckCircle, XCircle, RefreshCw, Loader2, QrCode, Unplug, FlaskConical } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
-type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'repasse' | 'procedimentos' | 'permissoes' | 'seguranca';
+type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'repasse' | 'procedimentos' | 'permissoes' | 'seguranca' | 'exames';
 
 interface PrivateProcedureItem {
   id: string;
@@ -319,6 +319,7 @@ export function ConfiguracoesPage() {
   const TABS: { key: Tab; label: string; icon: any }[] = [
     { key: 'clinica', label: 'Clinica', icon: Building2 },
     { key: 'convenios', label: 'Convenios', icon: Shield },
+    { key: 'exames', label: 'Tipos de Exame', icon: FlaskConical },
     ...(canManageTuss ? [{ key: 'tuss' as Tab, label: 'Procedimentos TUSS', icon: FileCode }] : []),
     ...(canManageTuss ? [{ key: 'procedimentos' as Tab, label: 'Procedimentos', icon: List }] : []),
     ...(canManageTuss ? [{ key: 'repasse' as Tab, label: 'Repasse', icon: Percent }] : []),
@@ -453,6 +454,14 @@ export function ConfiguracoesPage() {
   const [convenios, setConvenios] = useState<any[]>([]);
   const [newConvenio, setNewConvenio] = useState('');
 
+  // Exam types
+  const [examTypes, setExamTypes] = useState<{ id: string; name: string; category: string; ativo: boolean }[]>([]);
+  const [newExamName, setNewExamName] = useState('');
+  const [newExamCategory, setNewExamCategory] = useState('GERAL');
+  const [editingExam, setEditingExam] = useState<string | null>(null);
+  const [editExamName, setEditExamName] = useState('');
+  const [editExamCategory, setEditExamCategory] = useState('');
+
   // Repasse types
   const [repasseTypes, setRepasseTypes] = useState<RepasseTypeItem[]>([]);
   const [newRepasseType, setNewRepasseType] = useState('');
@@ -576,6 +585,13 @@ export function ConfiguracoesPage() {
     } catch {}
   }, []);
 
+  const loadExamTypes = useCallback(async () => {
+    try {
+      const { data } = await api.get('/exam-types', { params: { segment: user?.tenant?.segment } });
+      setExamTypes(data.data || []);
+    } catch {}
+  }, [user?.tenant?.segment]);
+
   const loadTuss = useCallback(async () => {
     if (!canManageTuss) return;
     try {
@@ -604,6 +620,7 @@ export function ConfiguracoesPage() {
   }, [canManageTuss]);
 
   useEffect(() => { loadSettings(); loadConvenios(); }, [loadSettings, loadConvenios]);
+  useEffect(() => { if (tab === 'exames') loadExamTypes(); }, [tab, loadExamTypes]);
   useEffect(() => { if (tab === 'tuss') loadTuss(); }, [tab, loadTuss]);
   useEffect(() => { if (tab === 'repasse') loadRepasseTypes(); }, [tab, loadRepasseTypes]);
   useEffect(() => { if (tab === 'procedimentos') loadPrivateProcedures(); }, [tab, loadPrivateProcedures]);
@@ -853,6 +870,40 @@ export function ConfiguracoesPage() {
     } catch { flash('Erro ao excluir'); }
   };
 
+  const addExamType = async () => {
+    if (!newExamName.trim()) return;
+    try {
+      await api.post('/exam-types', { name: newExamName.trim(), category: newExamCategory });
+      setNewExamName('');
+      setNewExamCategory('GERAL');
+      loadExamTypes();
+    } catch { flash('Erro ao adicionar tipo de exame'); }
+  };
+
+  const updateExamType = async (id: string) => {
+    try {
+      await api.put(`/exam-types/${id}`, { name: editExamName, category: editExamCategory });
+      setEditingExam(null);
+      loadExamTypes();
+    } catch { flash('Erro ao atualizar'); }
+  };
+
+  const toggleExamType = async (id: string, ativo: boolean) => {
+    try {
+      await api.put(`/exam-types/${id}`, { ativo: !ativo });
+      loadExamTypes();
+    } catch {}
+  };
+
+  const deleteExamType = async (id: string) => {
+    try {
+      await api.delete(`/exam-types/${id}`);
+      loadExamTypes();
+    } catch { flash('Erro ao excluir'); }
+  };
+
+  const examCategories = [...new Set(examTypes.map(e => e.category))].sort();
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
 
   return (
@@ -984,6 +1035,81 @@ export function ConfiguracoesPage() {
             ))}
             {convenios.length === 0 && <p className="text-sm text-gray-500 text-center py-4">Nenhum convenio cadastrado</p>}
           </div>
+        </div>
+      )}
+
+      {/* EXAMES TAB */}
+      {tab === 'exames' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Tipos de Exame</h2>
+          <p className="text-sm text-gray-500 mb-4">Defina os tipos de exame que sua clinica realiza. Eles aparecerao como sugestao nas prescricoes.</p>
+          <div className="flex gap-2 mb-4">
+            <input
+              value={newExamName}
+              onChange={e => setNewExamName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addExamType()}
+              placeholder="Nome do exame..."
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+            <select value={newExamCategory} onChange={e => setNewExamCategory(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="GERAL">Geral</option>
+              <option value="LABORATORIAL">Laboratorial</option>
+              <option value="IMAGEM">Imagem</option>
+              <option value="CARDIOLOGICO">Cardiologico</option>
+              <option value="OFTALMOLOGICO">Oftalmologico</option>
+              <option value="DERMATOLOGICO">Dermatologico</option>
+              <option value="COMPLEMENTAR">Complementar</option>
+              <option value="AVALIACAO">Avaliacao</option>
+            </select>
+            <button onClick={addExamType} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+              <Plus size={16} />
+            </button>
+          </div>
+
+          {examCategories.map(cat => {
+            const items = examTypes.filter(e => e.category === cat);
+            if (items.length === 0) return null;
+            return (
+              <div key={cat} className="mb-4">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{cat}</h3>
+                <div className="space-y-1">
+                  {items.map(exam => (
+                    <div key={exam.id} className="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-lg">
+                      {editingExam === exam.id ? (
+                        <div className="flex items-center gap-2 flex-1 mr-2">
+                          <input value={editExamName} onChange={e => setEditExamName(e.target.value)} className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" onKeyDown={e => e.key === 'Enter' && updateExamType(exam.id)} />
+                          <select value={editExamCategory} onChange={e => setEditExamCategory(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-sm">
+                            <option value="GERAL">Geral</option>
+                            <option value="LABORATORIAL">Laboratorial</option>
+                            <option value="IMAGEM">Imagem</option>
+                            <option value="CARDIOLOGICO">Cardiologico</option>
+                            <option value="OFTALMOLOGICO">Oftalmologico</option>
+                            <option value="DERMATOLOGICO">Dermatologico</option>
+                            <option value="COMPLEMENTAR">Complementar</option>
+                            <option value="AVALIACAO">Avaliacao</option>
+                          </select>
+                          <button onClick={() => updateExamType(exam.id)} className="text-green-600 hover:text-green-700"><CheckCircle size={16} /></button>
+                          <button onClick={() => setEditingExam(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className={`text-sm font-medium ${exam.ativo ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{exam.name}</span>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => { setEditingExam(exam.id); setEditExamName(exam.name); setEditExamCategory(exam.category); }} className="text-gray-400 hover:text-blue-600"><Edit2 size={14} /></button>
+                            <button onClick={() => toggleExamType(exam.id, exam.ativo)} className={`text-xs px-2 py-0.5 rounded-full font-medium ${exam.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
+                              {exam.ativo ? 'Ativo' : 'Inativo'}
+                            </button>
+                            <button onClick={() => deleteExamType(exam.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {examTypes.length === 0 && <p className="text-sm text-gray-500 text-center py-4">Nenhum tipo de exame cadastrado. Os exames padrao do seu segmento serao criados automaticamente.</p>}
         </div>
       )}
 

@@ -172,6 +172,12 @@ export function CustomersPage() {
   const [prescricaoOculos, setPrescricaoOculos] = useState({ od_esferico: '', od_cilindrico: '', od_eixo: '', od_adicao: '', od_dnp: '', oe_esferico: '', oe_cilindrico: '', oe_eixo: '', oe_adicao: '', oe_dnp: '', tipoLente: '', validade: '', observacoes: '' });
   const [savingPrescricao, setSavingPrescricao] = useState(false);
 
+  // Exam types for autocomplete
+  const [examTypesList, setExamTypesList] = useState<{ id: string; name: string; category: string; ativo: boolean }[]>([]);
+  useEffect(() => {
+    api.get('/exam-types', { params: { segment: user?.tenant?.segment } }).then(({ data }) => setExamTypesList(data.data || [])).catch(() => {});
+  }, [user?.tenant?.segment]);
+
   // Atestados state
   const [atestados, setAtestados] = useState<any[]>([]);
   const [loadingAtestados, setLoadingAtestados] = useState(false);
@@ -1291,6 +1297,10 @@ export function CustomersPage() {
                     </button>
                   </div>
 
+                  <datalist id="exam-types-list">
+                    {examTypesList.filter(e => e.ativo !== false).map(e => <option key={e.id} value={e.name} />)}
+                  </datalist>
+
                   {showNewPrescricao && (
                     <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
                       <div>
@@ -1335,7 +1345,7 @@ export function CustomersPage() {
                                 <button type="button" onClick={() => setPrescricaoItems(prescricaoItems.filter((_: any, i: number) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
                               </div>
                               <div className="grid grid-cols-2 gap-2">
-                                <input type="text" placeholder="Nome do exame" value={item.name || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, name: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
+                                <input type="text" placeholder="Nome do exame" list="exam-types-list" value={item.name || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, name: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
                                 {prescricaoType === 'EXAME_EXTERNO' && <input type="text" placeholder="Especialidade" value={item.specialty || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, specialty: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />}
                                 <input type="text" placeholder="Indicacao" value={item.indication || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, indication: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
                                 <select value={item.urgency || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, urgency: e.target.value }; setPrescricaoItems(updated); }} className={inputCls}>
