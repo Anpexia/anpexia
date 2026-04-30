@@ -128,3 +128,23 @@ export function decryptResultData(model: string, result: any): any {
   }
   return result;
 }
+
+export function decryptDeep(obj: any): void {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) {
+    for (const item of obj) decryptDeep(item);
+    return;
+  }
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'string' && isEncrypted(val)) {
+      obj[key] = decrypt(val);
+    } else if (val && typeof val === 'object') {
+      if (val.__enc) {
+        obj[key] = decryptJson(val);
+      } else {
+        decryptDeep(val);
+      }
+    }
+  }
+}

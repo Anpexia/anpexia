@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { tenantStore } from '../shared/middleware/tenantContext';
-import { ENCRYPTED_MODELS, encryptModelFields, decryptResultData } from '../shared/utils/encryption';
+import { ENCRYPTED_MODELS, encryptModelFields, decryptDeep } from '../shared/utils/encryption';
 
 // Only models that have a direct tenant_id column
 const TENANT_SCOPED_MODELS = new Set([
@@ -104,8 +104,8 @@ const prisma = basePrisma.$extends({
 
       const result = await query(args);
 
-      if (model && ENCRYPTED_MODELS[model] && result) {
-        decryptResultData(model, result);
+      if (result) {
+        decryptDeep(result);
       }
 
       return result;
