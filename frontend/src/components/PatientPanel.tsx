@@ -71,6 +71,9 @@ export type DetailTab = 'info' | 'prontuario' | 'prescricoes' | 'atestados' | 'a
 const apptStatusMap: Record<string, { label: string; cls: string }> = {
   scheduled: { label: 'Agendado', cls: 'bg-blue-100 text-blue-700' },
   confirmed: { label: 'Confirmado', cls: 'bg-green-100 text-green-700' },
+  present: { label: 'Presente', cls: 'bg-purple-100 text-purple-700' },
+  in_attendance: { label: 'Em atendimento', cls: 'bg-emerald-100 text-emerald-700' },
+  attended: { label: 'Atendido', cls: 'bg-emerald-100 text-emerald-700' },
   completed: { label: 'Realizado', cls: 'bg-slate-100 text-slate-600' },
   cancelled: { label: 'Cancelado', cls: 'bg-red-100 text-red-700' },
   no_show: { label: 'Faltou', cls: 'bg-amber-100 text-amber-700' },

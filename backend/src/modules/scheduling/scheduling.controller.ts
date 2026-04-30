@@ -225,7 +225,7 @@ router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRol
     const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId } });
     if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
 
-    const revertMap: Record<string, string> = { confirmed: 'scheduled', present: 'confirmed', completed: 'present' };
+    const revertMap: Record<string, string> = { confirmed: 'scheduled', present: 'confirmed', attended: 'in_attendance', completed: 'attended' };
     const newStatus = revertMap[call.status];
     if (!newStatus) throw new AppError(400, 'INVALID_REVERT', 'Status não pode ser revertido');
 
@@ -300,7 +300,7 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
     const where: any = {
       tenantId,
       checkinAt: { gte: dayStart, lte: dayEnd },
-      status: { in: ['present', 'in_attendance', 'completed'] },
+      status: { in: ['present', 'in_attendance', 'attended', 'completed'] },
     };
     if (doctorId) where.doctorId = doctorId;
 
@@ -372,7 +372,7 @@ router.patch('/queue/:id/start', authenticate, requireTenant, async (req: Reques
   } catch (err) { next(err); }
 });
 
-// PATCH /queue/:id/finish — finish attendance (status → completed)
+// PATCH /queue/:id/finish — doctor finishes attendance (status → attended, NOT completed)
 router.patch('/queue/:id/finish', authenticate, requireTenant, async (req: Request, res: Response, next) => {
   try {
     const id = req.params.id as string;
@@ -381,7 +381,10 @@ router.patch('/queue/:id/finish', authenticate, requireTenant, async (req: Reque
     const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId, status: 'in_attendance' } });
     if (!call) throw new AppError(404, 'NOT_FOUND', 'Atendimento nao encontrado');
 
-    const updated = await schedulingService.updateCallStatus(id, { status: 'completed' }, tenantId);
+    const updated = await prisma.scheduledCall.update({
+      where: { id },
+      data: { status: 'attended' },
+    });
 
     return success(res, updated);
   } catch (err) { next(err); }

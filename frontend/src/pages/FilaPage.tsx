@@ -155,6 +155,7 @@ export function FilaPage() {
   const waiting = queue.filter(q => q.status === 'present' && !q.calledAt);
   const called = queue.filter(q => q.status === 'present' && !!q.calledAt);
   const inAttendance = queue.filter(q => q.status === 'in_attendance');
+  const attended = queue.filter(q => q.status === 'attended');
   const completed = queue.filter(q => q.status === 'completed');
 
   waiting.sort((a, b) => {
@@ -162,7 +163,7 @@ export function FilaPage() {
     return new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime();
   });
 
-  const totalActive = waiting.length + called.length + inAttendance.length;
+  const totalActive = waiting.length + called.length + inAttendance.length + attended.length;
 
   return (
     <div>
@@ -345,6 +346,38 @@ export function FilaPage() {
                       <Stethoscope size={14} />
                       Abrir Atendimento
                     </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Attended — doctor finished, waiting for secretary */}
+          {attended.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-500" />
+                Atendidos ({attended.length})
+              </h2>
+              <div className="space-y-2">
+                {attended.map(item => (
+                  <div key={item.id} className="bg-emerald-50/50 rounded-xl border border-emerald-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                        <CheckCircle2 size={16} className="text-emerald-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}</p>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+                          <span>Agendado: {formatTime(item.date)}</span>
+                          {item.checkinAt && <span>Chegou: {formatTime(item.checkinAt)}</span>}
+                        </div>
+                        {!isDoctor && item.doctor && (
+                          <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full shrink-0">Consulta finalizada</span>
                   </div>
                 ))}
               </div>

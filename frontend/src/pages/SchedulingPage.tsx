@@ -106,7 +106,8 @@ const statusMap: Record<string, { label: string; cls: string; icon: string; step
   scheduled: { label: 'Agendado', cls: 'bg-blue-100 text-blue-700', icon: '🔵', step: 1 },
   confirmed: { label: 'Confirmado', cls: 'bg-green-100 text-green-700', icon: '✅', step: 2 },
   present: { label: 'Presente', cls: 'bg-purple-100 text-purple-700', icon: '🏥', step: 3 },
-  completed: { label: 'Realizado', cls: 'bg-slate-100 text-slate-600', icon: '✅', step: 4 },
+  attended: { label: 'Atendido', cls: 'bg-emerald-100 text-emerald-700', icon: '🩺', step: 4 },
+  completed: { label: 'Realizado', cls: 'bg-slate-100 text-slate-600', icon: '✅', step: 5 },
   cancelled: { label: 'Cancelado', cls: 'bg-red-100 text-red-700', icon: '❌', step: -1 },
   no_show: { label: 'Faltou', cls: 'bg-amber-100 text-amber-700', icon: '👻', step: -1 },
 };
@@ -115,7 +116,8 @@ const timelineSteps = [
   { key: 'scheduled', label: 'Agendado', icon: '🔵' },
   { key: 'confirmed', label: 'Confirmado', icon: '✅' },
   { key: 'present', label: 'Presente', icon: '🏥' },
-  { key: 'completed', label: 'Concluido', icon: '✅' },
+  { key: 'attended', label: 'Atendido', icon: '🩺' },
+  { key: 'completed', label: 'Realizado', icon: '✅' },
 ];
 
 function StatusTimeline({ status }: { status: string }) {
@@ -977,8 +979,9 @@ export function SchedulingPage() {
     }
   };
 
-  const upcomingAppointments = appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'present');
-  const pastAppointments = appointments.filter(a => a.status !== 'scheduled' && a.status !== 'confirmed' && a.status !== 'present');
+  const activeStatuses = new Set(['scheduled', 'confirmed', 'present', 'in_attendance', 'attended']);
+  const upcomingAppointments = appointments.filter(a => activeStatuses.has(a.status));
+  const pastAppointments = appointments.filter(a => !activeStatuses.has(a.status));
 
   const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
@@ -1129,20 +1132,36 @@ export function SchedulingPage() {
                                 <UserCheck size={14} />Presente
                               </button>
                             )}
-                            {canRevert && (a.status === 'confirmed' || a.status === 'present') && (
+                            {canRevert && (a.status === 'confirmed' || a.status === 'present' || a.status === 'attended') && (
                               <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
-                                <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : 'Desconfirmar'}
+                                <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : a.status === 'attended' ? 'Desfazer atendido' : 'Desconfirmar'}
                               </button>
                             )}
-                            <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">
-                              Realizado
-                            </button>
-                            <button onClick={() => handleStatusChange(a.id, 'no_show')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
-                              <AlertTriangle size={14} />Faltou
-                            </button>
-                            <button onClick={() => handleCancel(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1">
-                              <XCircle size={14} />Cancelar
-                            </button>
+                            {a.status === 'in_attendance' && (
+                              <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium flex items-center gap-1">
+                                Em atendimento...
+                              </span>
+                            )}
+                            {a.status === 'attended' && (
+                              <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1 animate-pulse">
+                                <Check size={14} />Realizado
+                              </button>
+                            )}
+                            {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && (
+                              <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">
+                                Realizado
+                              </button>
+                            )}
+                            {a.status !== 'in_attendance' && a.status !== 'attended' && (
+                              <button onClick={() => handleStatusChange(a.id, 'no_show')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
+                                <AlertTriangle size={14} />Faltou
+                              </button>
+                            )}
+                            {a.status !== 'in_attendance' && a.status !== 'attended' && (
+                              <button onClick={() => handleCancel(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1">
+                                <XCircle size={14} />Cancelar
+                              </button>
+                            )}
                             {canRevert && (
                               <button onClick={() => setDeleteConfirmId(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1" title="Excluir permanentemente">
                                 <Trash2 size={14} />Excluir
@@ -2288,7 +2307,9 @@ export function SchedulingPage() {
             <h3 className="text-lg font-semibold text-slate-800 mb-3">Reverter status</h3>
             <p className="text-sm text-slate-600 mb-1">
               {revertTarget.status === 'completed'
-                ? 'Deseja reverter este agendamento para Presente?'
+                ? 'Deseja reverter este agendamento para Atendido?'
+                : revertTarget.status === 'attended'
+                ? 'Deseja reverter este agendamento para Em atendimento?'
                 : revertTarget.status === 'present'
                 ? 'Deseja reverter este agendamento para Confirmado?'
                 : 'Deseja reverter este agendamento para Aguardando confirmação?'}
