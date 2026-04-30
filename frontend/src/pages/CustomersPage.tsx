@@ -6,6 +6,7 @@ import Papa from 'papaparse';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { DictationTextarea } from '../components/DictationTextarea';
+import { CidAutocomplete } from '../components/CidAutocomplete';
 import { useCepLookup, formatarCep } from '../hooks/useCepLookup';
 import { getSegmentConfig } from '../config/segmentConfig';
 
@@ -1465,7 +1466,7 @@ export function CustomersPage() {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">CID-10 (opcional)</label>
-                        <input type="text" value={atestadoForm.cid || ''} onChange={(e) => setAtestadoForm({ ...atestadoForm, cid: e.target.value })} className={inputCls} placeholder="Ex: J06.9 - Infeccao aguda das vias aereas" />
+                        <CidAutocomplete value={atestadoForm.cid || ''} onChange={(v) => setAtestadoForm({ ...atestadoForm, cid: v })} className={inputCls} />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
