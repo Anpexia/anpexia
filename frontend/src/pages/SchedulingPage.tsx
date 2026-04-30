@@ -357,7 +357,6 @@ export function SchedulingPage() {
   const resetPaymentState = () => {
     setBookPaymentType('PARTICULAR');
     setBookConvenioId('');
-    setPatientConvenios([]);
   };
 
   const openBookWithSlot = (date: string, time: string) => {
