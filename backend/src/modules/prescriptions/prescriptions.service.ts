@@ -50,6 +50,9 @@ export const prescriptionsService = {
   },
 
   async create(tenantId: string, data: CreatePrescriptionData) {
+    const patient = await prisma.customer.findFirst({ where: { id: data.patientId, tenantId } });
+    if (!patient) throw new AppError(404, 'PATIENT_NOT_FOUND', 'Paciente nao encontrado');
+
     const prescription = await prisma.prescription.create({
       data: {
         tenantId,

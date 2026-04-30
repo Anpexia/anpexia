@@ -1000,7 +1000,9 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                     <option value="MEDICAMENTO">Medicamento</option>
                     <option value="EXAME_EXTERNO">Exame Externo</option>
                     <option value="EXAME_INTERNO">Exame Interno</option>
-                    <option value="OCULOS">Oculos</option>
+                    {['CLINICA_MEDICA', 'CLINICA_OFTALMOLOGICA', 'CLINICA_GERAL'].includes(user?.tenant?.segment || '') && (
+                      <option value="OCULOS">Oculos</option>
+                    )}
                   </select>
                 </div>
 

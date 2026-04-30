@@ -36,7 +36,8 @@ function auditCtx(req: Request) {
 // GET /available-dates?tenantId=...
 router.get('/available-dates', async (req: Request, res: Response, next) => {
   try {
-    const tenantId = (req.query.tenantId as string) || null;
+    const tenantId = req.query.tenantId as string;
+    if (!tenantId) throw new AppError(400, 'MISSING_TENANT', 'tenantId e obrigatorio');
     const dates = await schedulingService.getAvailableDates(tenantId);
     return success(res, dates);
   } catch (err) { next(err); }
@@ -50,7 +51,8 @@ router.get('/available-slots/:date', async (req: Request, res: Response, next) =
       throw new AppError(400, 'INVALID_DATE', 'Data deve estar no formato YYYY-MM-DD');
     }
     const doctorId = (req.query.doctorId as string) || null;
-    const tenantId = (req.query.tenantId as string) || null;
+    const tenantId = req.query.tenantId as string;
+    if (!tenantId) throw new AppError(400, 'MISSING_TENANT', 'tenantId e obrigatorio');
     const slots = await schedulingService.getAvailableSlots(date, doctorId, tenantId);
     return success(res, slots);
   } catch (err) { next(err); }

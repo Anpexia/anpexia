@@ -21,6 +21,9 @@ export const evolutionsService = {
   },
 
   async create(tenantId: string, patientId: string, body: Record<string, any>) {
+    const patient = await prisma.customer.findFirst({ where: { id: patientId, tenantId } });
+    if (!patient) throw new AppError(404, 'PATIENT_NOT_FOUND', 'Paciente nao encontrado');
+
     const columnData: Record<string, any> = {};
     const extraData: Record<string, any> = {};
 
