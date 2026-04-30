@@ -76,10 +76,11 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && !user) {
+    if (isAuthenticated) {
       fetchMe();
     }
-  }, [isAuthenticated, user, fetchMe]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   return { user, loading, error, isAuthenticated, login, logout, fetchMe };
 }
