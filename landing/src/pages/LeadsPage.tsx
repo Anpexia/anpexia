@@ -70,7 +70,7 @@ export function LeadsPage() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
 
   const params = new URLSearchParams(window.location.search);
   const utmSource = params.get('utm_source') || '';
@@ -81,7 +81,7 @@ export function LeadsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    setError(false);
+    setError('');
     try {
       const notes = [
         form.message && `Mensagem: ${form.message}`,
@@ -104,8 +104,10 @@ export function LeadsPage() {
         utmContent: utmContent || undefined,
       });
       setSubmitted(true);
-    } catch {
-      setError(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || 'Erro desconhecido';
+      setError(msg);
+      console.error('[LeadCapture] Error:', err?.response?.status, msg, err);
     } finally {
       setSubmitting(false);
     }
@@ -193,7 +195,7 @@ export function LeadsPage() {
               {error && (
                 <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
                   <p style={{ color: '#DC2626', fontSize: '0.85rem', margin: 0, fontWeight: 500 }}>
-                    Erro ao enviar solicitacao. Tente novamente ou entre em contato pelo WhatsApp.
+                    Erro ao enviar: {error}
                   </p>
                 </div>
               )}
