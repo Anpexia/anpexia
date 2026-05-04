@@ -933,8 +933,6 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
                 {showNewEvolucao && user?.tenant?.segment === 'CLINICA_OFTALMOLOGICA' && (
                   <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ao Exame Oftalmológico</p>
-
                     <div>
                       <p className="text-xs font-medium text-slate-600 mb-1">Acuidade Visual c/ Correção</p>
                       <div className="grid grid-cols-2 gap-2">
@@ -970,14 +968,15 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                       <DictationTextarea value={evolucaoForm.fundoscopy || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, fundoscopy: v })} className={inputCls + ' h-16 resize-none'} placeholder="Achados do fundo de olho..." />
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Hipótese Diagnóstica</label>
-                      <DictationTextarea value={evolucaoForm.diagnosis || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, diagnosis: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: BAV OD, Glaucoma suspeito..." />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Conduta</label>
-                      <DictationTextarea value={evolucaoForm.plan || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, plan: v })} className={inputCls + ' h-16 resize-none'} placeholder="Prescricao de colirios, orientacoes, encaminhamentos..." />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Hipótese Diagnóstica</label>
+                        <DictationTextarea value={evolucaoForm.diagnosis || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, diagnosis: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: BAV OD, Glaucoma suspeito..." />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Conduta</label>
+                        <DictationTextarea value={evolucaoForm.plan || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, plan: v })} className={inputCls + ' h-16 resize-none'} placeholder="Prescricao de colirios, orientacoes, encaminhamentos..." />
+                      </div>
                     </div>
 
                     <div>
