@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -250,6 +250,13 @@ export function SchedulingPage() {
   const [monthAppointments, setMonthAppointments] = useState<Appointment[]>([]);
   const [loadingMonth, setLoadingMonth] = useState(false);
 
+  // History filters
+  const [historyFrom, setHistoryFrom] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [historyTo, setHistoryTo] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [historyData, setHistoryData] = useState<Appointment[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+
   // Status update
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -262,6 +269,16 @@ export function SchedulingPage() {
       const { data } = await api.get('/scheduling/calls');
       setAppointments(data.data);
     } catch {} finally { setLoading(false); }
+  }, []);
+
+  const fetchHistory = useCallback(async (from: string, to: string) => {
+    setLoadingHistory(true);
+    try {
+      const { data } = await api.get('/scheduling/calls', { params: { from, to, limit: 500 } });
+      const all: Appointment[] = data.data || [];
+      const pastStatuses = new Set(['completed', 'cancelled', 'no_show']);
+      setHistoryData(all.filter(a => pastStatuses.has(a.status)));
+    } catch {} finally { setLoadingHistory(false); }
   }, []);
 
   const fetchDates = useCallback(async () => {
@@ -301,6 +318,8 @@ export function SchedulingPage() {
   }, []);
 
   useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchConveniosLookup(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchConveniosLookup]);
+
+  useEffect(() => { if (view === 'history') fetchHistory(historyFrom, historyTo); }, [view, historyFrom, historyTo, fetchHistory]);
 
   useEffect(() => {
     if (view === 'calendar') fetchMonthAppointments(calMonth);
@@ -981,7 +1000,6 @@ export function SchedulingPage() {
 
   const activeStatuses = new Set(['scheduled', 'confirmed', 'present', 'in_attendance', 'attended']);
   const upcomingAppointments = appointments.filter(a => activeStatuses.has(a.status));
-  const pastAppointments = appointments.filter(a => !activeStatuses.has(a.status));
 
   const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
@@ -1004,7 +1022,7 @@ export function SchedulingPage() {
           Agendamentos
         </button>
         <button onClick={() => setView('history')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${view === 'history' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-          Historico ({pastAppointments.length})
+          Historico
         </button>
         <button onClick={() => setView('calendar')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${view === 'calendar' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
           Calendario
@@ -1185,146 +1203,243 @@ export function SchedulingPage() {
           {/* History View */}
           {view === 'history' && (
             <div>
-              {pastAppointments.length === 0 ? (
+              {/* Date filters */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 mb-4 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-600 font-medium">De:</label>
+                  <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-600 font-medium">Ate:</label>
+                  <input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                </div>
+                <button
+                  onClick={() => { const today = format(new Date(), 'yyyy-MM-dd'); setHistoryFrom(today); setHistoryTo(today); }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+                >
+                  Hoje
+                </button>
+                <span className="text-xs text-slate-400 ml-auto">{historyData.length} registro(s)</span>
+              </div>
+
+              {loadingHistory ? (
+                <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" /></div>
+              ) : historyData.length === 0 ? (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
-                  <p className="text-sm text-slate-500">Nenhum registro no historico.</p>
+                  <p className="text-sm text-slate-500">Nenhum registro no historico para o periodo selecionado.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {pastAppointments.map((a) => {
+                  {historyData.map((a) => {
                     const st = statusMap[a.status] || { label: a.status, cls: 'bg-gray-100 text-gray-600', icon: '⬜', step: 0 };
                     const isRealized = a.status === 'completed';
                     const hasProcs = (a.procedures?.length || 0) > 0;
+                    const hasPrivProcs = (a.privateProcedureCalls?.length || 0) > 0;
+                    const isExpanded = expandedHistoryId === a.id;
                     return (
-                      <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-col md:flex-row md:items-center justify-between gap-2">
-                        <div className="flex flex-col gap-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {isRealized && hasProcs && (
+                      <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm">
+                        <div className="p-3 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                          <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {isRealized && hasProcs && (
+                                <button
+                                  onClick={() => openTussModalForCall(a, true)}
+                                  title={`Clique para editar TUSS — ${a.procedures?.map((p) => `${p.tussProcedure.code} ${p.tussProcedure.description}`).join('; ')}`}
+                                  className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
+                                >
+                                  <FileCheck2 size={12} /> TUSS {a.procedures?.[0]?.tussProcedure.code}
+                                </button>
+                              )}
+                              {isRealized && !hasProcs && a.paymentType !== 'PARTICULAR' && (
+                                <span title="Sem TUSS vinculado" className="flex items-center text-amber-500"><AlertCircle size={14} /></span>
+                              )}
+                              <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
+                              <span className="text-sm font-medium text-slate-800 truncate">{a.customer?.name || a.name}</span>
+                              {(() => {
+                                const pt = a.paymentType || 'PARTICULAR';
+                                if (pt === 'CONVENIO') {
+                                  const nome = a.convenio?.nome || (a.convenioId ? conveniosLookup[a.convenioId]?.nome : null) || 'Convenio';
+                                  return (
+                                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{nome}</span>
+                                  );
+                                }
+                                return (
+                                  <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Particular</span>
+                                );
+                              })()}
+                              <span className="text-sm text-slate-500 hidden sm:inline">{a.phone}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {a.doctor ? (
+                                <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
+                                  <Stethoscope size={11} /> {a.doctor.name}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">
+                                  <AlertTriangle size={11} /> Sem medico
+                                </span>
+                              )}
                               <button
-                                onClick={() => openTussModalForCall(a, true)}
-                                title={`Clique para editar TUSS — ${a.procedures?.map((p) => `${p.tussProcedure.code} ${p.tussProcedure.description}`).join('; ')}`}
-                                className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
+                                onClick={() => openDoctorEdit(a)}
+                                title="Editar medico"
+                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
                               >
-                                <FileCheck2 size={12} /> TUSS {a.procedures?.[0]?.tussProcedure.code}
+                                <UserCog size={12} />
+                              </button>
+                              {a.paymentType === 'CONVENIO' && a.customerId && convenioMap[a.customerId] && (
+                                authEditingId === a.id ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={authEditValue}
+                                      onChange={(e) => setAuthEditValue(e.target.value)}
+                                      placeholder="Numero de autorizacao"
+                                      className="px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => saveAuth(a.id)}
+                                      disabled={savingAuthId === a.id}
+                                      className="p-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                    >
+                                      <Check size={12} />
+                                    </button>
+                                    <button
+                                      onClick={cancelEditAuth}
+                                      className="p-1 rounded bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ) : a.authorizationNumber ? (
+                                  <button
+                                    onClick={() => startEditAuth(a)}
+                                    className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
+                                    title="Clique para editar"
+                                  >
+                                    <ShieldCheck size={11} /> Autorizado: {a.authorizationNumber}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => startEditAuth(a)}
+                                    className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-100"
+                                    title="Clique para adicionar numero"
+                                  >
+                                    <ShieldAlert size={11} /> Sem autorizacao
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isRealized && !hasProcs && a.paymentType !== 'PARTICULAR' && (
+                              <button
+                                onClick={() => openRegistrarTussForExisting(a)}
+                                className="px-2 py-1 text-xs font-medium rounded bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                              >
+                                Registrar TUSS
                               </button>
                             )}
-                            {isRealized && !hasProcs && a.paymentType !== 'PARTICULAR' && (
-                              <span title="Sem TUSS vinculado" className="flex items-center text-amber-500"><AlertCircle size={14} /></span>
-                            )}
-                            <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
-                            <span className="text-sm font-medium text-slate-800 truncate">{a.customer?.name || a.name}</span>
-                            {(() => {
-                              const pt = a.paymentType || 'PARTICULAR';
-                              if (pt === 'CONVENIO') {
-                                const nome = a.convenio?.nome || (a.convenioId ? conveniosLookup[a.convenioId]?.nome : null) || 'Convenio';
-                                return (
-                                  <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{nome}</span>
-                                );
-                              }
-                              return (
-                                <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Particular</span>
-                              );
-                            })()}
-                            <span className="text-sm text-slate-500 hidden sm:inline">{a.phone}</span>
-                          </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {a.doctor ? (
-                              <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
-                                <Stethoscope size={11} /> {a.doctor.name}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">
-                                <AlertTriangle size={11} /> Sem medico
-                              </span>
+                            {isRealized && a.paymentType === 'PARTICULAR' && !((a as any).privateProcedureCalls?.length || (a as any)._count?.privateProcedureCalls) && (
+                              <button
+                                onClick={() => openPartModalForCall(a, true)}
+                                className="px-2 py-1 text-xs font-medium rounded bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200"
+                              >
+                                Registrar Procedimento
+                              </button>
                             )}
                             <button
-                              onClick={() => openDoctorEdit(a)}
-                              title="Editar medico"
-                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                              onClick={() => setExpandedHistoryId(isExpanded ? null : a.id)}
+                              className="px-2 py-1 text-xs font-medium rounded bg-[#EFF6FF] text-[#1E3A5F] hover:bg-[#DBEAFE] border border-[#BFDBFE] flex items-center gap-1"
+                              title="Ver detalhes"
                             >
-                              <UserCog size={12} />
+                              <Eye size={12} />{isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                             </button>
-                            {a.paymentType === 'CONVENIO' && a.customerId && convenioMap[a.customerId] && (
-                              authEditingId === a.id ? (
-                                <div className="flex items-center gap-1.5">
-                                  <input
-                                    type="text"
-                                    value={authEditValue}
-                                    onChange={(e) => setAuthEditValue(e.target.value)}
-                                    placeholder="Numero de autorizacao"
-                                    className="px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
-                                    autoFocus
-                                  />
-                                  <button
-                                    onClick={() => saveAuth(a.id)}
-                                    disabled={savingAuthId === a.id}
-                                    className="p-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                  >
-                                    <Check size={12} />
-                                  </button>
-                                  <button
-                                    onClick={cancelEditAuth}
-                                    className="p-1 rounded bg-slate-50 text-slate-500 hover:bg-slate-100"
-                                  >
-                                    <X size={12} />
-                                  </button>
+                            {canRevert && isRealized && (
+                              <button
+                                onClick={() => setRevertTarget(a)}
+                                className="px-2 py-1 text-xs font-medium rounded bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 flex items-center gap-1"
+                              >
+                                <Undo2 size={12} />Desfazer realizado
+                              </button>
+                            )}
+                            {canRevert && (
+                              <button
+                                onClick={() => setDeleteConfirmId(a.id)}
+                                className="px-2 py-1 text-xs font-medium rounded bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 flex items-center gap-1"
+                                title="Excluir permanentemente"
+                              >
+                                <Trash2 size={12} />Excluir
+                              </button>
+                            )}
+                            <span className={`text-xs px-2 py-0.5 rounded ${st.cls}`}>{st.icon} {st.label}</span>
+                          </div>
+                        </div>
+
+                        {/* Expanded details */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/50 space-y-3">
+                            {hasProcs && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 mb-1.5">Procedimentos TUSS</p>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead><tr className="text-left text-slate-400 border-b border-slate-200">
+                                      <th className="pb-1 pr-3">Codigo</th><th className="pb-1 pr-3">Descricao</th><th className="pb-1 pr-3">Tipo</th><th className="pb-1 pr-3">Valor</th><th className="pb-1 pr-3">Medico</th><th className="pb-1">Autorizacao</th>
+                                    </tr></thead>
+                                    <tbody>
+                                      {a.procedures?.map((p) => (
+                                        <tr key={p.id} className="border-b border-slate-100">
+                                          <td className="py-1.5 pr-3 font-mono text-slate-700">{p.tussProcedure.code}</td>
+                                          <td className="py-1.5 pr-3 text-slate-700">{p.tussProcedure.description}</td>
+                                          <td className="py-1.5 pr-3"><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{p.tussProcedure.type}</span></td>
+                                          <td className="py-1.5 pr-3 text-slate-700">R$ {p.tussProcedure.value.toFixed(2)}</td>
+                                          <td className="py-1.5 pr-3 text-slate-700">{p.doctor?.name || a.doctor?.name || '-'}</td>
+                                          <td className="py-1.5 text-slate-700">{p.authorizationNumber || '-'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
                                 </div>
-                              ) : a.authorizationNumber ? (
-                                <button
-                                  onClick={() => startEditAuth(a)}
-                                  className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
-                                  title="Clique para editar"
-                                >
-                                  <ShieldCheck size={11} /> Autorizado: {a.authorizationNumber}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => startEditAuth(a)}
-                                  className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-100"
-                                  title="Clique para adicionar numero"
-                                >
-                                  <ShieldAlert size={11} /> Sem autorizacao
-                                </button>
-                              )
+                              </div>
+                            )}
+
+                            {hasPrivProcs && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 mb-1.5">Procedimentos Particulares</p>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead><tr className="text-left text-slate-400 border-b border-slate-200">
+                                      <th className="pb-1 pr-3">Nome</th><th className="pb-1 pr-3">Tipo</th><th className="pb-1 pr-3">Valor</th><th className="pb-1 pr-3">Medico</th><th className="pb-1">Notas</th>
+                                    </tr></thead>
+                                    <tbody>
+                                      {a.privateProcedureCalls?.map((p) => (
+                                        <tr key={p.id} className="border-b border-slate-100">
+                                          <td className="py-1.5 pr-3 text-slate-700">{p.privateProcedure.name}</td>
+                                          <td className="py-1.5 pr-3"><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{p.privateProcedure.type}</span></td>
+                                          <td className="py-1.5 pr-3 text-slate-700">{p.privateProcedure.value != null ? `R$ ${p.privateProcedure.value.toFixed(2)}` : '-'}</td>
+                                          <td className="py-1.5 pr-3 text-slate-700">{p.doctor?.name || a.doctor?.name || '-'}</td>
+                                          <td className="py-1.5 text-slate-700">{p.notes || '-'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+
+                            {!hasProcs && !hasPrivProcs && (
+                              <p className="text-xs text-slate-400 italic">Nenhum procedimento registrado neste agendamento.</p>
+                            )}
+
+                            {a.notes && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 mb-1">Observacoes</p>
+                                <p className="text-xs text-slate-600">{a.notes}</p>
+                              </div>
                             )}
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {isRealized && !hasProcs && a.paymentType !== 'PARTICULAR' && (
-                            <button
-                              onClick={() => openRegistrarTussForExisting(a)}
-                              className="px-2 py-1 text-xs font-medium rounded bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                            >
-                              Registrar TUSS
-                            </button>
-                          )}
-                          {isRealized && a.paymentType === 'PARTICULAR' && !((a as any).privateProcedureCalls?.length || (a as any)._count?.privateProcedureCalls) && (
-                            <button
-                              onClick={() => openPartModalForCall(a, true)}
-                              className="px-2 py-1 text-xs font-medium rounded bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200"
-                            >
-                              Registrar Procedimento
-                            </button>
-                          )}
-                          {canRevert && isRealized && (
-                            <button
-                              onClick={() => setRevertTarget(a)}
-                              className="px-2 py-1 text-xs font-medium rounded bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 flex items-center gap-1"
-                            >
-                              <Undo2 size={12} />Desfazer realizado
-                            </button>
-                          )}
-                          {canRevert && (
-                            <button
-                              onClick={() => setDeleteConfirmId(a.id)}
-                              className="px-2 py-1 text-xs font-medium rounded bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 flex items-center gap-1"
-                              title="Excluir permanentemente"
-                            >
-                              <Trash2 size={12} />Excluir
-                            </button>
-                          )}
-                          <span className={`text-xs px-2 py-0.5 rounded ${st.cls}`}>{st.icon} {st.label}</span>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
