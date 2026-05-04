@@ -931,7 +931,80 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                   </button>
                 </div>
 
-                {showNewEvolucao && (
+                {showNewEvolucao && user?.tenant?.segment === 'CLINICA_OFTALMOLOGICA' && (
+                  <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ao Exame Oftalmológico</p>
+
+                    <div>
+                      <p className="text-xs font-medium text-slate-600 mb-1">Acuidade Visual c/ Correção</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><label className="block text-[11px] text-slate-500 mb-0.5">OD</label><input type="text" value={evolucaoForm.acuity_od || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, acuity_od: e.target.value })} className={inputCls} placeholder="20/20" /></div>
+                        <div><label className="block text-[11px] text-slate-500 mb-0.5">OE</label><input type="text" value={evolucaoForm.acuity_oe || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, acuity_oe: e.target.value })} className={inputCls} placeholder="20/20" /></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium text-slate-600 mb-1">Refração Dinâmica</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div><label className="block text-[11px] text-slate-500 mb-0.5">OD</label><input type="text" value={evolucaoForm.refraction_od || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, refraction_od: e.target.value })} className={inputCls} placeholder="-2.00 -0.50 x 180" /></div>
+                        <div><label className="block text-[11px] text-slate-500 mb-0.5">OE</label><input type="text" value={evolucaoForm.refraction_oe || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, refraction_oe: e.target.value })} className={inputCls} placeholder="-1.75 -0.25 x 10" /></div>
+                        <div><label className="block text-[11px] text-slate-500 mb-0.5">Adição</label><input type="text" value={evolucaoForm.refraction_add || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, refraction_add: e.target.value })} className={inputCls} placeholder="+2.00" /></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Biomicroscopia</label>
+                      <DictationTextarea value={evolucaoForm.objective || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, objective: v })} className={inputCls + ' h-16 resize-none'} placeholder="Palpebras, conjuntiva, cornea, CA, cristalino..." />
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium text-slate-600 mb-1">Tonometria (mmHg)</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><label className="block text-[11px] text-slate-500 mb-0.5">OD</label><input type="number" value={evolucaoForm.iop_od || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, iop_od: e.target.value })} className={inputCls} placeholder="14" /></div>
+                        <div><label className="block text-[11px] text-slate-500 mb-0.5">OE</label><input type="number" value={evolucaoForm.iop_oe || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, iop_oe: e.target.value })} className={inputCls} placeholder="15" /></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Mapeamento de Retina (AO)</label>
+                      <DictationTextarea value={evolucaoForm.fundoscopy || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, fundoscopy: v })} className={inputCls + ' h-16 resize-none'} placeholder="Achados do fundo de olho..." />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Hipótese Diagnóstica</label>
+                      <DictationTextarea value={evolucaoForm.diagnosis || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, diagnosis: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: BAV OD, Glaucoma suspeito..." />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Conduta</label>
+                      <DictationTextarea value={evolucaoForm.plan || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, plan: v })} className={inputCls + ' h-16 resize-none'} placeholder="Prescricao de colirios, orientacoes, encaminhamentos..." />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Retorno</label>
+                      <input type="text" value={evolucaoForm.returnDate || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, returnDate: e.target.value })} className={inputCls} placeholder="Ex: 3 meses com exames" />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Queixa / Subjetivo</label>
+                      <DictationTextarea value={evolucaoForm.subjective || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, subjective: v })} className={inputCls + ' h-16 resize-none'} placeholder="Queixas visuais, sintomas, relato do paciente..." />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Exames Solicitados</label>
+                      <DictationTextarea value={evolucaoForm.exams || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, exams: v })} className={inputCls + ' h-16 resize-none'} placeholder="OCT, campo visual, paquimetria, topografia, retinografia..." />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setShowNewEvolucao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                      <button type="button" onClick={handleAddEvolucao} disabled={savingEvolucao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
+                        {savingEvolucao ? 'Salvando...' : 'Registrar'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {showNewEvolucao && user?.tenant?.segment !== 'CLINICA_OFTALMOLOGICA' && (
                   <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
                     {getSegmentConfig(user?.tenant?.segment).evolucao.map(field => (
                       <div key={field.key}>

@@ -73,15 +73,20 @@ const EVOLUCAO_GERAL: FieldDef[] = [
 ];
 
 const EVOLUCAO_OFTALMO: FieldDef[] = [
+  { key: 'acuity_od', label: 'AV c/c OD', placeholder: '20/20', type: 'text' },
+  { key: 'acuity_oe', label: 'AV c/c OE', placeholder: '20/20', type: 'text' },
+  { key: 'refraction_od', label: 'Refração OD', placeholder: 'Ex: -2.00 -0.50 x 180', type: 'text' },
+  { key: 'refraction_oe', label: 'Refração OE', placeholder: 'Ex: -1.75 -0.25 x 10', type: 'text' },
+  { key: 'refraction_add', label: 'Adição', placeholder: 'Ex: +2.00', type: 'text' },
+  { key: 'objective', label: 'Biomicroscopia', placeholder: 'Palpebras, conjuntiva, cornea, CA, cristalino...', type: 'textarea' },
+  { key: 'iop_od', label: 'PIO OD', placeholder: '14', type: 'number' },
+  { key: 'iop_oe', label: 'PIO OE', placeholder: '15', type: 'number' },
+  { key: 'fundoscopy', label: 'Mapeamento de Retina (AO)', placeholder: 'Achados do fundo de olho...', type: 'textarea' },
+  { key: 'diagnosis', label: 'Hipotese Diagnostica', placeholder: 'Ex: BAV OD, Glaucoma suspeito...', type: 'textarea' },
+  { key: 'plan', label: 'Conduta', placeholder: 'Prescricao de colirios, orientacoes, encaminhamentos...', type: 'textarea' },
+  { key: 'returnDate', label: 'Retorno', placeholder: 'Ex: 3 meses com exames', type: 'text' },
   { key: 'subjective', label: 'Queixa / Subjetivo', placeholder: 'Queixas visuais, sintomas, relato do paciente...', type: 'textarea' },
-  { key: 'acuity_od', label: 'Acuidade Visual OD', placeholder: 'Ex: 20/20, 20/40 cc, J1...', type: 'text' },
-  { key: 'acuity_oe', label: 'Acuidade Visual OE', placeholder: 'Ex: 20/20, 20/40 cc, J1...', type: 'text' },
-  { key: 'iop_od', label: 'Pressao Intraocular OD (mmHg)', placeholder: 'Ex: 14', type: 'number' },
-  { key: 'iop_oe', label: 'Pressao Intraocular OE (mmHg)', placeholder: 'Ex: 15', type: 'number' },
-  { key: 'objective', label: 'Biomicroscopia / Exame', placeholder: 'Achados do exame: palpebras, conjuntiva, cornea, CA, cristalino, FO...', type: 'textarea' },
   { key: 'exams', label: 'Exames Solicitados', placeholder: 'OCT, campo visual, paquimetria, topografia, retinografia...', type: 'textarea' },
-  { key: 'plan', label: 'Conduta / Plano', placeholder: 'Prescricao de colirios, orientacoes, encaminhamentos...', type: 'textarea' },
-  { key: 'returnDate', label: 'Retorno', placeholder: 'Ex: Retorno em 3 meses com exames...', type: 'textarea' },
 ];
 
 const EVOLUCAO_ESTETICA: FieldDef[] = [

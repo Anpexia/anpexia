@@ -31,8 +31,7 @@ interface TrustedDevice {
   createdAt: string;
 }
 
-const PROCEDURE_TYPES = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'BOTOX', 'OUTROS'] as const;
-type ProcedureType = typeof PROCEDURE_TYPES[number];
+type ProcedureType = string;
 
 interface TussProcedureItem {
   id: string;
@@ -621,9 +620,9 @@ export function ConfiguracoesPage() {
 
   useEffect(() => { loadSettings(); loadConvenios(); }, [loadSettings, loadConvenios]);
   useEffect(() => { if (tab === 'exames') loadExamTypes(); }, [tab, loadExamTypes]);
-  useEffect(() => { if (tab === 'tuss') loadTuss(); }, [tab, loadTuss]);
+  useEffect(() => { if (tab === 'tuss') { loadTuss(); loadRepasseTypes(); } }, [tab, loadTuss, loadRepasseTypes]);
   useEffect(() => { if (tab === 'repasse') loadRepasseTypes(); }, [tab, loadRepasseTypes]);
-  useEffect(() => { if (tab === 'procedimentos') loadPrivateProcedures(); }, [tab, loadPrivateProcedures]);
+  useEffect(() => { if (tab === 'procedimentos') { loadPrivateProcedures(); loadRepasseTypes(); } }, [tab, loadPrivateProcedures, loadRepasseTypes]);
   useEffect(() => { if (tab === 'permissoes') loadRolePermissions(); }, [tab, loadRolePermissions]);
 
   const addRepasseType = async () => {
@@ -655,7 +654,8 @@ export function ConfiguracoesPage() {
 
   const openTussCreate = () => {
     setTussEditing(null);
-    setTussForm({ code: '', description: '', type: 'CONSULTA', value: '', convenioId: '' });
+    const defaultType = repasseTypes.length > 0 ? repasseTypes[0].name : 'CONSULTA';
+    setTussForm({ code: '', description: '', type: defaultType, value: '', convenioId: '' });
     setTussModalOpen(true);
   };
 
@@ -711,7 +711,8 @@ export function ConfiguracoesPage() {
 
   const openProcCreate = () => {
     setProcEditing(null);
-    setProcForm({ name: '', description: '', type: 'CONSULTA', value: '', duration: '30', isActive: true });
+    const defaultType = repasseTypes.length > 0 ? repasseTypes[0].name : 'CONSULTA';
+    setProcForm({ name: '', description: '', type: defaultType, value: '', duration: '30', isActive: true });
     setProcModalOpen(true);
   };
 
@@ -1197,8 +1198,8 @@ export function ConfiguracoesPage() {
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">Todos os tipos</option>
-                {PROCEDURE_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                {repasseTypes.map((rt) => (
+                  <option key={rt.id} value={rt.name}>{rt.name}</option>
                 ))}
               </select>
               <select
@@ -1442,7 +1443,7 @@ export function ConfiguracoesPage() {
                   onChange={(e) => setProcForm({ ...procForm, type: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 >
-                  {PROCEDURE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {repasseTypes.map((rt) => <option key={rt.id} value={rt.name}>{rt.name}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -1510,7 +1511,7 @@ export function ConfiguracoesPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
                   <select value={tussForm.type} onChange={(e) => setTussForm({ ...tussForm, type: e.target.value as ProcedureType })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                    {PROCEDURE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {repasseTypes.map((rt) => <option key={rt.id} value={rt.name}>{rt.name}</option>)}
                   </select>
                 </div>
                 <div>

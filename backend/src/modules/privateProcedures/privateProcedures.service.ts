@@ -1,6 +1,21 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
 
+async function validateTypeForTenant(tenantId: string, type: string): Promise<string> {
+  const normalized = (type || '').trim().toUpperCase();
+  if (!normalized) return 'CONSULTA';
+  const rows = await prisma.repasseType.findMany({
+    where: { tenantId },
+    select: { name: true },
+  });
+  if (rows.length === 0) return normalized;
+  const valid = rows.map((r) => r.name);
+  if (!valid.includes(normalized)) {
+    throw new AppError(400, 'INVALID_TYPE', `Tipo inválido. Valores aceitos: ${valid.join(', ')}`);
+  }
+  return normalized;
+}
+
 interface CreateInput {
   name: string;
   description?: string | null;
@@ -61,13 +76,14 @@ export const privateProceduresService = {
 
     const value = sanitizeValue(data.value);
     const duration = sanitizeDuration(data.duration);
+    const validType = await validateTypeForTenant(tenantId, data.type || 'CONSULTA');
 
     return prisma.privateProcedure.create({
       data: {
         tenantId,
         name,
         description: data.description?.toString().trim() || null,
-        type: (data.type || 'CONSULTA').toUpperCase().trim(),
+        type: validType,
         value: value ?? null,
         duration: duration === undefined ? 30 : duration ?? 30,
         isActive: true,
@@ -107,7 +123,7 @@ export const privateProceduresService = {
     }
 
     if (data.type !== undefined) {
-      updateData.type = (data.type || 'CONSULTA').toUpperCase().trim();
+      updateData.type = await validateTypeForTenant(tenantId, data.type || 'CONSULTA');
     }
 
     if (data.value !== undefined) {

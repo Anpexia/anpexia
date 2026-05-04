@@ -35,6 +35,21 @@ export const repasseTypesService = {
     if (item.isDefault) {
       throw new AppError(400, 'DEFAULT_TYPE', 'Não é possível deletar tipos padrão');
     }
+
+    const [tussCount, privateCount, repasseCount] = await Promise.all([
+      prisma.tussProcedure.count({ where: { tenantId, type: item.name } }),
+      prisma.privateProcedure.count({ where: { tenantId, type: item.name } }),
+      prisma.doctorRepasse.count({ where: { tenantId, procedureType: item.name } }),
+    ]);
+
+    if (tussCount > 0 || privateCount > 0 || repasseCount > 0) {
+      const refs: string[] = [];
+      if (tussCount > 0) refs.push(`${tussCount} procedimento(s) TUSS`);
+      if (privateCount > 0) refs.push(`${privateCount} procedimento(s) particular(es)`);
+      if (repasseCount > 0) refs.push(`${repasseCount} repasse(s) de médico(s)`);
+      throw new AppError(400, 'TYPE_IN_USE', `Não é possível excluir: tipo vinculado a ${refs.join(', ')}`);
+    }
+
     await prisma.repasseType.delete({ where: { id } });
   },
 };
