@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Plus, X, CheckCircle, UserCheck, UserX, Shield, Edit2, Trash2, Clock } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import SpecialtyCombobox from '../components/SpecialtyCombobox';
 
 interface ShiftRange {
   inicio: string;
@@ -400,7 +401,7 @@ export function TeamPage() {
                 <div className="grid grid-cols-[7fr_3fr] gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                    <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Clínica Geral" />
+                    <SpecialtyCombobox value={formEspecialidade} onChange={setFormEspecialidade} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
@@ -496,7 +497,7 @@ export function TeamPage() {
                     <div className="grid grid-cols-[7fr_3fr] gap-3">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                        <input value={formEspecialidade} onChange={e => setFormEspecialidade(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Ex: Clínica Geral" />
+                        <SpecialtyCombobox value={formEspecialidade} onChange={setFormEspecialidade} disabled={!isOwner} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>

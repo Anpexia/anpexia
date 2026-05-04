@@ -7,24 +7,18 @@ import { schedulingService } from '../scheduling/scheduling.service';
 //
 // Flow:
 //   Entry → Menu (agendar / atendente)
-//   → Registration (new patient) → Scheduling
-//   → Scheduling (existing patient)
+//   → Registration (new patient): Name → Payment → Convenio? → Confirm → Scheduling
+//   → Scheduling (existing patient): Payment → Convenio? → Specialty → Doctor → Date → Period → Time → Confirm
 // ============================================================
 
 export type FlowState =
   | 'IDLE'
   | 'MENU'
-  // Registration
+  // Registration (simplified)
   | 'REG_NAME'
-  | 'REG_EMAIL'
-  | 'REG_CPF'
-  | 'REG_BIRTH'
-  | 'REG_CEP'
-  | 'REG_ADDRESS_NUMBER'
-  | 'REG_COMPLEMENTO_ASK'
-  | 'REG_COMPLEMENTO'
+  | 'REG_PAYMENT'
+  | 'REG_CONVENIO'
   | 'REG_CONFIRM'
-  | 'REG_ALTER'
   // Scheduling
   | 'SCHED_PAYMENT'
   | 'SCHED_CONVENIO'
@@ -145,17 +139,11 @@ export async function handleConversationFlow(
   // Route based on current state
   switch (conv.state) {
     case 'MENU': return handleMenu(tenantId, phone, text);
-    // Registration
+    // Registration (simplified)
     case 'REG_NAME': return handleRegName(tenantId, phone, text);
-    case 'REG_EMAIL': return handleRegEmail(tenantId, phone, text);
-    case 'REG_CPF': return handleRegCpf(tenantId, phone, text);
-    case 'REG_BIRTH': return handleRegBirth(tenantId, phone, text);
-    case 'REG_CEP': return handleRegCep(tenantId, phone, text);
-    case 'REG_ADDRESS_NUMBER': return handleRegAddressNumber(tenantId, phone, text);
-    case 'REG_COMPLEMENTO_ASK': return handleRegComplementoAsk(tenantId, phone, text);
-    case 'REG_COMPLEMENTO': return handleRegComplemento(tenantId, phone, text);
+    case 'REG_PAYMENT': return handleRegPayment(tenantId, phone, text);
+    case 'REG_CONVENIO': return handleRegConvenio(tenantId, phone, text);
     case 'REG_CONFIRM': return handleRegConfirm(tenantId, phone, text);
-    case 'REG_ALTER': return handleRegAlter(tenantId, phone, text);
     // Scheduling
     case 'SCHED_PAYMENT': return handleSchedPayment(tenantId, phone, text);
     case 'SCHED_CONVENIO': return handleSchedConvenio(tenantId, phone, text);
@@ -231,12 +219,12 @@ async function handleMenu(tenantId: string, phone: string, text: string): Promis
 }
 
 // ============================================================
-// Registration flow — new patient
+// Registration flow — new patient (simplified: name + payment)
 // ============================================================
 
 function startRegistration(tenantId: string, phone: string): FlowResponse {
   setState(tenantId, phone, 'REG_NAME', { reg: {} });
-  return { type: 'text', text: 'Qual o seu nome completo?' };
+  return { type: 'text', text: 'Vamos fazer seu cadastro rapidinho! 📋\n\nQual o seu nome completo?' };
 }
 
 function handleRegName(tenantId: string, phone: string, text: string): FlowResponse {
@@ -245,216 +233,104 @@ function handleRegName(tenantId: string, phone: string, text: string): FlowRespo
   }
   const conv = getState(tenantId, phone)!;
   conv.data.reg = { ...conv.data.reg, name: text.trim() };
-  setState(tenantId, phone, 'REG_EMAIL', conv.data);
-  return { type: 'text', text: 'Qual o seu email?' };
-}
-
-function handleRegEmail(tenantId: string, phone: string, text: string): FlowResponse {
-  const email = text.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { type: 'text', text: 'Email invalido. Por favor, informe um email valido.' };
-  }
-  const conv = getState(tenantId, phone)!;
-  conv.data.reg = { ...conv.data.reg, email };
-  setState(tenantId, phone, 'REG_CPF', conv.data);
-  return { type: 'text', text: 'Qual o seu CPF?' };
-}
-
-function handleRegCpf(tenantId: string, phone: string, text: string): FlowResponse {
-  const cleaned = text.replace(/\D/g, '');
-  if (cleaned.length !== 11 || !validateCpf(cleaned)) {
-    return { type: 'text', text: 'CPF invalido. Por favor, informe um CPF valido (11 digitos).' };
-  }
-  const formatted = cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  const conv = getState(tenantId, phone)!;
-  conv.data.reg = { ...conv.data.reg, cpf: formatted, cpfRaw: cleaned };
-  setState(tenantId, phone, 'REG_BIRTH', conv.data);
+  setState(tenantId, phone, 'REG_PAYMENT', conv.data);
   return {
     type: 'text',
-    text: 'Qual a sua data de nascimento?\n(exemplo: 15031990 para 15 de marco de 1990)',
+    text: 'Como sera o pagamento da consulta?\n\n1 - Particular\n2 - Convenio',
   };
 }
 
-function handleRegBirth(tenantId: string, phone: string, text: string): FlowResponse {
-  const cleaned = text.replace(/[\s\/\-\.]/g, '');
-  let day: string, month: string, year: string;
-
-  if (cleaned.length === 8 && /^\d{8}$/.test(cleaned)) {
-    day = cleaned.slice(0, 2);
-    month = cleaned.slice(2, 4);
-    year = cleaned.slice(4, 8);
-  } else {
-    const match = text.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
-    if (!match) {
-      return { type: 'text', text: 'Formato invalido. Use DDMMAAAA (exemplo: 15031990).' };
-    }
-    [, day, month, year] = match;
+async function handleRegPayment(tenantId: string, phone: string, text: string): Promise<FlowResponse> {
+  const n = text.trim();
+  if (n === '1' || n.toLowerCase().includes('particular')) {
+    const conv = getState(tenantId, phone)!;
+    conv.data.reg.paymentType = 'PARTICULAR';
+    conv.data.reg.convenioId = null;
+    conv.data.reg.convenioName = null;
+    return showRegConfirmation(tenantId, phone);
   }
 
-  const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00Z`);
-  if (isNaN(date.getTime()) || date > new Date()) {
-    return { type: 'text', text: 'Data invalida. Use DDMMAAAA (exemplo: 15031990).' };
-  }
+  if (n === '2' || n.toLowerCase().includes('convenio') || n.toLowerCase().includes('convênio')) {
+    const convenios = await prisma.convenio.findMany({
+      where: { tenantId, ativo: true },
+      orderBy: { nome: 'asc' },
+    });
 
-  const formatted = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-  const conv = getState(tenantId, phone)!;
-  conv.data.reg = { ...conv.data.reg, birthDate: formatted, birthDateISO: date.toISOString() };
-  setState(tenantId, phone, 'REG_CEP', conv.data);
-  return {
-    type: 'text',
-    text: 'Vamos cadastrar seu endereco. 📍\n\nQual o seu CEP? (exemplo: 40444-444)',
-  };
-}
-
-async function handleRegCep(tenantId: string, phone: string, text: string): Promise<FlowResponse> {
-  const cep = text.replace(/\D/g, '');
-  if (cep.length !== 8) {
-    return { type: 'text', text: 'CEP invalido. Informe 8 digitos (exemplo: 40444444).' };
-  }
-
-  const conv = getState(tenantId, phone);
-  if (!conv) {
-    return { type: 'text', text: 'Sessao expirada. Envie qualquer mensagem para recomecar.' };
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
-    const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      console.error(`[CHATBOT] ViaCEP HTTP ${response.status} for CEP ${cep}`);
-      return { type: 'text', text: 'Servico de CEP indisponivel no momento. Tente novamente em alguns segundos.' };
+    if (convenios.length === 0) {
+      const conv = getState(tenantId, phone)!;
+      conv.data.reg.paymentType = 'PARTICULAR';
+      conv.data.reg.convenioId = null;
+      conv.data.reg.convenioName = null;
+      return showRegConfirmation(tenantId, phone);
     }
 
-    const data = await response.json() as any;
+    const conv = getState(tenantId, phone)!;
+    conv.data.reg.convenioList = convenios.map(c => ({ id: c.id, nome: c.nome }));
+    setState(tenantId, phone, 'REG_CONVENIO', conv.data);
 
-    if (data.erro) {
-      conv.data.reg = { ...conv.data.reg, cep, street: '', neighborhood: '', city: '', state: '', cepNotFound: true };
-      setState(tenantId, phone, 'REG_ADDRESS_NUMBER', conv.data);
-      return {
-        type: 'text',
-        text: 'CEP nao encontrado. Digite "0" para preencher manualmente ou informe outro CEP.',
-      };
-    }
-
-    conv.data.reg = {
-      ...conv.data.reg,
-      cep: data.cep || cep,
-      street: data.logradouro || '',
-      neighborhood: data.bairro || '',
-      city: data.localidade || '',
-      state: data.uf || '',
-      cepNotFound: false,
-    };
-    setState(tenantId, phone, 'REG_ADDRESS_NUMBER', conv.data);
-
+    const list = convenios.map((c, i) => `${i + 1} - ${c.nome}`).join('\n');
     return {
       type: 'text',
-      text: `Achei este endereco: 📍\n${data.logradouro}, ${data.bairro}, ${data.localidade}-${data.uf}\n\nQual o numero?`,
+      text: `Qual o seu convenio?\n\n${list}\n\nResponda com o numero da opcao.`,
     };
-  } catch (err: any) {
-    console.error(`[CHATBOT] CEP lookup failed for ${cep}:`, err.message || err);
-    return { type: 'text', text: 'Erro ao buscar CEP. Tente novamente em alguns segundos.' };
   }
+
+  return { type: 'text', text: 'Responda com 1 (Particular) ou 2 (Convenio).' };
 }
 
-function handleRegAddressNumber(tenantId: string, phone: string, text: string): FlowResponse {
+function handleRegConvenio(tenantId: string, phone: string, text: string): FlowResponse {
   const conv = getState(tenantId, phone)!;
+  const list = conv.data.reg.convenioList as Array<{ id: string; nome: string }>;
+  const num = parseInt(text.trim());
 
-  if (text.trim() === '0' && conv.data.reg.cepNotFound) {
-    // Manual address entry — just ask for full address
-    conv.data.reg = { ...conv.data.reg, manualAddress: true };
-    setState(tenantId, phone, 'REG_COMPLEMENTO', conv.data);
-    return { type: 'text', text: 'Informe seu endereco completo (rua, numero, bairro, cidade e estado):' };
+  if (isNaN(num) || num < 1 || num > list.length) {
+    return { type: 'text', text: `Opcao invalida. Escolha de 1 a ${list.length}.` };
   }
 
-  const num = text.trim().replace(/\D/g, '');
-  if (!num) {
-    return { type: 'text', text: 'Informe apenas o numero do endereco (somente digitos).' };
-  }
-
-  conv.data.reg = { ...conv.data.reg, number: num };
-  setState(tenantId, phone, 'REG_COMPLEMENTO_ASK', conv.data);
-  return {
-    type: 'text',
-    text: 'Seu endereco tem complemento?\n(apartamento, bloco, lote, etc)\n\n1 - Sim\n2 - Nao',
-  };
+  const selected = list[num - 1];
+  conv.data.reg.paymentType = 'CONVENIO';
+  conv.data.reg.convenioId = selected.id;
+  conv.data.reg.convenioName = selected.nome;
+  return showRegConfirmation(tenantId, phone);
 }
 
-function handleRegComplementoAsk(tenantId: string, phone: string, text: string): FlowResponse {
-  const n = text.trim();
-  if (n === '1' || n.toLowerCase() === 'sim') {
-    setState(tenantId, phone, 'REG_COMPLEMENTO', getState(tenantId, phone)!.data);
-    return { type: 'text', text: 'Qual o complemento?\n(exemplo: Apto 101, Bloco B, Fundos)' };
-  }
-  if (n === '2' || n.toLowerCase().startsWith('nao') || n.toLowerCase().startsWith('não')) {
-    return showRegConfirmation(tenantId, phone, '');
-  }
-  return { type: 'text', text: 'Responda com 1 (Sim) ou 2 (Nao).' };
-}
-
-function handleRegComplemento(tenantId: string, phone: string, text: string): FlowResponse {
-  const conv = getState(tenantId, phone)!;
-  if (conv.data.reg.manualAddress) {
-    conv.data.reg = { ...conv.data.reg, fullAddress: text.trim() };
-    return showRegConfirmation(tenantId, phone, '');
-  }
-  return showRegConfirmation(tenantId, phone, text.trim());
-}
-
-function showRegConfirmation(tenantId: string, phone: string, complemento: string): FlowResponse {
+function showRegConfirmation(tenantId: string, phone: string): FlowResponse {
   const conv = getState(tenantId, phone)!;
   const r = conv.data.reg;
-  r.complemento = complemento;
 
-  let addressLine: string;
-  if (r.manualAddress) {
-    addressLine = r.fullAddress || '';
-  } else {
-    addressLine = `${r.street}, ${r.number}`;
-    if (complemento) addressLine += `, ${complemento}`;
-    addressLine += `\n${r.neighborhood}, ${r.city}-${r.state}\nCEP: ${r.cep}`;
-  }
-  r.addressFormatted = addressLine;
+  const paymentLine = r.paymentType === 'CONVENIO' && r.convenioName
+    ? `Convenio: ${r.convenioName}`
+    : 'Pagamento: Particular';
 
   setState(tenantId, phone, 'REG_CONFIRM', conv.data);
   return {
     type: 'text',
     text: `Confirme seus dados:\n\n` +
           `Nome: ${r.name}\n` +
-          `Email: ${r.email}\n` +
-          `CPF: ${r.cpf}\n` +
-          `Nascimento: ${r.birthDate}\n` +
-          `Endereco: ${addressLine}\n\n` +
-          `1 - Confirmar tudo ✅\n` +
-          `2 - Alterar dados 🔄`,
+          `${paymentLine}\n\n` +
+          `1 - Confirmar ✅\n` +
+          `2 - Corrigir nome 🔄`,
   };
 }
 
 async function handleRegConfirm(tenantId: string, phone: string, text: string): Promise<FlowResponse> {
   const n = text.trim();
+
+  if (n === '2' || n.toLowerCase().includes('corrigir')) {
+    setState(tenantId, phone, 'REG_NAME', getState(tenantId, phone)!.data);
+    return { type: 'text', text: 'Qual o seu nome completo?' };
+  }
+
   if (n === '1' || n.toLowerCase().includes('confirmar')) {
     const conv = getState(tenantId, phone)!;
     const r = conv.data.reg;
 
-    // Save customer
     try {
-      const addressJson = r.manualAddress
-        ? { raw: r.fullAddress }
-        : { cep: r.cep, street: r.street, number: r.number, complement: r.complemento || '', neighborhood: r.neighborhood, city: r.city, state: r.state };
-
       const customer = await prisma.customer.create({
         data: {
           tenantId,
           name: r.name,
           phone,
-          email: r.email,
-          cpfCnpj: r.cpfRaw,
-          birthDate: r.birthDateISO ? new Date(r.birthDateISO) : undefined,
-          address: addressJson,
           origin: 'whatsapp-chatbot',
           optInWhatsApp: true,
         },
@@ -470,52 +346,26 @@ async function handleRegConfirm(tenantId: string, phone: string, text: string): 
         },
       });
 
-      setState(tenantId, phone, 'IDLE', {}, customer.id);
-      return startSchedulingFlow(tenantId, phone);
+      // Carry payment data to scheduling
+      setState(tenantId, phone, 'IDLE', {
+        paymentType: r.paymentType,
+        convenioId: r.convenioId || null,
+        convenioName: r.convenioName || null,
+      }, customer.id);
+
+      // Skip payment step — go straight to specialty
+      return showSpecialties(tenantId, phone);
     } catch (err: any) {
       console.error('[FLOW] Error saving customer:', err.message);
       return { type: 'text', text: 'Ocorreu um erro ao salvar seus dados. Tente novamente enviando qualquer mensagem.' };
     }
   }
 
-  if (n === '2' || n.toLowerCase().includes('alterar')) {
-    setState(tenantId, phone, 'REG_ALTER', getState(tenantId, phone)!.data);
-    return {
-      type: 'text',
-      text: 'Qual dado deseja alterar?\n\n1 - Nome\n2 - Email\n3 - CPF\n4 - Nascimento\n5 - Endereco',
-    };
-  }
-
-  return { type: 'text', text: 'Responda com 1 (Confirmar) ou 2 (Alterar).' };
-}
-
-function handleRegAlter(tenantId: string, phone: string, text: string): FlowResponse {
-  const n = text.trim();
-  const conv = getState(tenantId, phone)!;
-
-  switch (n) {
-    case '1':
-      setState(tenantId, phone, 'REG_NAME', conv.data);
-      return { type: 'text', text: 'Qual o seu nome completo?' };
-    case '2':
-      setState(tenantId, phone, 'REG_EMAIL', conv.data);
-      return { type: 'text', text: 'Qual o seu email?' };
-    case '3':
-      setState(tenantId, phone, 'REG_CPF', conv.data);
-      return { type: 'text', text: 'Qual o seu CPF?' };
-    case '4':
-      setState(tenantId, phone, 'REG_BIRTH', conv.data);
-      return { type: 'text', text: 'Qual a sua data de nascimento?\n(exemplo: 15031990)' };
-    case '5':
-      setState(tenantId, phone, 'REG_CEP', conv.data);
-      return { type: 'text', text: 'Qual o seu CEP? (exemplo: 40444-444)' };
-    default:
-      return { type: 'text', text: 'Opcao invalida. Escolha de 1 a 5.' };
-  }
+  return { type: 'text', text: 'Responda com 1 (Confirmar) ou 2 (Corrigir nome).' };
 }
 
 // ============================================================
-// Scheduling flow
+// Scheduling flow — existing patients
 // ============================================================
 
 async function startSchedulingFlow(tenantId: string, phone: string): Promise<FlowResponse> {
@@ -538,7 +388,6 @@ async function handleSchedPayment(tenantId: string, phone: string, text: string)
   }
 
   if (n === '2' || n.toLowerCase().includes('convenio') || n.toLowerCase().includes('convênio')) {
-    // Show convenios list
     const convenios = await prisma.convenio.findMany({
       where: { tenantId, ativo: true },
       orderBy: { nome: 'asc' },
@@ -583,7 +432,6 @@ async function handleSchedConvenio(tenantId: string, phone: string, text: string
 }
 
 async function showSpecialties(tenantId: string, phone: string): Promise<FlowResponse> {
-  // Get unique specialties from active doctors in this tenant
   const doctors = await prisma.user.findMany({
     where: {
       tenantId,
@@ -605,7 +453,6 @@ async function showSpecialties(tenantId: string, phone: string): Promise<FlowRes
   const specialties = Array.from(specialtyMap.keys()).sort();
 
   if (specialties.length === 0) {
-    // No specialties configured — go straight to date with no doctor filter
     const conv = getState(tenantId, phone)!;
     conv.data.doctorId = null;
     conv.data.doctorName = null;
@@ -675,7 +522,6 @@ async function showDates(tenantId: string, phone: string): Promise<FlowResponse>
   const conv = getState(tenantId, phone)!;
   const doctorId = conv.data.doctorId as string | null;
 
-  // Load doctor's working hours to filter days
   let doctorHorarios: any = null;
   let durationMin = 30;
   if (doctorId) {
@@ -687,7 +533,6 @@ async function showDates(tenantId: string, phone: string): Promise<FlowResponse>
     if (doctor?.duracaoConsulta) durationMin = doctor.duracaoConsulta;
   }
 
-  // Fall back to tenant hours
   let tenantHorarios: any = null;
   const settings = await prisma.tenantSettings.findUnique({ where: { tenantId } });
   if (settings?.horarios) tenantHorarios = settings.horarios;
@@ -695,7 +540,6 @@ async function showDates(tenantId: string, phone: string): Promise<FlowResponse>
 
   const horarios = doctorHorarios || tenantHorarios;
 
-  // Generate next 14 days, filter by doctor's active days
   const SP_OFFSET_VAL = '-03:00';
   const now = new Date();
   const todaySP = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -709,16 +553,14 @@ async function showDates(tenantId: string, phone: string): Promise<FlowResponse>
     const dayOfWeek = d.getDay();
     const dayKey = DAY_KEYS_MAP[dayOfWeek];
 
-    // Check if doctor works this day
     if (horarios && horarios[dayKey]) {
       if (!horarios[dayKey].ativo) continue;
     } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-      continue; // Default: skip weekends
+      continue;
     }
 
     const dateStr = new Date(d.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    // Check if there are available slots on this date
     const slots = await schedulingService.getAvailableSlots(dateStr, doctorId, tenantId);
     const freeSlots = slots.filter(s => s.available);
     if (freeSlots.length === 0) continue;
@@ -876,7 +718,6 @@ async function handleSchedConfirm(tenantId: string, phone: string, text: string)
       notes: `Agendado via WhatsApp`,
     }, tenantId);
 
-    // Get tenant address for confirmation message
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { name: true, address: true },
@@ -923,21 +764,4 @@ async function findCustomer(tenantId: string, phone: string) {
     },
     orderBy: { createdAt: 'desc' },
   });
-}
-
-function validateCpf(cpf: string): boolean {
-  const cleaned = cpf.replace(/\D/g, '');
-  if (cleaned.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(cleaned)) return false;
-  let sum = 0;
-  for (let i = 0; i < 9; i++) sum += parseInt(cleaned[i]) * (10 - i);
-  let check = 11 - (sum % 11);
-  if (check >= 10) check = 0;
-  if (parseInt(cleaned[9]) !== check) return false;
-  sum = 0;
-  for (let i = 0; i < 10; i++) sum += parseInt(cleaned[i]) * (11 - i);
-  check = 11 - (sum % 11);
-  if (check >= 10) check = 0;
-  if (parseInt(cleaned[10]) !== check) return false;
-  return true;
 }
