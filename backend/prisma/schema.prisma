@@ -830,7 +830,7 @@ model ScheduledCall {
   phone      String
   date       DateTime
   duration   Int      @default(30)
-  status     String   @default("scheduled") // scheduled, confirmed, present, completed, cancelled, no_show
+  status     String   @default("scheduled") // scheduled, confirmed, awaiting_payment, present, completed, cancelled, no_show
   notes      String?
   checkinAt  DateTime? @map("checkin_at")
   calledAt   DateTime? @map("called_at")
@@ -1384,6 +1384,9 @@ model PrivateProcedureCall {
   doctorId           String?          @map("doctor_id")
   doctor             User?            @relation("PrivateProcedureDoctor", fields: [doctorId], references: [id])
   notes              String?
+  paymentStatus      String?          @default("pending") @map("payment_status")
+  paymentMethod      String?          @map("payment_method")
+  paidAt             DateTime?        @map("paid_at")
   createdAt          DateTime         @default(now()) @map("created_at")
 
   @@map("private_procedure_calls")

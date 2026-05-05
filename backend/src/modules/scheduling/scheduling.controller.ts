@@ -225,7 +225,7 @@ router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRol
     const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId } });
     if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
 
-    const revertMap: Record<string, string> = { confirmed: 'scheduled', present: 'confirmed', attended: 'in_attendance', completed: 'attended' };
+    const revertMap: Record<string, string> = { confirmed: 'scheduled', awaiting_payment: 'confirmed', present: 'confirmed', attended: 'in_attendance', completed: 'attended' };
     const newStatus = revertMap[call.status];
     if (!newStatus) throw new AppError(400, 'INVALID_REVERT', 'Status não pode ser revertido');
 
@@ -289,6 +289,105 @@ router.delete('/calls/:id/permanent', authenticate, requireTenant, requireRole('
     const result = await schedulingService.hardDeleteCall(req.params.id as string, req.auth!.tenantId!);
     await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'APPOINTMENT', entityId: req.params.id as string, metadata: { permanent: true } });
     return success(res, result);
+  } catch (err) { next(err); }
+});
+
+// GET /calls/:id/payment-summary — payment status for a call's procedures
+router.get('/calls/:id/payment-summary', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const tenantId = req.auth!.tenantId!;
+    const callId = req.params.id as string;
+
+    const call = await prisma.scheduledCall.findFirst({
+      where: { id: callId, tenantId },
+      select: { paymentType: true },
+    });
+    if (!call) return res.status(404).json({ error: { message: 'Agendamento nao encontrado' } });
+
+    const procedures = await prisma.privateProcedureCall.findMany({
+      where: { scheduledCallId: callId },
+      include: { privateProcedure: { select: { id: true, name: true, value: true, type: true } } },
+    });
+
+    const items = procedures.map(p => ({
+      id: p.id,
+      procedureId: p.privateProcedureId,
+      name: p.privateProcedure.name,
+      type: p.privateProcedure.type,
+      value: p.privateProcedure.value ?? 0,
+      paymentStatus: p.paymentStatus || 'pending',
+      paymentMethod: p.paymentMethod,
+      paidAt: p.paidAt,
+    }));
+
+    const total = items.reduce((s, i) => s + i.value, 0);
+    const paid = items.filter(i => i.paymentStatus === 'paid').reduce((s, i) => s + i.value, 0);
+
+    return success(res, { items, total, paid, pending: total - paid });
+  } catch (err) { next(err); }
+});
+
+// POST /calls/:id/pay — register payment for procedures
+router.post('/calls/:id/pay', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const tenantId = req.auth!.tenantId!;
+    const callId = req.params.id as string;
+    const { procedureCallIds, paymentMethod } = req.body as { procedureCallIds: string[]; paymentMethod: string };
+
+    if (!procedureCallIds?.length || !paymentMethod) {
+      return res.status(400).json({ error: { message: 'procedureCallIds e paymentMethod sao obrigatorios' } });
+    }
+
+    const call = await prisma.scheduledCall.findFirst({ where: { id: callId, tenantId } });
+    if (!call) return res.status(404).json({ error: { message: 'Agendamento nao encontrado' } });
+
+    await prisma.privateProcedureCall.updateMany({
+      where: { id: { in: procedureCallIds }, scheduledCallId: callId },
+      data: { paymentStatus: 'paid', paymentMethod, paidAt: new Date() },
+    });
+
+    // If all procedures are now paid and status is awaiting_payment, transition to present
+    if (call.status === 'awaiting_payment') {
+      const unpaid = await prisma.privateProcedureCall.count({
+        where: { scheduledCallId: callId, paymentStatus: { not: 'paid' } },
+      });
+      if (unpaid === 0) {
+        await prisma.scheduledCall.update({
+          where: { id: callId },
+          data: { status: 'present' },
+        });
+      }
+    }
+
+    return success(res, { updated: procedureCallIds.length });
+  } catch (err) { next(err); }
+});
+
+// POST /calls/:id/add-procedure — add a procedure to an existing call
+router.post('/calls/:id/add-procedure', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const tenantId = req.auth!.tenantId!;
+    const callId = req.params.id as string;
+    const { privateProcedureId, doctorId } = req.body as { privateProcedureId: string; doctorId?: string };
+
+    if (!privateProcedureId) {
+      return res.status(400).json({ error: { message: 'privateProcedureId e obrigatorio' } });
+    }
+
+    const call = await prisma.scheduledCall.findFirst({ where: { id: callId, tenantId } });
+    if (!call) return res.status(404).json({ error: { message: 'Agendamento nao encontrado' } });
+
+    const entry = await prisma.privateProcedureCall.create({
+      data: {
+        scheduledCallId: callId,
+        privateProcedureId,
+        doctorId: doctorId || call.doctorId || undefined,
+        paymentStatus: 'pending',
+      },
+      include: { privateProcedure: { select: { id: true, name: true, value: true, type: true } } },
+    });
+
+    return success(res, entry);
   } catch (err) { next(err); }
 });
 

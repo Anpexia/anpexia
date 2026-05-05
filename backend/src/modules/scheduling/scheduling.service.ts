@@ -485,6 +485,17 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
       }
     }
 
+    if (paymentType === 'PARTICULAR' && data.privateProcedureId) {
+      await tx.privateProcedureCall.create({
+        data: {
+          scheduledCallId: scheduledCall.id,
+          privateProcedureId: data.privateProcedureId,
+          doctorId: data.doctorId || undefined,
+          paymentStatus: 'pending',
+        },
+      });
+    }
+
     // If lead exists, update stage and log activity
     if (lead) {
       await tx.lead.update({
@@ -908,11 +919,21 @@ async function updateCallStatus(id: string, data: UpdateCallStatusInput, tenantI
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    // Block "completed" if PARTICULAR has unpaid procedures
+    if (data.status === 'completed' && call.paymentType === 'PARTICULAR') {
+      const unpaid = await tx.privateProcedureCall.count({
+        where: { scheduledCallId: id, paymentStatus: { not: 'paid' } },
+      });
+      if (unpaid > 0) {
+        throw new AppError(400, 'UNPAID_PROCEDURES', 'Existem procedimentos com pagamento pendente. Registre o pagamento antes de marcar como realizado.');
+      }
+    }
+
     const updateData: any = {
       status: data.status,
       notes: data.notes ?? call.notes,
     };
-    if (data.status === 'present' && !call.checkinAt) {
+    if ((data.status === 'present' || data.status === 'awaiting_payment') && !call.checkinAt) {
       updateData.checkinAt = new Date();
     }
     const updatedCall = await tx.scheduledCall.update({

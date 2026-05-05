@@ -11,6 +11,7 @@ export const bookCallSchema = z.object({
   doctorId: z.string().optional().nullable(),
   paymentType: z.enum(['PARTICULAR', 'CONVENIO']).optional(),
   convenioId: z.string().optional().nullable(),
+  privateProcedureId: z.string().optional().nullable(),
 });
 
 export const linkProceduresSchema = z.object({
@@ -33,7 +34,7 @@ export const updateConfigSchema = z.object({
 });
 
 export const updateCallStatusSchema = z.object({
-  status: z.enum(['scheduled', 'confirmed', 'present', 'completed', 'cancelled', 'no_show']),
+  status: z.enum(['scheduled', 'confirmed', 'awaiting_payment', 'present', 'completed', 'cancelled', 'no_show']),
   notes: z.string().max(1000).optional().nullable(),
 });
 

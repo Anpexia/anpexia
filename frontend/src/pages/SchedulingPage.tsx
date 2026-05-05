@@ -40,6 +40,9 @@ interface CallPrivateProcedure {
   doctorId?: string | null;
   doctor?: { id: string; name: string } | null;
   notes?: string | null;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  paidAt?: string | null;
   privateProcedure: {
     id: string;
     name: string;
@@ -106,9 +109,10 @@ type View = 'calendar' | 'list' | 'history';
 const statusMap: Record<string, { label: string; cls: string; icon: string; step: number }> = {
   scheduled: { label: 'Agendado', cls: 'bg-blue-100 text-blue-700', icon: '🔵', step: 1 },
   confirmed: { label: 'Confirmado', cls: 'bg-green-100 text-green-700', icon: '✅', step: 2 },
-  present: { label: 'Presente', cls: 'bg-purple-100 text-purple-700', icon: '🏥', step: 3 },
-  attended: { label: 'Atendido', cls: 'bg-emerald-100 text-emerald-700', icon: '🩺', step: 4 },
-  completed: { label: 'Realizado', cls: 'bg-slate-100 text-slate-600', icon: '✅', step: 5 },
+  awaiting_payment: { label: 'Aguardando pgto', cls: 'bg-yellow-100 text-yellow-700', icon: '💰', step: 3 },
+  present: { label: 'Na fila', cls: 'bg-purple-100 text-purple-700', icon: '🏥', step: 4 },
+  attended: { label: 'Atendido', cls: 'bg-emerald-100 text-emerald-700', icon: '🩺', step: 5 },
+  completed: { label: 'Realizado', cls: 'bg-slate-100 text-slate-600', icon: '✅', step: 6 },
   cancelled: { label: 'Cancelado', cls: 'bg-red-100 text-red-700', icon: '❌', step: -1 },
   no_show: { label: 'Faltou', cls: 'bg-amber-100 text-amber-700', icon: '👻', step: -1 },
 };
@@ -116,7 +120,8 @@ const statusMap: Record<string, { label: string; cls: string; icon: string; step
 const timelineSteps = [
   { key: 'scheduled', label: 'Agendado', icon: '🔵' },
   { key: 'confirmed', label: 'Confirmado', icon: '✅' },
-  { key: 'present', label: 'Presente', icon: '🏥' },
+  { key: 'awaiting_payment', label: 'Pgto', icon: '💰' },
+  { key: 'present', label: 'Fila', icon: '🏥' },
   { key: 'attended', label: 'Atendido', icon: '🩺' },
   { key: 'completed', label: 'Realizado', icon: '✅' },
 ];
@@ -179,8 +184,24 @@ export function SchedulingPage() {
   // Payment type for new appointment
   const [bookPaymentType, setBookPaymentType] = useState<'PARTICULAR' | 'CONVENIO'>('PARTICULAR');
   const [bookConvenioId, setBookConvenioId] = useState<string>('');
+  const [bookProcedureId, setBookProcedureId] = useState<string>('');
+  // Private procedures list (for booking PARTICULAR)
+  interface BookPrivProc { id: string; name: string; value: number | null; type: string }
+  const [bookPrivProcedures, setBookPrivProcedures] = useState<BookPrivProc[]>([]);
   // Tenant-wide convenios lookup (for rendering badges and booking modal)
   const [conveniosLookup, setConveniosLookup] = useState<Record<string, ConvenioOption>>({});
+
+  // Payment modal
+  interface PaymentSummary { items: Array<{ id: string; procedureId: string; name: string; type: string; value: number; paymentStatus: string; paymentMethod: string | null; paidAt: string | null }>; total: number; paid: number; pending: number }
+  const [paymentCallId, setPaymentCallId] = useState<string | null>(null);
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('PIX');
+  const [payingIds, setPayingIds] = useState(false);
+
+  // Add procedure modal (post-attendance)
+  const [addProcCallId, setAddProcCallId] = useState<string | null>(null);
+  const [addProcId, setAddProcId] = useState('');
+  const [addProcSaving, setAddProcSaving] = useState(false);
 
   // Doctors
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -346,7 +367,14 @@ export function SchedulingPage() {
     } catch {} finally { setLoadingAgenda(false); }
   }, []);
 
-  useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchConveniosLookup(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchConveniosLookup]);
+  const fetchBookPrivProcedures = useCallback(async () => {
+    try {
+      const { data } = await api.get('/private-procedures');
+      setBookPrivProcedures((data.data || []).filter((p: BookPrivProc & { isActive: boolean }) => p.isActive));
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchConveniosLookup(); fetchBookPrivProcedures(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchConveniosLookup, fetchBookPrivProcedures]);
 
   useEffect(() => { if (view === 'list') fetchAgenda(agendaDate, agendaMode); }, [view, agendaDate, agendaMode, fetchAgenda, agendaRefresh]);
 
@@ -409,6 +437,47 @@ export function SchedulingPage() {
   const resetPaymentState = () => {
     setBookPaymentType('PARTICULAR');
     setBookConvenioId('');
+    setBookProcedureId('');
+  };
+
+  const openPaymentModal = async (callId: string) => {
+    setPaymentCallId(callId);
+    setPaymentMethod('PIX');
+    setPayingIds(false);
+    try {
+      const { data } = await api.get(`/scheduling/calls/${callId}/payment-summary`);
+      setPaymentSummary(data.data);
+    } catch { setPaymentSummary(null); }
+  };
+
+  const handlePay = async () => {
+    if (!paymentCallId || !paymentSummary) return;
+    const unpaidIds = paymentSummary.items.filter(i => i.paymentStatus !== 'paid').map(i => i.id);
+    if (unpaidIds.length === 0) return;
+    setPayingIds(true);
+    try {
+      await api.post(`/scheduling/calls/${paymentCallId}/pay`, { procedureCallIds: unpaidIds, paymentMethod });
+      showToast('Pagamento registrado!');
+      setPaymentCallId(null);
+      setPaymentSummary(null);
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao registrar pagamento');
+    } finally { setPayingIds(false); }
+  };
+
+  const handleAddProcedure = async () => {
+    if (!addProcCallId || !addProcId) return;
+    setAddProcSaving(true);
+    try {
+      await api.post(`/scheduling/calls/${addProcCallId}/add-procedure`, { privateProcedureId: addProcId });
+      showToast('Procedimento adicionado!');
+      setAddProcCallId(null);
+      setAddProcId('');
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao adicionar procedimento');
+    } finally { setAddProcSaving(false); }
   };
 
   const openBookWithSlot = (date: string, time: string) => {
@@ -493,6 +562,10 @@ export function SchedulingPage() {
       showToast('Selecione o convenio do paciente');
       return;
     }
+    if (bookPaymentType === 'PARTICULAR' && !bookProcedureId) {
+      showToast('Selecione o procedimento');
+      return;
+    }
     setSaving(true);
     try {
       const payload: any = {
@@ -508,6 +581,9 @@ export function SchedulingPage() {
       };
       if (bookPaymentType === 'CONVENIO') {
         payload.convenioId = bookConvenioId;
+      }
+      if (bookPaymentType === 'PARTICULAR' && bookProcedureId) {
+        payload.privateProcedureId = bookProcedureId;
       }
       await api.post('/scheduling/book', payload);
       setShowBookModal(false);
@@ -1137,18 +1213,39 @@ export function SchedulingPage() {
               </div>
             )}
             {a.notes && <p className="text-xs text-slate-400 mt-1">{a.notes}</p>}
+            {/* Private procedure info */}
+            {a.paymentType === 'PARTICULAR' && a.privateProcedureCalls && a.privateProcedureCalls.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {a.privateProcedureCalls.map(pc => (
+                  <span key={pc.id} className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
+                    {pc.privateProcedure.name}
+                    {pc.privateProcedure.value != null && <span className="font-medium">R$ {Number(pc.privateProcedure.value).toFixed(2)}</span>}
+                  </span>
+                ))}
+              </div>
+            )}
+            {/* Add procedure after attendance */}
+            {a.paymentType === 'PARTICULAR' && a.status === 'attended' && (
+              <button onClick={() => { setAddProcCallId(a.id); setAddProcId(''); }} className="mt-1 text-xs text-[#2563EB] hover:underline">+ Adicionar procedimento</button>
+            )}
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
           {a.status === 'scheduled' && (
             <button onClick={() => handleStatusChange(a.id, 'confirmed')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 flex items-center gap-1"><Check size={14} />Confirmar</button>
           )}
-          {a.status === 'confirmed' && (
+          {a.status === 'confirmed' && a.paymentType === 'PARTICULAR' && (
+            <button onClick={() => handleStatusChange(a.id, 'awaiting_payment')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-medium hover:bg-yellow-100 flex items-center gap-1"><UserCheck size={14} />Confirmar presenca</button>
+          )}
+          {a.status === 'confirmed' && a.paymentType !== 'PARTICULAR' && (
             <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1"><UserCheck size={14} />Presente</button>
           )}
-          {canRevert && (a.status === 'confirmed' || a.status === 'present' || a.status === 'attended') && (
+          {a.status === 'awaiting_payment' && (
+            <button onClick={() => openPaymentModal(a.id)} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1 animate-pulse">Registrar pagamento</button>
+          )}
+          {canRevert && (a.status === 'confirmed' || a.status === 'awaiting_payment' || a.status === 'present' || a.status === 'attended') && (
             <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
-              <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : a.status === 'attended' ? 'Desfazer atendido' : 'Desconfirmar'}
+              <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : a.status === 'attended' ? 'Desfazer atendido' : a.status === 'awaiting_payment' ? 'Desfazer presenca' : 'Desconfirmar'}
             </button>
           )}
           {a.status === 'in_attendance' && (
@@ -1157,13 +1254,13 @@ export function SchedulingPage() {
           {a.status === 'attended' && (
             <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1 animate-pulse"><Check size={14} />Realizado</button>
           )}
-          {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && (
+          {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && a.status !== 'awaiting_payment' && (
             <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">Realizado</button>
           )}
-          {a.status !== 'in_attendance' && a.status !== 'attended' && (
+          {a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && (
             <button onClick={() => handleStatusChange(a.id, 'no_show')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1"><AlertTriangle size={14} />Faltou</button>
           )}
-          {a.status !== 'in_attendance' && a.status !== 'attended' && (
+          {a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && (
             <button onClick={() => handleCancel(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1"><XCircle size={14} />Cancelar</button>
           )}
           {canRevert && (
@@ -1989,6 +2086,27 @@ export function SchedulingPage() {
                     )}
                   </div>
                 )}
+                {bookPaymentType === 'PARTICULAR' && (
+                  <div className="mt-2">
+                    {bookPrivProcedures.length === 0 ? (
+                      <p className="text-xs text-amber-600">Nenhum procedimento particular cadastrado. Cadastre em Configuracoes.</p>
+                    ) : (
+                      <select
+                        value={bookProcedureId}
+                        onChange={(e) => setBookProcedureId(e.target.value)}
+                        className={inputCls}
+                        required
+                      >
+                        <option value="">Selecione o procedimento</option>
+                        {bookPrivProcedures.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}{p.value != null ? ` — R$ ${Number(p.value).toFixed(2)}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -2660,6 +2778,8 @@ export function SchedulingPage() {
                 ? 'Deseja reverter este agendamento para Em atendimento?'
                 : revertTarget.status === 'present'
                 ? 'Deseja reverter este agendamento para Confirmado?'
+                : revertTarget.status === 'awaiting_payment'
+                ? 'Deseja reverter este agendamento para Confirmado?'
                 : 'Deseja reverter este agendamento para Aguardando confirmação?'}
             </p>
             {revertTarget.status === 'completed' && (
@@ -2692,6 +2812,114 @@ export function SchedulingPage() {
               <button onClick={handlePermanentDelete} disabled={deleting} className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
                 {deleting ? 'Excluindo...' : 'Excluir'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {paymentCallId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-800">Registrar pagamento</h3>
+              <button onClick={() => { setPaymentCallId(null); setPaymentSummary(null); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            {!paymentSummary ? (
+              <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1E3A5F]" /></div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  {paymentSummary.items.map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{item.name}</p>
+                        <p className="text-xs text-slate-500">{item.type}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-slate-800">R$ {Number(item.value).toFixed(2)}</p>
+                        {item.paymentStatus === 'paid' ? (
+                          <span className="text-xs text-emerald-600">Pago</span>
+                        ) : (
+                          <span className="text-xs text-amber-600">Pendente</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-slate-200 pt-3">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-slate-600">Total:</span>
+                    <span className="font-semibold">R$ {paymentSummary.total.toFixed(2)}</span>
+                  </div>
+                  {paymentSummary.paid > 0 && (
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-emerald-600">Pago:</span>
+                      <span className="font-semibold text-emerald-600">R$ {paymentSummary.paid.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-amber-600">Pendente:</span>
+                    <span className="font-semibold text-amber-600">R$ {paymentSummary.pending.toFixed(2)}</span>
+                  </div>
+                </div>
+                {paymentSummary.pending > 0 && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Forma de pagamento</label>
+                      <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]">
+                        <option value="PIX">PIX</option>
+                        <option value="CARTAO_CREDITO">Cartao de credito</option>
+                        <option value="CARTAO_DEBITO">Cartao de debito</option>
+                        <option value="DINHEIRO">Dinheiro</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={handlePay}
+                      disabled={payingIds}
+                      className="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {payingIds ? 'Processando...' : `Confirmar pagamento — R$ ${paymentSummary.pending.toFixed(2)}`}
+                    </button>
+                  </>
+                )}
+                {paymentSummary.pending === 0 && (
+                  <div className="text-center py-2">
+                    <p className="text-sm text-emerald-600 font-medium">Todos os procedimentos pagos!</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Procedure Modal (post-attendance) */}
+      {addProcCallId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-800">Adicionar procedimento</h3>
+              <button onClick={() => { setAddProcCallId(null); setAddProcId(''); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Procedimento</label>
+                <select value={addProcId} onChange={(e) => setAddProcId(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]">
+                  <option value="">Selecione...</option>
+                  {bookPrivProcedures.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.value != null ? ` — R$ ${Number(p.value).toFixed(2)}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => { setAddProcCallId(null); setAddProcId(''); }} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button onClick={handleAddProcedure} disabled={addProcSaving || !addProcId} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                  {addProcSaving ? 'Salvando...' : 'Adicionar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
