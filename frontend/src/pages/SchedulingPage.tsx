@@ -198,9 +198,10 @@ export function SchedulingPage() {
   const [paymentMethod, setPaymentMethod] = useState('PIX');
   const [payingIds, setPayingIds] = useState(false);
 
-  // Add procedure modal (post-attendance)
+  // Add procedure modal (post-attendance) — supports multiple procedures
   const [addProcCallId, setAddProcCallId] = useState<string | null>(null);
-  const [addProcId, setAddProcId] = useState('');
+  interface AddProcRow { procedureId: string; doctorId: string }
+  const [addProcRows, setAddProcRows] = useState<AddProcRow[]>([{ procedureId: '', doctorId: '' }]);
   const [addProcSaving, setAddProcSaving] = useState(false);
 
   // Doctors
@@ -467,13 +468,21 @@ export function SchedulingPage() {
   };
 
   const handleAddProcedure = async () => {
-    if (!addProcCallId || !addProcId) return;
+    if (!addProcCallId) return;
+    const validRows = addProcRows.filter(r => r.procedureId);
+    if (validRows.length === 0) return;
     setAddProcSaving(true);
     try {
-      await api.post(`/scheduling/calls/${addProcCallId}/add-procedure`, { privateProcedureId: addProcId });
-      showToast('Procedimento adicionado!');
+      for (const row of validRows) {
+        await api.post(`/scheduling/calls/${addProcCallId}/add-procedure`, {
+          privateProcedureId: row.procedureId,
+          doctorId: row.doctorId || undefined,
+        });
+      }
+      await api.patch(`/scheduling/calls/${addProcCallId}`, { status: 'awaiting_payment' });
+      showToast(`${validRows.length} procedimento(s) adicionado(s)! Aguardando pagamento.`);
       setAddProcCallId(null);
-      setAddProcId('');
+      setAddProcRows([{ procedureId: '', doctorId: '' }]);
       fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) {
       showToast(err?.response?.data?.error?.message || 'Erro ao adicionar procedimento');
@@ -1226,7 +1235,7 @@ export function SchedulingPage() {
             )}
             {/* Add procedure after attendance */}
             {a.paymentType === 'PARTICULAR' && a.status === 'attended' && (
-              <button onClick={() => { setAddProcCallId(a.id); setAddProcId(''); }} className="mt-1 text-xs text-[#2563EB] hover:underline">+ Adicionar procedimento</button>
+              <button onClick={() => { setAddProcCallId(a.id); setAddProcRows([{ procedureId: '', doctorId: '' }]); }} className="mt-1 text-xs text-[#2563EB] hover:underline">+ Adicionar procedimento</button>
             )}
           </div>
         </div>
@@ -1241,6 +1250,9 @@ export function SchedulingPage() {
             <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1"><UserCheck size={14} />Presente</button>
           )}
           {a.status === 'awaiting_payment' && (
+            <button onClick={() => openPaymentModal(a.id)} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1 animate-pulse">Registrar pagamento</button>
+          )}
+          {a.status === 'attended' && a.paymentType === 'PARTICULAR' && a.privateProcedureCalls && a.privateProcedureCalls.some(pc => pc.paymentStatus !== 'paid') && (
             <button onClick={() => openPaymentModal(a.id)} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1 animate-pulse">Registrar pagamento</button>
           )}
           {canRevert && (a.status === 'confirmed' || a.status === 'awaiting_payment' || a.status === 'present' || a.status === 'attended') && (
@@ -2894,32 +2906,61 @@ export function SchedulingPage() {
         </div>
       )}
 
-      {/* Add Procedure Modal (post-attendance) */}
+      {/* Add Procedure Modal (post-attendance) — multiple procedures with doctor */}
       {addProcCallId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-sm p-6">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-800">Adicionar procedimento</h3>
-              <button onClick={() => { setAddProcCallId(null); setAddProcId(''); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+              <h3 className="font-semibold text-slate-800">Adicionar procedimento(s)</h3>
+              <button onClick={() => { setAddProcCallId(null); setAddProcRows([{ procedureId: '', doctorId: '' }]); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Procedimento</label>
-                <select value={addProcId} onChange={(e) => setAddProcId(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]">
-                  <option value="">Selecione...</option>
-                  {bookPrivProcedures.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}{p.value != null ? ` — R$ ${Number(p.value).toFixed(2)}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setAddProcCallId(null); setAddProcId(''); }} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button onClick={handleAddProcedure} disabled={addProcSaving || !addProcId} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
-                  {addProcSaving ? 'Salvando...' : 'Adicionar'}
-                </button>
-              </div>
+            <p className="text-xs text-slate-500 mb-4">Apos confirmar, o paciente voltara para a fila de pagamento.</p>
+            <div className="space-y-3 mb-4">
+              {addProcRows.map((row, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-600">Procedimento {idx + 1}</span>
+                    {addProcRows.length > 1 && (
+                      <button type="button" onClick={() => setAddProcRows(rows => rows.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
+                    )}
+                  </div>
+                  <select
+                    value={row.procedureId}
+                    onChange={(e) => setAddProcRows(rows => rows.map((r, i) => i === idx ? { ...r, procedureId: e.target.value } : r))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  >
+                    <option value="">Selecione o procedimento...</option>
+                    {bookPrivProcedures.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.value != null ? ` — R$ ${Number(p.value).toFixed(2)}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={row.doctorId}
+                    onChange={(e) => setAddProcRows(rows => rows.map((r, i) => i === idx ? { ...r, doctorId: e.target.value } : r))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  >
+                    <option value="">Mesmo medico (padrao)</option>
+                    {doctors.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}{d.especialidade ? ` — ${d.especialidade}` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setAddProcRows(rows => [...rows, { procedureId: '', doctorId: '' }])}
+              className="w-full py-2 border border-dashed border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 mb-4"
+            >
+              + Adicionar outro procedimento
+            </button>
+            <div className="flex gap-3">
+              <button onClick={() => { setAddProcCallId(null); setAddProcRows([{ procedureId: '', doctorId: '' }]); }} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button onClick={handleAddProcedure} disabled={addProcSaving || !addProcRows.some(r => r.procedureId)} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                {addProcSaving ? 'Salvando...' : `Confirmar (${addProcRows.filter(r => r.procedureId).length})`}
+              </button>
             </div>
           </div>
         </div>
