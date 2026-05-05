@@ -768,15 +768,25 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
   for (const p of call.procedures) { if (p.doctorId) doctorIds.add(p.doctorId); }
   for (const pp of call.privateProcedureCalls) { if (pp.doctorId) doctorIds.add(pp.doctorId); }
 
-  // Load repasse maps for ALL involved doctors
-  const repasseMaps = new Map<string, Map<string, number>>();
+  // Load repasse maps for ALL involved doctors (by procedure ID)
+  const repasseByTuss = new Map<string, Map<string, number>>();   // doctorId -> tussProcedureId -> %
+  const repasseByPrivate = new Map<string, Map<string, number>>(); // doctorId -> privateProcedureId -> %
+  const repasseByType = new Map<string, Map<string, number>>();    // doctorId -> procedureType -> % (legacy fallback)
   if (doctorIds.size > 0) {
     const repasses = await tx.doctorRepasse.findMany({
       where: { tenantId, doctorId: { in: [...doctorIds] } },
     });
     for (const r of repasses) {
-      if (!repasseMaps.has(r.doctorId)) repasseMaps.set(r.doctorId, new Map());
-      repasseMaps.get(r.doctorId)!.set(r.procedureType, r.percentage);
+      if (r.tussProcedureId) {
+        if (!repasseByTuss.has(r.doctorId)) repasseByTuss.set(r.doctorId, new Map());
+        repasseByTuss.get(r.doctorId)!.set(r.tussProcedureId, r.percentage);
+      } else if (r.privateProcedureId) {
+        if (!repasseByPrivate.has(r.doctorId)) repasseByPrivate.set(r.doctorId, new Map());
+        repasseByPrivate.get(r.doctorId)!.set(r.privateProcedureId, r.percentage);
+      } else if (r.procedureType) {
+        if (!repasseByType.has(r.doctorId)) repasseByType.set(r.doctorId, new Map());
+        repasseByType.get(r.doctorId)!.set(r.procedureType, r.percentage);
+      }
     }
   }
 
@@ -810,8 +820,9 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
 
     // Doctor repasse expense (using per-procedure doctor)
     if (effectiveDoctorId && effectiveDoctorName) {
-      const docRepasse = repasseMaps.get(effectiveDoctorId);
-      const pct = docRepasse?.get(proc.type) ?? 0;
+      const pct = repasseByTuss.get(effectiveDoctorId)?.get(p.tussProcedureId)
+        ?? repasseByType.get(effectiveDoctorId)?.get(proc.type)
+        ?? 0;
       if (pct > 0) {
         const repasse = (valor * pct) / 100;
         await tx.financialTransaction.create({
@@ -855,8 +866,9 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
     });
 
     if (effectiveDoctorId && effectiveDoctorName) {
-      const docRepasse = repasseMaps.get(effectiveDoctorId);
-      const pct = docRepasse?.get(proc.type) ?? docRepasse?.get('OUTROS') ?? 0;
+      const pct = repasseByPrivate.get(effectiveDoctorId)?.get(pp.privateProcedureId)
+        ?? repasseByType.get(effectiveDoctorId)?.get(proc.type)
+        ?? 0;
       if (pct > 0) {
         const repasse = (valor * pct) / 100;
         await tx.financialTransaction.create({

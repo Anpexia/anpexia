@@ -384,6 +384,7 @@ export const financialService = {
     // Build lookup map: doctorId -> procedureType -> percentage.
     const repasseMap: Record<string, Record<string, number>> = {};
     for (const r of repasses) {
+      if (!r.procedureType) continue;
       if (!repasseMap[r.doctorId]) repasseMap[r.doctorId] = {};
       repasseMap[r.doctorId][r.procedureType] = Number(r.percentage) || 0;
     }

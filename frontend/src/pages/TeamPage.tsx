@@ -91,17 +91,20 @@ export function TeamPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Edit modal tab
-  const [editTab, setEditTab] = useState<'dados' | 'horarios' | 'repasse'>('dados');
+  const [editTab, setEditTab] = useState<'dados' | 'horarios' | 'repasse_tuss' | 'repasse_particular'>('dados');
 
   // Doctor schedule
   const [horarios, setHorarios] = useState<Horarios>(DEFAULT_HORARIOS);
   const [duracaoConsulta, setDuracaoConsulta] = useState<number>(30);
   const [savingHorarios, setSavingHorarios] = useState(false);
 
-  // Repasse (visible when editing a provider)
-  const [repasseTypes, setRepasseTypes] = useState<Array<{ id: string; name: string; isDefault: boolean }>>([]);
-  const [repasse, setRepasse] = useState<Record<string, number>>({});
+  // Repasse per procedure
+  interface RepasseProcedure { procedureId: string; name: string; code?: string; type: string; value: number | null; percentage: number }
+  const [repasseTuss, setRepasseTuss] = useState<RepasseProcedure[]>([]);
+  const [repassePrivate, setRepassePrivate] = useState<RepasseProcedure[]>([]);
   const [loadingRepasse, setLoadingRepasse] = useState(false);
+  const [repasseSearch, setRepasseSearch] = useState('');
+  const [savingRepasse, setSavingRepasse] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -116,14 +119,18 @@ export function TeamPage() {
 
   useEffect(() => { fetchMembers(); }, []);
 
-  const fetchRepasseTypes = async () => {
+  const loadRepasseTuss = async (doctorId: string) => {
     try {
-      const { data } = await api.get('/repasse-types');
-      setRepasseTypes(data.data || []);
-      return data.data || [];
-    } catch {
-      return [];
-    }
+      const { data } = await api.get(`/doctors/${doctorId}/repasse/tuss`);
+      setRepasseTuss(data.data || []);
+    } catch { setRepasseTuss([]); }
+  };
+
+  const loadRepassePrivate = async (doctorId: string) => {
+    try {
+      const { data } = await api.get(`/doctors/${doctorId}/repasse/private`);
+      setRepassePrivate(data.data || []);
+    } catch { setRepassePrivate([]); }
   };
 
   const handleCreate = async () => {
@@ -169,14 +176,6 @@ export function TeamPage() {
           rqe: providerActive ? (formRqe || undefined) : undefined,
         });
       }
-      // Save repasse for providers (OWNER or MANAGER)
-      if (providerActive && canManage) {
-        const repasses = repasseTypes.map((t) => ({
-          procedureType: t.name,
-          percentage: Number(repasse[t.name]) || 0,
-        }));
-        await api.put(`/doctors/${editMember.id}/repasse`, { repasses });
-      }
       showToast('Membro atualizado!');
       setEditMember(null);
       resetForm();
@@ -191,21 +190,32 @@ export function TeamPage() {
   const loadRepasse = async (doctorId: string) => {
     setLoadingRepasse(true);
     try {
-      const types = await fetchRepasseTypes();
-      const map: Record<string, number> = {};
-      for (const t of types) {
-        map[t.name] = 0;
-      }
-      const { data } = await api.get(`/doctors/${doctorId}/repasse`);
-      for (const r of data.data || []) {
-        map[r.procedureType] = r.percentage;
-      }
-      setRepasse(map);
-    } catch {
-      setRepasse({});
-    } finally {
+      await Promise.all([loadRepasseTuss(doctorId), loadRepassePrivate(doctorId)]);
+    } catch {} finally {
       setLoadingRepasse(false);
     }
+  };
+
+  const handleSaveRepasseTuss = async () => {
+    if (!editMember) return;
+    setSavingRepasse(true);
+    try {
+      const repasses = repasseTuss.filter(r => r.percentage > 0).map(r => ({ procedureId: r.procedureId, percentage: r.percentage }));
+      await api.put(`/doctors/${editMember.id}/repasse/tuss`, { repasses });
+      showToast('Repasse TUSS salvo!');
+    } catch { showToast('Erro ao salvar repasse'); }
+    finally { setSavingRepasse(false); }
+  };
+
+  const handleSaveRepassePrivate = async () => {
+    if (!editMember) return;
+    setSavingRepasse(true);
+    try {
+      const repasses = repassePrivate.filter(r => r.percentage > 0).map(r => ({ procedureId: r.procedureId, percentage: r.percentage }));
+      await api.put(`/doctors/${editMember.id}/repasse/private`, { repasses });
+      showToast('Repasse Particular salvo!');
+    } catch { showToast('Erro ao salvar repasse'); }
+    finally { setSavingRepasse(false); }
   };
 
   const handleToggle = async (id: string) => {
@@ -247,7 +257,8 @@ export function TeamPage() {
       setHorarios(m.horarios ? migrateHorarios(m.horarios) : { ...DEFAULT_HORARIOS });
       setDuracaoConsulta(m.duracaoConsulta || 30);
     } else {
-      setRepasse({});
+      setRepasseTuss([]);
+      setRepassePrivate([]);
       setHorarios({ ...DEFAULT_HORARIOS });
       setDuracaoConsulta(30);
     }
@@ -473,10 +484,10 @@ export function TeamPage() {
               const providerActive = isProviderRole || formIsProvider;
               return providerActive;
             })() && (
-              <div className="border-b border-slate-200 flex gap-1 mb-4">
-                {([['dados', 'Dados'], ['horarios', 'Horarios'], ['repasse', 'Repasse']] as const).map(([k, label]) => (
-                  <button key={k} onClick={() => setEditTab(k)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${editTab === k ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+              <div className="border-b border-slate-200 flex gap-1 mb-4 overflow-x-auto">
+                {([['dados', 'Dados'], ['horarios', 'Horarios'], ['repasse_tuss', 'Repasse TUSS'], ['repasse_particular', 'Repasse Particular']] as const).map(([k, label]) => (
+                  <button key={k} onClick={() => { setEditTab(k); setRepasseSearch(''); }}
+                    className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${editTab === k ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                     {label}
                   </button>
                 ))}
@@ -619,33 +630,82 @@ export function TeamPage() {
                 </>
               )}
 
-              {/* Tab: Repasse */}
-              {editTab === 'repasse' && (
+              {/* Tab: Repasse TUSS */}
+              {editTab === 'repasse_tuss' && (
                 <>
-                  <h3 className="text-sm font-semibold text-slate-800 mb-1">Repasse por tipo de procedimento</h3>
-                  <p className="text-xs text-slate-500 mb-3">Percentual do valor do procedimento repassado ao medico.</p>
+                  <p className="text-xs text-slate-500 mb-3">Percentual de repasse por procedimento TUSS.</p>
                   {loadingRepasse ? (
-                    <div className="text-xs text-slate-400">Carregando repasses...</div>
-                  ) : repasseTypes.length === 0 ? (
-                    <div className="text-xs text-slate-400">Nenhum tipo de repasse cadastrado. Configure em Configuracoes {'>'} Repasse.</div>
+                    <div className="text-xs text-slate-400 py-4">Carregando...</div>
+                  ) : repasseTuss.length === 0 ? (
+                    <div className="text-xs text-slate-400 py-4">Nenhum procedimento TUSS cadastrado.</div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {repasseTypes.map((t) => (
-                        <div key={t.id}>
-                          <label className="block text-xs font-medium text-slate-600 mb-1">
-                            {t.name.charAt(0) + t.name.slice(1).toLowerCase()} %
-                          </label>
-                          <input type="number" min="0" max="100" step="0.01"
-                            value={repasse[t.name] ?? 0}
-                            onChange={e => setRepasse(r => ({ ...r, [t.name]: Number(e.target.value) }))}
-                            className={inputCls} />
-                        </div>
-                      ))}
-                    </div>
+                    <>
+                      <input type="text" value={repasseSearch} onChange={e => setRepasseSearch(e.target.value)}
+                        placeholder="Buscar procedimento..." className={inputCls + ' mb-3'} />
+                      <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+                        {repasseTuss
+                          .filter(r => !repasseSearch || r.name.toLowerCase().includes(repasseSearch.toLowerCase()) || r.code?.includes(repasseSearch))
+                          .map(r => (
+                          <div key={r.procedureId} className="flex items-center gap-3 py-1.5 border-b border-slate-100 last:border-0">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-800 truncate">{r.code ? `${r.code} - ` : ''}{r.name}</p>
+                              <p className="text-xs text-slate-400">R$ {(r.value ?? 0).toFixed(2)}</p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <input type="number" min="0" max="100" step="0.5"
+                                value={r.percentage}
+                                onChange={e => setRepasseTuss(prev => prev.map(p => p.procedureId === r.procedureId ? { ...p, percentage: Number(e.target.value) || 0 } : p))}
+                                className="w-20 px-2 py-1.5 border border-slate-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                              <span className="text-xs text-slate-500">%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
-                  <button onClick={handleUpdate} disabled={submitting}
-                    className="w-full btn-pill btn-primary justify-center">
-                    {submitting ? 'Salvando...' : 'Salvar Repasse'}
+                  <button onClick={handleSaveRepasseTuss} disabled={savingRepasse}
+                    className="w-full btn-pill btn-primary justify-center mt-3">
+                    {savingRepasse ? 'Salvando...' : 'Salvar Repasse TUSS'}
+                  </button>
+                </>
+              )}
+
+              {/* Tab: Repasse Particular */}
+              {editTab === 'repasse_particular' && (
+                <>
+                  <p className="text-xs text-slate-500 mb-3">Percentual de repasse por procedimento particular.</p>
+                  {loadingRepasse ? (
+                    <div className="text-xs text-slate-400 py-4">Carregando...</div>
+                  ) : repassePrivate.length === 0 ? (
+                    <div className="text-xs text-slate-400 py-4">Nenhum procedimento particular cadastrado.</div>
+                  ) : (
+                    <>
+                      <input type="text" value={repasseSearch} onChange={e => setRepasseSearch(e.target.value)}
+                        placeholder="Buscar procedimento..." className={inputCls + ' mb-3'} />
+                      <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+                        {repassePrivate
+                          .filter(r => !repasseSearch || r.name.toLowerCase().includes(repasseSearch.toLowerCase()))
+                          .map(r => (
+                          <div key={r.procedureId} className="flex items-center gap-3 py-1.5 border-b border-slate-100 last:border-0">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-800 truncate">{r.name}</p>
+                              <p className="text-xs text-slate-400">{r.value ? `R$ ${r.value.toFixed(2)}` : 'Sem valor definido'}</p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <input type="number" min="0" max="100" step="0.5"
+                                value={r.percentage}
+                                onChange={e => setRepassePrivate(prev => prev.map(p => p.procedureId === r.procedureId ? { ...p, percentage: Number(e.target.value) || 0 } : p))}
+                                className="w-20 px-2 py-1.5 border border-slate-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                              <span className="text-xs text-slate-500">%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <button onClick={handleSaveRepassePrivate} disabled={savingRepasse}
+                    className="w-full btn-pill btn-primary justify-center mt-3">
+                    {savingRepasse ? 'Salvando...' : 'Salvar Repasse Particular'}
                   </button>
                 </>
               )}

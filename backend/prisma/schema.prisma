@@ -1266,6 +1266,7 @@ model TussProcedure {
   convenio Convenio? @relation(fields: [convenioId], references: [id], onDelete: SetNull)
 
   scheduledCallProcedures ScheduledCallProcedure[]
+  doctorRepasses          DoctorRepasse[]
 
   @@index([tenantId])
   @@index([convenioId])
@@ -1290,17 +1291,22 @@ model ScheduledCallProcedure {
 }
 
 model DoctorRepasse {
-  id            String   @id @default(cuid())
-  tenantId      String   @map("tenant_id")
-  doctorId      String   @map("doctor_id")
-  procedureType String   @map("procedure_type") // CONSULTA, EXAME, CIRURGIA, TERAPIA, OUTROS
-  percentage    Float    @default(0)
-  createdAt     DateTime @default(now()) @map("created_at")
+  id                 String            @id @default(cuid())
+  tenantId           String            @map("tenant_id")
+  doctorId           String            @map("doctor_id")
+  procedureType      String?           @map("procedure_type")
+  tussProcedureId    String?           @map("tuss_procedure_id")
+  privateProcedureId String?           @map("private_procedure_id")
+  percentage         Float             @default(0)
+  createdAt          DateTime          @default(now()) @map("created_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  doctor User   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  doctor           User              @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  tussProcedure    TussProcedure?    @relation(fields: [tussProcedureId], references: [id], onDelete: Cascade)
+  privateProcedure PrivateProcedure? @relation(fields: [privateProcedureId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, doctorId, procedureType])
+  @@unique([tenantId, doctorId, tussProcedureId])
+  @@unique([tenantId, doctorId, privateProcedureId])
   @@index([tenantId])
   @@index([doctorId])
   @@map("doctor_repasses")
@@ -1361,8 +1367,9 @@ model PrivateProcedure {
   duration    Int?     @default(30)
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
-  calls       PrivateProcedureCall[]
-  templates   ProcedureTemplate[]
+  calls          PrivateProcedureCall[]
+  templates      ProcedureTemplate[]
+  doctorRepasses DoctorRepasse[]
 
   @@unique([tenantId, name])
   @@map("private_procedures")
