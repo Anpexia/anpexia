@@ -4,6 +4,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addM
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { PatientPanel } from '../components/PatientPanel';
 
 interface DoctorHorario {
   ativo: boolean;
@@ -264,6 +265,9 @@ export function SchedulingPage() {
 
   // Status update
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Patient panel
+  const [patientPanelId, setPatientPanelId] = useState<string | null>(null);
 
   // Toast
   const [toastMsg, setToastMsg] = useState('');
@@ -1081,7 +1085,13 @@ export function SchedulingPage() {
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-slate-800">{a.customer?.name || a.name}</span>
+              {a.customerId ? (
+                <button onClick={() => setPatientPanelId(a.customerId!)} className="font-medium text-[#2563EB] hover:underline text-left">
+                  {a.customer?.name || a.name}
+                </button>
+              ) : (
+                <span className="font-medium text-slate-800">{a.name}</span>
+              )}
               {(() => {
                 const pt = a.paymentType || 'PARTICULAR';
                 if (pt === 'CONVENIO') {
@@ -1090,7 +1100,6 @@ export function SchedulingPage() {
                 }
                 return <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Particular</span>;
               })()}
-              {a.customer && <span className="text-xs bg-[#EFF6FF] text-[#1E3A5F] px-1.5 py-0.5 rounded">Paciente vinculado</span>}
               {a.doctor ? (
                 <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
                   <Stethoscope size={11} /> {a.doctor.name}
@@ -1454,7 +1463,13 @@ export function SchedulingPage() {
                                 <span title="Sem TUSS vinculado" className="flex items-center text-amber-500"><AlertCircle size={14} /></span>
                               )}
                               <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
-                              <span className="text-sm font-medium text-slate-800 truncate">{a.customer?.name || a.name}</span>
+                              {a.customerId ? (
+                                <button onClick={() => setPatientPanelId(a.customerId!)} className="text-sm font-medium text-[#2563EB] hover:underline truncate text-left">
+                                  {a.customer?.name || a.name}
+                                </button>
+                              ) : (
+                                <span className="text-sm font-medium text-slate-800 truncate">{a.name}</span>
+                              )}
                               {(() => {
                                 const pt = a.paymentType || 'PARTICULAR';
                                 if (pt === 'CONVENIO') {
@@ -1770,7 +1785,11 @@ export function SchedulingPage() {
                                     <div key={a.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
                                       <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium text-[#1E3A5F] w-12">{format(new Date(a.date), 'HH:mm')}</span>
-                                        <span className="text-sm text-slate-700 truncate max-w-[120px]">{a.customer?.name || a.name}</span>
+                                        {a.customerId ? (
+                                          <button onClick={() => setPatientPanelId(a.customerId!)} className="text-sm text-[#2563EB] hover:underline truncate max-w-[120px] text-left">{a.customer?.name || a.name}</button>
+                                        ) : (
+                                          <span className="text-sm text-slate-700 truncate max-w-[120px]">{a.name}</span>
+                                        )}
                                       </div>
                                       <span className={`text-[10px] px-1.5 py-0.5 rounded ${st?.cls || ''}`}>{st?.label || a.status}</span>
                                     </div>
@@ -1857,6 +1876,20 @@ export function SchedulingPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Patient Panel Modal */}
+      {patientPanelId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-3xl my-8">
+            <PatientPanel
+              customerId={patientPanelId}
+              onClose={() => setPatientPanelId(null)}
+              initialTab="info"
+              onPatientUpdated={() => { fetchAppointments(); setAgendaRefresh(r => r + 1); }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Book Modal */}
