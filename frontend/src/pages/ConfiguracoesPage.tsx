@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, Percent, X, List, Lock, CheckCircle, XCircle, RefreshCw, Loader2, QrCode, Unplug, FlaskConical } from 'lucide-react';
+import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, X, List, Lock, CheckCircle, XCircle, RefreshCw, Loader2, QrCode, Unplug, FlaskConical } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
-type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'repasse' | 'procedimentos' | 'permissoes' | 'seguranca' | 'exames';
+type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'procedimentos' | 'permissoes' | 'seguranca' | 'exames';
 
 interface PrivateProcedureItem {
   id: string;
@@ -321,7 +321,6 @@ export function ConfiguracoesPage() {
     { key: 'exames', label: 'Tipos de Exame', icon: FlaskConical },
     ...(canManageTuss ? [{ key: 'tuss' as Tab, label: 'Procedimentos TUSS', icon: FileCode }] : []),
     ...(canManageTuss ? [{ key: 'procedimentos' as Tab, label: 'Procedimentos', icon: List }] : []),
-    ...(canManageTuss ? [{ key: 'repasse' as Tab, label: 'Repasse', icon: Percent }] : []),
     { key: 'horarios', label: 'Horarios', icon: Clock },
     ...(canManageTuss ? [{ key: 'permissoes' as Tab, label: 'Permissoes', icon: Lock }] : []),
     { key: 'whatsapp', label: 'WhatsApp', icon: Wifi },
@@ -463,9 +462,6 @@ export function ConfiguracoesPage() {
 
   // Repasse types
   const [repasseTypes, setRepasseTypes] = useState<RepasseTypeItem[]>([]);
-  const [newRepasseType, setNewRepasseType] = useState('');
-  const [repasseError, setRepasseError] = useState('');
-  const [addingRepasse, setAddingRepasse] = useState(false);
 
   // Procedimentos particulares
   const [procList, setProcList] = useState<PrivateProcedureItem[]>([]);
@@ -623,36 +619,9 @@ export function ConfiguracoesPage() {
   useEffect(() => { loadSettings(); loadConvenios(); }, [loadSettings, loadConvenios]);
   useEffect(() => { if (tab === 'exames') loadExamTypes(); }, [tab, loadExamTypes]);
   useEffect(() => { if (tab === 'tuss') { loadTuss(); loadRepasseTypes(); } }, [tab, loadTuss, loadRepasseTypes]);
-  useEffect(() => { if (tab === 'repasse') loadRepasseTypes(); }, [tab, loadRepasseTypes]);
   useEffect(() => { if (tab === 'procedimentos') { loadPrivateProcedures(); loadRepasseTypes(); } }, [tab, loadPrivateProcedures, loadRepasseTypes]);
   useEffect(() => { if (tab === 'permissoes') loadRolePermissions(); }, [tab, loadRolePermissions]);
 
-  const addRepasseType = async () => {
-    const name = newRepasseType.trim();
-    if (!name) return;
-    setAddingRepasse(true);
-    setRepasseError('');
-    try {
-      await api.post('/repasse-types', { name });
-      setNewRepasseType('');
-      await loadRepasseTypes();
-    } catch (err: any) {
-      setRepasseError(err.response?.data?.error?.message || 'Erro ao adicionar tipo');
-    } finally {
-      setAddingRepasse(false);
-    }
-  };
-
-  const deleteRepasseType = async (item: RepasseTypeItem) => {
-    if (!confirm(`Excluir o tipo "${item.name}"?`)) return;
-    setRepasseError('');
-    try {
-      await api.delete(`/repasse-types/${item.id}`);
-      await loadRepasseTypes();
-    } catch (err: any) {
-      setRepasseError(err.response?.data?.error?.message || 'Erro ao excluir');
-    }
-  };
 
   const openTussCreate = () => {
     setTussEditing(null);
@@ -1289,67 +1258,6 @@ export function ConfiguracoesPage() {
                 <Download size={16} /> {generatingXml ? 'Gerando...' : 'Gerar XML'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* REPASSE TAB */}
-      {tab === 'repasse' && canManageTuss && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-gray-800">Tipos de Repasse</h2>
-            <p className="text-sm text-gray-500 mt-1">Gerencie os tipos de procedimento para cálculo de repasse médico</p>
-          </div>
-
-          {repasseError && (
-            <div className="mb-4 px-4 py-2 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200 flex items-center justify-between">
-              <span>{repasseError}</span>
-              <button onClick={() => setRepasseError('')} className="text-red-500 hover:text-red-700">
-                <X size={14} />
-              </button>
-            </div>
-          )}
-
-          <div className="space-y-2 mb-5">
-            {repasseTypes.length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-4">Nenhum tipo cadastrado</p>
-            )}
-            {repasseTypes.map((t) => (
-              <div key={t.id} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-gray-800">{t.name}</span>
-                  {t.isDefault && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Padrão</span>
-                  )}
-                </div>
-                {!t.isDefault && (
-                  <button
-                    onClick={() => deleteRepasseType(t)}
-                    className="p-1.5 rounded hover:bg-red-50 text-red-500"
-                    title="Excluir"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-2 pt-4 border-t border-gray-100">
-            <input
-              value={newRepasseType}
-              onChange={(e) => setNewRepasseType(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addRepasseType()}
-              placeholder="Nome do tipo (ex: RETORNO)"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm uppercase"
-            />
-            <button
-              onClick={addRepasseType}
-              disabled={addingRepasse || !newRepasseType.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {addingRepasse ? 'Adicionando...' : 'Adicionar'}
-            </button>
           </div>
         </div>
       )}
