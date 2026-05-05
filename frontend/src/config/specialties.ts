@@ -53,4 +53,22 @@ export const MEDICAL_SPECIALTIES = [
   'Urologia',
 ] as const;
 
+export const HEALTH_SPECIALTIES = [
+  'Biomedicina',
+  'Educacao Fisica',
+  'Enfermagem',
+  'Farmacia',
+  'Fisioterapia',
+  'Fonoaudiologia',
+  'Musicoterapia',
+  'Nutricao',
+  'Optometria',
+  'Podologia',
+  'Psicologia',
+  'Psicopedagogia',
+  'Quiropraxia',
+  'Terapia Ocupacional',
+] as const;
+
 export type MedicalSpecialty = typeof MEDICAL_SPECIALTIES[number];
+export type HealthSpecialty = typeof HEALTH_SPECIALTIES[number];

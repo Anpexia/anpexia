@@ -436,8 +436,8 @@ async function showSpecialties(tenantId: string, phone: string): Promise<FlowRes
     where: {
       tenantId,
       isActive: true,
+      isProvider: true,
       especialidade: { not: null },
-      role: { in: ['DOCTOR', 'OWNER', 'MANAGER', 'EMPLOYEE'] },
     },
     select: { id: true, name: true, especialidade: true, horarios: true, duracaoConsulta: true },
   });

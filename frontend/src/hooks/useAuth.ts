@@ -7,6 +7,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  isProvider?: boolean;
   twoFactorEnabled?: boolean;
   tenant: { id: string; name: string; slug: string; plan: string; segment?: string; logo?: string } | null;
 }

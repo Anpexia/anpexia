@@ -493,6 +493,7 @@ export function ConfiguracoesPage() {
   const CONFIGURABLE_ROLES = [
     { key: 'MANAGER', label: 'Gerente' },
     { key: 'DOCTOR', label: 'Medico' },
+    { key: 'HEALTH_PROFESSIONAL', label: 'Prof. Saude' },
     { key: 'NURSE', label: 'Enfermeira' },
     { key: 'RECEPTIONIST', label: 'Recepcionista' },
     { key: 'FINANCIAL', label: 'Financeiro' },
@@ -503,6 +504,7 @@ export function ConfiguracoesPage() {
   const DEFAULT_ROLE_PERMS: Record<string, string[]> = {
     MANAGER: ['/dashboard', '/pacientes', '/estoque', '/financeiro', '/agendamentos', '/fila', '/scripts', '/assinatura', '/equipe', '/configuracoes'],
     DOCTOR: ['/pacientes', '/agendamentos', '/fila', '/scripts'],
+    HEALTH_PROFESSIONAL: ['/pacientes', '/agendamentos', '/fila', '/scripts'],
     NURSE: ['/pacientes', '/agendamentos', '/fila', '/scripts'],
     RECEPTIONIST: ['/pacientes', '/agendamentos', '/fila', '/scripts'],
     FINANCIAL: ['/financeiro'],

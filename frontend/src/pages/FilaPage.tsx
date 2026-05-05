@@ -64,7 +64,7 @@ export function FilaPage() {
   const [attendingItem, setAttendingItem] = useState<QueueItem | null>(null);
   const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isDoctor = user?.role === 'DOCTOR';
+  const isDoctor = user?.role === 'DOCTOR' || user?.role === 'HEALTH_PROFESSIONAL' || !!user?.isProvider;
 
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 4000); };
 

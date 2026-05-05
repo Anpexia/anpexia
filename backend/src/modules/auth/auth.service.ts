@@ -217,6 +217,7 @@ export const authService = {
         name: user.name,
         email: user.email,
         role: user.role,
+        isProvider: user.isProvider,
         twoFactorEnabled: user.twoFactorEnabled,
         tenant: user.tenant,
       },
@@ -289,6 +290,7 @@ export const authService = {
         name: user.name,
         email: user.email,
         role: user.role,
+        isProvider: user.isProvider,
         twoFactorEnabled: user.twoFactorEnabled,
         tenant: user.tenant,
       },
@@ -470,6 +472,7 @@ export const authService = {
     email: string;
     role: string;
     phone?: string;
+    isProvider?: boolean;
     especialidade?: string;
     rqe?: string;
     inviteLinkBase?: string;
@@ -491,6 +494,7 @@ export const authService = {
         email: normalizedEmail,
         phone: params.phone,
         role: params.role as any,
+        isProvider: params.isProvider ?? false,
         especialidade: params.especialidade,
         rqe: params.rqe,
         passwordHash: crypto.randomBytes(32).toString('hex'), // placeholder; never usable
@@ -498,7 +502,7 @@ export const authService = {
         inviteToken,
         inviteTokenExpiresAt,
       },
-      select: { id: true, name: true, email: true, role: true, especialidade: true, rqe: true },
+      select: { id: true, name: true, email: true, role: true, isProvider: true, especialidade: true, rqe: true },
     });
 
     const base = (params.inviteLinkBase || env.frontendUrl).replace(/\/$/, '');

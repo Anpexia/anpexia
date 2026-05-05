@@ -9,7 +9,8 @@ interface CreateMemberData {
   email: string;
   password?: string;
   phone?: string;
-  role: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'NURSE' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
+  role: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'HEALTH_PROFESSIONAL' | 'NURSE' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE';
+  isProvider?: boolean;
   especialidade?: string;
   rqe?: string;
   sendInvite?: boolean;
@@ -25,6 +26,7 @@ export const teamService = {
         email: true,
         phone: true,
         role: true,
+        isProvider: true,
         especialidade: true,
         rqe: true,
         horarios: true,
@@ -40,12 +42,14 @@ export const teamService = {
 
   async listDoctors(tenantId: string) {
     return prisma.user.findMany({
-      where: { tenantId, role: 'DOCTOR', isActive: true },
+      where: { tenantId, isProvider: true, isActive: true },
       select: {
         id: true,
         name: true,
         email: true,
         phone: true,
+        role: true,
+        isProvider: true,
         especialidade: true,
         rqe: true,
         tipoRegistro: true,
@@ -66,6 +70,9 @@ export const teamService = {
       throw new AppError(403, 'FORBIDDEN', 'Apenas um Admin pode criar outro Admin');
     }
 
+    const isProviderRole = role === 'DOCTOR' || role === 'HEALTH_PROFESSIONAL';
+    const isProvider = isProviderRole || !!data.isProvider;
+
     // Invite flow: no password provided -> send invite email to define password
     if (!data.password || data.sendInvite) {
       const user = await authService.createInvite({
@@ -76,6 +83,7 @@ export const teamService = {
         phone: data.phone,
         especialidade: data.especialidade,
         rqe: data.rqe,
+        isProvider,
       });
       return { ...user, isActive: true, createdAt: new Date(), invited: true };
     }
@@ -97,6 +105,7 @@ export const teamService = {
         passwordHash,
         phone: data.phone,
         role: data.role,
+        isProvider,
         especialidade: data.especialidade,
         rqe: data.rqe,
         tenantId,
@@ -108,6 +117,7 @@ export const teamService = {
         email: true,
         phone: true,
         role: true,
+        isProvider: true,
         especialidade: true,
         rqe: true,
         isActive: true,
@@ -118,19 +128,26 @@ export const teamService = {
     return user;
   },
 
-  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: 'OWNER' | 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'; especialidade?: string; rqe?: string; horarios?: any; duracaoConsulta?: number }) {
+  async update(tenantId: string, userId: string, data: { name?: string; phone?: string; role?: string; isProvider?: boolean; especialidade?: string; rqe?: string; horarios?: any; duracaoConsulta?: number }) {
     const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario nao encontrado');
 
+    const updateData: any = { ...data };
+    if (data.role) {
+      const isProviderRole = data.role === 'DOCTOR' || data.role === 'HEALTH_PROFESSIONAL';
+      if (isProviderRole) updateData.isProvider = true;
+    }
+
     return prisma.user.update({
       where: { id: userId },
-      data,
+      data: updateData,
       select: {
         id: true,
         name: true,
         email: true,
         phone: true,
         role: true,
+        isProvider: true,
         especialidade: true,
         rqe: true,
         horarios: true,
@@ -175,14 +192,12 @@ export const teamService = {
   },
 
   async updateProfile(userId: string, data: {
-    name?: string; phone?: string; especialidade?: string; rqe?: string;
-    tipoRegistro?: string; numeroRegistro?: string;
-    duracaoConsulta?: number; bio?: string;
+    name?: string; phone?: string; bio?: string;
   }) {
-    const { horarios: _ignored, ...safeData } = data as any;
+    const { name, phone, bio } = data;
     return prisma.user.update({
       where: { id: userId },
-      data: safeData,
+      data: { name, phone, bio },
       select: {
         id: true, name: true, email: true, phone: true, role: true,
         especialidade: true, rqe: true, tipoRegistro: true, numeroRegistro: true,

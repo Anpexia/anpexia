@@ -177,10 +177,6 @@ export function ProfilePage() {
       const payload: Record<string, any> = {};
       if (name && name !== user?.name) payload.name = name;
       if (phone) payload.phone = phone;
-      if (especialidade) payload.especialidade = especialidade;
-      if (rqe) payload.rqe = rqe;
-      if (tipoRegistro) payload.tipoRegistro = tipoRegistro;
-      if (numeroRegistro) payload.numeroRegistro = numeroRegistro;
       if (bio) payload.bio = bio;
 
       await api.put('/team/me/profile', payload);
@@ -344,36 +340,31 @@ export function ProfilePage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
               <input value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} placeholder="5571999999999" />
             </div>
-            <div className="grid grid-cols-[7fr_3fr] gap-3">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                <input value={especialidade} onChange={e => setEspecialidade(e.target.value)} className={inputCls} placeholder="Ex: Clínica Geral" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
-                <input type="number" value={rqe} onChange={e => setRqe(e.target.value)} className={inputCls} placeholder="Número" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de registro</label>
-                <select value={tipoRegistro} onChange={e => setTipoRegistro(e.target.value)} className={inputCls}>
-                  <option value="">Selecione</option>
-                  <option value="CRM">CRM</option>
-                  <option value="CRO">CRO</option>
-                  <option value="CRF">CRF</option>
-                  <option value="COREN">COREN</option>
-                  <option value="CRP">CRP</option>
-                  <option value="CRN">CRN</option>
-                  <option value="CREFITO">CREFITO</option>
-                  <option value="Outro">Outro</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Numero do registro</label>
-                <input value={numeroRegistro} onChange={e => setNumeroRegistro(e.target.value)} className={inputCls} placeholder="12345/BA" />
-              </div>
-            </div>
+            {(user?.role === 'DOCTOR' || user?.role === 'HEALTH_PROFESSIONAL' || user?.isProvider) && (
+              <>
+                <div className="grid grid-cols-[7fr_3fr] gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
+                    <input value={especialidade} disabled className={inputCls + ' bg-slate-50 text-slate-500'} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
+                    <input value={rqe} disabled className={inputCls + ' bg-slate-50 text-slate-500'} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de registro</label>
+                    <input value={tipoRegistro || '-'} disabled className={inputCls + ' bg-slate-50 text-slate-500'} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Numero do registro</label>
+                    <input value={numeroRegistro} disabled className={inputCls + ' bg-slate-50 text-slate-500'} />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400">Dados profissionais sao editaveis apenas pelo proprietario no menu Equipe.</p>
+              </>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Bio / Apresentacao</label>
               <textarea value={bio} onChange={e => setBio(e.target.value)} className={inputCls + ' h-16 resize-none'} placeholder="Breve apresentacao profissional..." />

@@ -123,6 +123,7 @@ model User {
   name         String
   phone        String? // WhatsApp para receber alertas
   role         Role      @default(EMPLOYEE)
+  isProvider       Boolean   @default(false) @map("is_provider")
   especialidade    String?  @map("especialidade")
   rqe              String?  @map("rqe")
   tipoRegistro     String?  @map("tipo_registro")  // CRM, CRO, CRF, COREN, etc.
@@ -195,6 +196,7 @@ enum Role {
   OWNER // Dono da empresa cliente
   MANAGER // Gerente
   DOCTOR // Médico
+  HEALTH_PROFESSIONAL // Profissional da Saúde (psicólogo, fisioterapeuta, etc.)
   NURSE // Enfermeira
   RECEPTIONIST // Recepcionista
   FINANCIAL // Financeiro

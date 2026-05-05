@@ -58,6 +58,7 @@ interface TeamMember {
   email: string;
   phone: string | null;
   role: string;
+  isProvider?: boolean;
   especialidade?: string | null;
   rqe?: string | null;
   horarios?: Horarios | null;
@@ -83,7 +84,8 @@ export function TeamPage() {
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [formRole, setFormRole] = useState<'OWNER' | 'MANAGER' | 'DOCTOR' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'>('RECEPTIONIST');
+  const [formRole, setFormRole] = useState<'OWNER' | 'MANAGER' | 'DOCTOR' | 'HEALTH_PROFESSIONAL' | 'NURSE' | 'RECEPTIONIST' | 'FINANCIAL' | 'STOCK' | 'EMPLOYEE'>('RECEPTIONIST');
+  const [formIsProvider, setFormIsProvider] = useState(false);
   const [formEspecialidade, setFormEspecialidade] = useState('');
   const [formRqe, setFormRqe] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -96,7 +98,7 @@ export function TeamPage() {
   const [duracaoConsulta, setDuracaoConsulta] = useState<number>(30);
   const [savingHorarios, setSavingHorarios] = useState(false);
 
-  // Repasse (only visible when editing a DOCTOR)
+  // Repasse (visible when editing a provider)
   const [repasseTypes, setRepasseTypes] = useState<Array<{ id: string; name: string; isDefault: boolean }>>([]);
   const [repasse, setRepasse] = useState<Record<string, number>>({});
   const [loadingRepasse, setLoadingRepasse] = useState(false);
@@ -128,13 +130,16 @@ export function TeamPage() {
     if (!formName || !formEmail) { showToast('Preencha todos os campos obrigatorios'); return; }
     setSubmitting(true);
     try {
+      const isProviderRole = formRole === 'DOCTOR' || formRole === 'HEALTH_PROFESSIONAL';
+      const providerActive = isProviderRole || formIsProvider;
       await api.post('/team', {
         name: formName,
         email: formEmail,
         phone: formPhone || undefined,
         role: formRole,
-        especialidade: formRole === 'DOCTOR' ? (formEspecialidade || undefined) : undefined,
-        rqe: formRole === 'DOCTOR' ? (formRqe || undefined) : undefined,
+        isProvider: providerActive,
+        especialidade: providerActive ? (formEspecialidade || undefined) : undefined,
+        rqe: providerActive ? (formRqe || undefined) : undefined,
       });
       showToast(`Convite enviado para ${formEmail}. O membro receberá um email para definir sua senha.`);
       setShowCreateModal(false);
@@ -152,17 +157,20 @@ export function TeamPage() {
     setSubmitting(true);
     try {
       // OWNER can edit basic fields. MANAGER cannot (backend enforces).
+      const isProviderRole = formRole === 'DOCTOR' || formRole === 'HEALTH_PROFESSIONAL';
+      const providerActive = isProviderRole || formIsProvider;
       if (isOwner) {
         await api.put(`/team/${editMember.id}`, {
           name: formName,
           phone: formPhone || undefined,
           role: formRole,
-          especialidade: formRole === 'DOCTOR' ? (formEspecialidade || undefined) : undefined,
-          rqe: formRole === 'DOCTOR' ? (formRqe || undefined) : undefined,
+          isProvider: providerActive,
+          especialidade: providerActive ? (formEspecialidade || undefined) : undefined,
+          rqe: providerActive ? (formRqe || undefined) : undefined,
         });
       }
-      // Save repasse for doctors (OWNER or MANAGER)
-      if ((editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && canManage) {
+      // Save repasse for providers (OWNER or MANAGER)
+      if (providerActive && canManage) {
         const repasses = repasseTypes.map((t) => ({
           procedureType: t.name,
           percentage: Number(repasse[t.name]) || 0,
@@ -221,7 +229,7 @@ export function TeamPage() {
     }
   };
 
-  const resetForm = () => { setFormName(''); setFormEmail(''); setFormPhone(''); setFormRole('RECEPTIONIST'); setFormEspecialidade(''); setFormRqe(''); };
+  const resetForm = () => { setFormName(''); setFormEmail(''); setFormPhone(''); setFormRole('RECEPTIONIST'); setFormIsProvider(false); setFormEspecialidade(''); setFormRqe(''); };
 
   const openEdit = (m: TeamMember) => {
     setEditMember(m);
@@ -229,9 +237,12 @@ export function TeamPage() {
     setFormName(m.name);
     setFormPhone(m.phone || '');
     setFormRole(m.role as any);
+    setFormIsProvider(m.isProvider || false);
     setFormEspecialidade(m.especialidade || '');
     setFormRqe(m.rqe || '');
-    if (m.role === 'DOCTOR') {
+    const isProviderRole = m.role === 'DOCTOR' || m.role === 'HEALTH_PROFESSIONAL';
+    const providerActive = isProviderRole || m.isProvider;
+    if (providerActive) {
       loadRepasse(m.id);
       setHorarios(m.horarios ? migrateHorarios(m.horarios) : { ...DEFAULT_HORARIOS });
       setDuracaoConsulta(m.duracaoConsulta || 30);
@@ -255,12 +266,13 @@ export function TeamPage() {
     }
   };
 
-  const roleLabel: Record<string, string> = { SUPER_ADMIN: 'Super Admin', OWNER: 'Proprietario', MANAGER: 'Gerente', DOCTOR: 'Medico', NURSE: 'Enfermeira', RECEPTIONIST: 'Recepcionista', FINANCIAL: 'Financeiro', STOCK: 'Estoque', EMPLOYEE: 'Funcionario' };
+  const roleLabel: Record<string, string> = { SUPER_ADMIN: 'Super Admin', OWNER: 'Proprietario', MANAGER: 'Gerente', DOCTOR: 'Medico', HEALTH_PROFESSIONAL: 'Prof. Saude', NURSE: 'Enfermeira', RECEPTIONIST: 'Recepcionista', FINANCIAL: 'Financeiro', STOCK: 'Estoque', EMPLOYEE: 'Funcionario' };
   const roleBadge: Record<string, string> = {
     SUPER_ADMIN: 'bg-purple-100 text-purple-700',
     OWNER: 'bg-blue-100 text-[#1E3A5F]',
     MANAGER: 'bg-blue-100 text-blue-700',
     DOCTOR: 'bg-emerald-100 text-emerald-700',
+    HEALTH_PROFESSIONAL: 'bg-teal-100 text-teal-700',
     NURSE: 'bg-pink-100 text-pink-700',
     RECEPTIONIST: 'bg-amber-100 text-amber-700',
     FINANCIAL: 'bg-cyan-100 text-cyan-700',
@@ -386,10 +398,11 @@ export function TeamPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
-                <select value={formRole} onChange={e => setFormRole(e.target.value as any)} className={inputCls}>
+                <select value={formRole} onChange={e => { setFormRole(e.target.value as any); setFormIsProvider(false); }} className={inputCls}>
                   {isOwner && <option value="OWNER">Admin</option>}
                   <option value="MANAGER">Gerente</option>
                   <option value="DOCTOR">Medico</option>
+                  <option value="HEALTH_PROFESSIONAL">Profissional da Saude</option>
                   <option value="NURSE">Enfermeira</option>
                   <option value="RECEPTIONIST">Recepcionista</option>
                   <option value="FINANCIAL">Financeiro</option>
@@ -397,15 +410,22 @@ export function TeamPage() {
                   <option value="EMPLOYEE">Funcionario</option>
                 </select>
               </div>
-              {formRole === 'DOCTOR' && (
+              {(formRole === 'OWNER' || formRole === 'MANAGER') && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formIsProvider} onChange={e => setFormIsProvider(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]" />
+                  <span className="text-sm text-slate-700">Tambem atende pacientes (prestador)</span>
+                </label>
+              )}
+              {(formRole === 'DOCTOR' || formRole === 'HEALTH_PROFESSIONAL' || ((formRole === 'OWNER' || formRole === 'MANAGER') && formIsProvider)) && (
                 <div className="grid grid-cols-[7fr_3fr] gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                    <SpecialtyCombobox value={formEspecialidade} onChange={setFormEspecialidade} />
+                    <SpecialtyCombobox value={formEspecialidade} onChange={setFormEspecialidade} type={formRole === 'HEALTH_PROFESSIONAL' ? 'health' : 'medical'} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
-                    <input type="number" value={formRqe} onChange={e => setFormRqe(e.target.value)} className={inputCls} placeholder="Número" />
+                    <label className="block text-sm font-medium text-slate-700 mb-1">{formRole === 'HEALTH_PROFESSIONAL' ? 'Registro' : 'RQE'}</label>
+                    <input type="number" value={formRqe} onChange={e => setFormRqe(e.target.value)} className={inputCls} placeholder="Numero" />
                   </div>
                 </div>
               )}
@@ -448,7 +468,11 @@ export function TeamPage() {
             </div>
 
             {/* Tabs */}
-            {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
+            {(() => {
+              const isProviderRole = formRole === 'DOCTOR' || formRole === 'HEALTH_PROFESSIONAL';
+              const providerActive = isProviderRole || formIsProvider;
+              return providerActive;
+            })() && (
               <div className="border-b border-slate-200 flex gap-1 mb-4">
                 {([['dados', 'Dados'], ['horarios', 'Horarios'], ['repasse', 'Repasse']] as const).map(([k, label]) => (
                   <button key={k} onClick={() => setEditTab(k)}
@@ -482,10 +506,11 @@ export function TeamPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
-                    <select value={formRole} onChange={e => setFormRole(e.target.value as any)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')}>
+                    <select value={formRole} onChange={e => { setFormRole(e.target.value as any); setFormIsProvider(false); }} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')}>
                       {isOwner && <option value="OWNER">Admin</option>}
                       <option value="MANAGER">Gerente</option>
                       <option value="DOCTOR">Medico</option>
+                      <option value="HEALTH_PROFESSIONAL">Profissional da Saude</option>
                       <option value="NURSE">Enfermeira</option>
                       <option value="RECEPTIONIST">Recepcionista</option>
                       <option value="FINANCIAL">Financeiro</option>
@@ -493,14 +518,21 @@ export function TeamPage() {
                       <option value="EMPLOYEE">Funcionario</option>
                     </select>
                   </div>
-                  {(editMember.role === 'DOCTOR' || formRole === 'DOCTOR') && (
+                  {(formRole === 'OWNER' || formRole === 'MANAGER') && isOwner && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={formIsProvider} onChange={e => setFormIsProvider(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]" />
+                      <span className="text-sm text-slate-700">Tambem atende pacientes (prestador)</span>
+                    </label>
+                  )}
+                  {(formRole === 'DOCTOR' || formRole === 'HEALTH_PROFESSIONAL' || ((formRole === 'OWNER' || formRole === 'MANAGER') && formIsProvider)) && (
                     <div className="grid grid-cols-[7fr_3fr] gap-3">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
-                        <SpecialtyCombobox value={formEspecialidade} onChange={setFormEspecialidade} disabled={!isOwner} />
+                        <SpecialtyCombobox value={formEspecialidade} onChange={setFormEspecialidade} type={formRole === 'HEALTH_PROFESSIONAL' ? 'health' : 'medical'} disabled={!isOwner} />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">RQE</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">{formRole === 'HEALTH_PROFESSIONAL' ? 'Registro' : 'RQE'}</label>
                         <input type="number" value={formRqe} onChange={e => setFormRqe(e.target.value)} disabled={!isOwner} className={inputCls + (!isOwner ? ' bg-slate-50 text-slate-400' : '')} placeholder="Numero" />
                       </div>
                     </div>

@@ -1,23 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
-import { MEDICAL_SPECIALTIES } from '../config/specialties';
+import { MEDICAL_SPECIALTIES, HEALTH_SPECIALTIES } from '../config/specialties';
 import { ChevronDown } from 'lucide-react';
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
+  type?: 'medical' | 'health';
   disabled?: boolean;
   className?: string;
 }
 
-export default function SpecialtyCombobox({ value, onChange, disabled, className = '' }: Props) {
+export default function SpecialtyCombobox({ value, onChange, type = 'medical', disabled, className = '' }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const list = type === 'health' ? HEALTH_SPECIALTIES : MEDICAL_SPECIALTIES;
+
   const filtered = search
-    ? MEDICAL_SPECIALTIES.filter(s => s.toLowerCase().includes(search.toLowerCase()))
-    : MEDICAL_SPECIALTIES;
+    ? list.filter(s => s.toLowerCase().includes(search.toLowerCase()))
+    : list;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

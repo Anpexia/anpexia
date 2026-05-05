@@ -25,6 +25,7 @@ const defaultRoleAllowedPaths: Record<string, string[]> = {
   OWNER: allNavItems.map(i => i.path),
   MANAGER: allNavItems.map(i => i.path),
   DOCTOR: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
+  HEALTH_PROFESSIONAL: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
   NURSE: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
   RECEPTIONIST: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
   FINANCIAL: ['/financeiro', '/perfil'],

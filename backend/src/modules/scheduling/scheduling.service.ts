@@ -695,13 +695,13 @@ async function updateCallDoctor(id: string, tenantId: string, doctorId: string |
     throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
   }
 
-  // If assigning a doctor, validate it belongs to this tenant and has DOCTOR role
+  // If assigning a provider, validate it belongs to this tenant and is active
   if (doctorId) {
     const doctor = await prisma.user.findFirst({
-      where: { id: doctorId, tenantId, role: 'DOCTOR', isActive: true },
+      where: { id: doctorId, tenantId, isProvider: true, isActive: true },
     });
     if (!doctor) {
-      throw new AppError(400, 'INVALID_DOCTOR', 'Médico não encontrado ou inativo');
+      throw new AppError(400, 'INVALID_DOCTOR', 'Profissional não encontrado ou inativo');
     }
   }
 
