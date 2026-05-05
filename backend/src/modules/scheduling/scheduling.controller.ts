@@ -237,6 +237,11 @@ router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRol
       if (newStatus === 'confirmed' || newStatus === 'scheduled') {
         updateData.calledAt = null;
       }
+      // When reverting back to a queue-visible status, update checkinAt to now
+      // so the patient appears in today's queue regardless of original check-in date
+      if (['present', 'in_attendance', 'attended'].includes(newStatus) && call.checkinAt) {
+        updateData.checkinAt = new Date();
+      }
       const u = await tx.scheduledCall.update({ where: { id }, data: updateData });
 
       if (call.status === 'completed') {
@@ -300,7 +305,7 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
     const where: any = {
       tenantId,
       checkinAt: { gte: dayStart, lte: dayEnd },
-      status: { in: ['present', 'in_attendance', 'attended', 'completed'] },
+      status: { in: ['present', 'in_attendance', 'attended'] },
     };
     if (doctorId) where.doctorId = doctorId;
 
@@ -369,6 +374,42 @@ router.patch('/queue/:id/start', authenticate, requireTenant, async (req: Reques
     });
 
     return success(res, updated);
+  } catch (err) { next(err); }
+});
+
+// GET /queue/history — completed appointments by date range
+router.get('/queue/history', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const tenantId = req.auth!.tenantId!;
+    const doctorId = (req.query.doctorId as string) || null;
+    const from = req.query.from as string;
+    const to = req.query.to as string;
+
+    const todaySP = new Date(new Date().getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const dayFrom = from || todaySP;
+    const dayTo = to || todaySP;
+
+    const where: any = {
+      tenantId,
+      status: { in: ['completed', 'attended'] },
+      checkinAt: {
+        gte: new Date(`${dayFrom}T00:00:00-03:00`),
+        lte: new Date(`${dayTo}T23:59:59.999-03:00`),
+      },
+    };
+    if (doctorId) where.doctorId = doctorId;
+
+    const history = await prisma.scheduledCall.findMany({
+      where,
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        doctor: { select: { id: true, name: true } },
+      },
+      orderBy: { checkinAt: 'desc' },
+      take: 200,
+    });
+
+    return success(res, history);
   } catch (err) { next(err); }
 });
 
