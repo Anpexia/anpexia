@@ -7,27 +7,6 @@ const apiUrl =
   import.meta.env.VITE_API_URL ||
   (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('anpexia.com.br') ? PROD_API_URL : '/api/v1');
 
-const ESTADOS = [
-  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG',
-  'PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
-];
-
-const ESPECIALIDADES = [
-  'Clinica Medica',
-  'Clinica Estetica',
-  'Clinica Odontologica',
-  'Clinica Oftalmologica',
-  'Clinica de Fisioterapia',
-  'Clinica Veterinaria',
-  'Psicologia / Psiquiatria',
-  'Dermatologia',
-  'Ortopedia',
-  'Pediatria',
-  'Ginecologia',
-  'Cardiologia',
-  'Outra especialidade',
-];
-
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '14px 16px',
@@ -58,16 +37,7 @@ function formatPhone(value: string): string {
 }
 
 export function LeadsPage() {
-  const [form, setForm] = useState({
-    name: '',
-    clinic: '',
-    phone: '',
-    email: '',
-    city: '',
-    state: '',
-    specialty: '',
-    message: '',
-  });
+  const [form, setForm] = useState({ name: '', clinic: '', phone: '' });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -83,21 +53,11 @@ export function LeadsPage() {
     setSubmitting(true);
     setError('');
     try {
-      const notes = [
-        form.message && `Mensagem: ${form.message}`,
-        form.city && `Cidade: ${form.city}`,
-        form.state && `Estado: ${form.state}`,
-        form.specialty && `Especialidade: ${form.specialty}`,
-      ].filter(Boolean).join('\n');
-
       await axios.post(`${apiUrl}/sales/capture`, {
         name: form.name,
         phone: form.phone.replace(/\D/g, ''),
-        email: form.email || undefined,
         company: form.clinic,
-        segment: form.specialty || undefined,
         source: 'leads_page',
-        notes: notes || undefined,
         utmSource: utmSource || undefined,
         utmMedium: utmMedium || undefined,
         utmCampaign: utmCampaign || undefined,
@@ -184,7 +144,7 @@ export function LeadsPage() {
                 Obrigado pelo interesse! Nossa equipe entrara em contato em breve para agendar sua demonstracao.
               </p>
               <button
-                onClick={() => { setSubmitted(false); setForm({ name: '', clinic: '', phone: '', email: '', city: '', state: '', specialty: '', message: '' }); }}
+                onClick={() => { setSubmitted(false); setForm({ name: '', clinic: '', phone: '' }); }}
                 style={{ backgroundColor: 'transparent', border: 'none', color: '#2563EB', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}
               >
                 Enviar outra solicitacao
@@ -200,21 +160,9 @@ export function LeadsPage() {
                 </div>
               )}
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1E3A5F', marginBottom: 4 }}>Solicite uma demonstracao gratuita</h2>
-              <p style={{ fontSize: '0.85rem', color: '#9CA3AF', marginBottom: 24 }}>Campos com * sao obrigatorios</p>
+              <p style={{ fontSize: '0.85rem', color: '#9CA3AF', marginBottom: 24 }}>Preencha os dados abaixo e entraremos em contato</p>
 
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <label style={labelStyle}>Nome completo *</label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={e => setForm({ ...form, name: e.target.value })}
-                    style={inputStyle}
-                    placeholder="Seu nome completo"
-                    required
-                  />
-                </div>
-
                 <div>
                   <label style={labelStyle}>Nome da clinica *</label>
                   <input
@@ -228,6 +176,18 @@ export function LeadsPage() {
                 </div>
 
                 <div>
+                  <label style={labelStyle}>Seu nome *</label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
+                    style={inputStyle}
+                    placeholder="Nome do responsavel"
+                    required
+                  />
+                </div>
+
+                <div>
                   <label style={labelStyle}>WhatsApp *</label>
                   <input
                     type="tel"
@@ -236,67 +196,6 @@ export function LeadsPage() {
                     style={inputStyle}
                     placeholder="(99) 99999-9999"
                     required
-                  />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Email</label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={e => setForm({ ...form, email: e.target.value })}
-                    style={inputStyle}
-                    placeholder="seu@email.com"
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={labelStyle}>Cidade</label>
-                    <input
-                      type="text"
-                      value={form.city}
-                      onChange={e => setForm({ ...form, city: e.target.value })}
-                      style={inputStyle}
-                      placeholder="Sua cidade"
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Estado</label>
-                    <select
-                      value={form.state}
-                      onChange={e => setForm({ ...form, state: e.target.value })}
-                      style={{ ...inputStyle, color: form.state ? '#1E3A5F' : '#9CA3AF', appearance: 'auto' as const }}
-                    >
-                      <option value="">Selecione</option>
-                      {ESTADOS.map(uf => (
-                        <option key={uf} value={uf}>{uf}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Especialidade</label>
-                  <select
-                    value={form.specialty}
-                    onChange={e => setForm({ ...form, specialty: e.target.value })}
-                    style={{ ...inputStyle, color: form.specialty ? '#1E3A5F' : '#9CA3AF', appearance: 'auto' as const }}
-                  >
-                    <option value="">Selecione</option>
-                    {ESPECIALIDADES.map(esp => (
-                      <option key={esp} value={esp}>{esp}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Mensagem</label>
-                  <textarea
-                    value={form.message}
-                    onChange={e => setForm({ ...form, message: e.target.value })}
-                    style={{ ...inputStyle, minHeight: 90, resize: 'vertical' as const }}
-                    placeholder="Conte-nos sobre sua clinica..."
                   />
                 </div>
 
