@@ -158,6 +158,11 @@ export function SchedulingPage() {
   const { user } = useAuth();
   const canRevert = user?.role === 'OWNER' || user?.role === 'MANAGER' || user?.role === 'SUPER_ADMIN';
   const [view, setView] = useState<View>('list');
+  const [agendaMode, setAgendaMode] = useState<'diario' | 'semanal' | 'mensal'>('diario');
+  const [agendaDate, setAgendaDate] = useState(() => new Date());
+  const [agendaAppointments, setAgendaAppointments] = useState<Appointment[]>([]);
+  const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [agendaRefresh, setAgendaRefresh] = useState(0);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [, setAvailableDates] = useState<AvailableDate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -317,7 +322,29 @@ export function SchedulingPage() {
     } catch {}
   }, []);
 
+  const fetchAgenda = useCallback(async (date: Date, mode: 'diario' | 'semanal' | 'mensal') => {
+    setLoadingAgenda(true);
+    try {
+      let from: string, to: string;
+      if (mode === 'diario') {
+        from = format(date, 'yyyy-MM-dd');
+        to = from;
+      } else if (mode === 'semanal') {
+        const ws = startOfWeek(date, { weekStartsOn: 1 });
+        from = format(ws, 'yyyy-MM-dd');
+        to = format(addDays(ws, 6), 'yyyy-MM-dd');
+      } else {
+        from = format(startOfMonth(date), 'yyyy-MM-dd');
+        to = format(endOfMonth(date), 'yyyy-MM-dd');
+      }
+      const { data } = await api.get('/scheduling/calls', { params: { from, to, limit: 500 } });
+      setAgendaAppointments(data.data || []);
+    } catch {} finally { setLoadingAgenda(false); }
+  }, []);
+
   useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchConveniosLookup(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchConveniosLookup]);
+
+  useEffect(() => { if (view === 'list') fetchAgenda(agendaDate, agendaMode); }, [view, agendaDate, agendaMode, fetchAgenda, agendaRefresh]);
 
   useEffect(() => { if (view === 'history') fetchHistory(historyFrom, historyTo); }, [view, historyFrom, historyTo, fetchHistory]);
 
@@ -480,7 +507,7 @@ export function SchedulingPage() {
       }
       await api.post('/scheduling/book', payload);
       setShowBookModal(false);
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
       fetchDates();
       showToast('Agendamento criado com sucesso!');
     } catch (err: any) {
@@ -493,7 +520,7 @@ export function SchedulingPage() {
     setUpdatingId(id);
     try {
       await api.patch(`/scheduling/calls/${id}`, { status });
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao atualizar status.'); } finally { setUpdatingId(null); }
   };
 
@@ -720,7 +747,7 @@ export function SchedulingPage() {
             : 'Realizacao confirmada!',
       );
       setTussModalCall(null);
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) {
       showToast(err?.response?.data?.error?.message || 'Erro ao salvar procedimento');
     } finally {
@@ -741,7 +768,7 @@ export function SchedulingPage() {
       await api.post(`/scheduling/calls/${tussModalCall.id}/inventory`, { materials });
       showToast('Baixa de estoque registrada!');
       setTussModalCall(null);
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) {
       const code = err?.response?.data?.error?.code;
       const msg = err?.response?.data?.error?.message || 'Erro ao baixar estoque';
@@ -892,7 +919,7 @@ export function SchedulingPage() {
 
       showToast(partRetro ? 'Procedimentos registrados!' : 'Realizacao confirmada!');
       setPartModalCall(null);
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) {
       showToast(err?.response?.data?.error?.message || 'Erro ao salvar procedimento');
     } finally {
@@ -915,7 +942,7 @@ export function SchedulingPage() {
       });
       showToast('Medico atualizado!');
       setDoctorEditCall(null);
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) {
       showToast(err?.response?.data?.error?.message || 'Erro ao atualizar medico');
     } finally {
@@ -943,7 +970,7 @@ export function SchedulingPage() {
       showToast('Autorizacao salva!');
       setAuthEditingId(null);
       setAuthEditValue('');
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) {
       showToast(err?.response?.data?.error?.message || 'Erro ao salvar autorizacao');
     } finally {
@@ -954,7 +981,7 @@ export function SchedulingPage() {
   const handleCancel = async (id: string) => {
     try {
       await api.delete(`/scheduling/calls/${id}`);
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
       fetchDates();
       showToast('Agendamento cancelado.');
     } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao cancelar agendamento.'); }
@@ -968,7 +995,7 @@ export function SchedulingPage() {
     setDeleting(true);
     try {
       await api.delete(`/scheduling/calls/${deleteConfirmId}/permanent`);
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
       fetchDates();
       showToast('Agendamento excluido permanentemente.');
     } catch (err: any) {
@@ -988,7 +1015,7 @@ export function SchedulingPage() {
     setReverting(true);
     try {
       await api.patch(`/scheduling/calls/${revertTarget.id}/revert-status`);
-      fetchAppointments();
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
       showToast('Status revertido com sucesso.');
     } catch (err: any) {
       showToast(err?.response?.data?.error?.message || 'Erro ao reverter status.');
@@ -999,9 +1026,147 @@ export function SchedulingPage() {
   };
 
   const activeStatuses = new Set(['scheduled', 'confirmed', 'present', 'in_attendance', 'attended']);
-  const upcomingAppointments = appointments.filter(a => activeStatuses.has(a.status));
+
+  const agendaActive = useMemo(() => agendaAppointments.filter(a => activeStatuses.has(a.status)), [agendaAppointments]);
+
+  const agendaByDay = useMemo(() => {
+    const map = new Map<string, Appointment[]>();
+    for (const a of agendaActive) {
+      const key = format(new Date(a.date), 'yyyy-MM-dd');
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(a);
+    }
+    return map;
+  }, [agendaActive]);
+
+  const agendaWeekStart = useMemo(() => startOfWeek(agendaDate, { weekStartsOn: 1 }), [agendaDate]);
+
+  const agendaMonthDays = useMemo(() => {
+    const ms = startOfMonth(agendaDate);
+    const me = endOfMonth(agendaDate);
+    const gs = startOfWeek(ms, { weekStartsOn: 1 });
+    const ge = endOfWeek(me, { weekStartsOn: 1 });
+    const days: Date[] = [];
+    let d = gs;
+    while (d <= ge) { days.push(d); d = addDays(d, 1); }
+    return days;
+  }, [agendaDate]);
+
+  const agendaDoctorsForDay = useCallback((dateStr: string) => {
+    const dayKeyMap: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+    const dayOfWeek = new Date(dateStr + 'T12:00:00').getDay();
+    const dayKey = dayKeyMap[dayOfWeek];
+    return doctors.filter(d => {
+      if (!d.horarios) return false;
+      const h = d.horarios[dayKey];
+      return h && h.ativo;
+    });
+  }, [doctors]);
+
+  const navigateAgenda = (dir: number) => {
+    if (agendaMode === 'diario') setAgendaDate(d => addDays(d, dir));
+    else if (agendaMode === 'semanal') setAgendaDate(d => addDays(d, dir * 7));
+    else setAgendaDate(d => dir > 0 ? addMonths(d, 1) : subMonths(d, 1));
+  };
 
   const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
+
+  const renderAppointmentCard = (a: Appointment) => (
+    <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-start gap-4">
+          <div className="bg-[#EFF6FF] rounded-lg p-3 text-center min-w-[60px]">
+            <p className="text-xs text-[#1E3A5F] font-medium">{format(new Date(a.date), 'MMM', { locale: ptBR }).toUpperCase()}</p>
+            <p className="text-xl font-bold text-[#1E3A5F]">{format(new Date(a.date), 'dd')}</p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-slate-800">{a.customer?.name || a.name}</span>
+              {(() => {
+                const pt = a.paymentType || 'PARTICULAR';
+                if (pt === 'CONVENIO') {
+                  const nome = a.convenio?.nome || (a.convenioId ? conveniosLookup[a.convenioId]?.nome : null) || 'Convenio';
+                  return <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{nome}</span>;
+                }
+                return <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Particular</span>;
+              })()}
+              {a.customer && <span className="text-xs bg-[#EFF6FF] text-[#1E3A5F] px-1.5 py-0.5 rounded">Paciente vinculado</span>}
+              {a.doctor ? (
+                <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
+                  <Stethoscope size={11} /> {a.doctor.name}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">
+                  <AlertTriangle size={11} /> Sem medico
+                </span>
+              )}
+              <button onClick={() => openDoctorEdit(a)} title="Editar medico" className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700">
+                <UserCog size={13} />
+              </button>
+            </div>
+            <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
+              <span className="flex items-center gap-1"><Clock size={14} />{format(new Date(a.date), 'HH:mm')}</span>
+              <span className="flex items-center gap-1"><Phone size={14} />{a.phone}</span>
+            </div>
+            {a.paymentType === 'CONVENIO' && a.customerId && convenioMap[a.customerId] && (
+              <div className="mt-2">
+                {authEditingId === a.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <input type="text" value={authEditValue} onChange={(e) => setAuthEditValue(e.target.value)} placeholder="Numero de autorizacao" className="px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#2563EB]" autoFocus />
+                    <button onClick={() => saveAuth(a.id)} disabled={savingAuthId === a.id} className="p-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"><Check size={12} /></button>
+                    <button onClick={cancelEditAuth} className="p-1 rounded bg-slate-50 text-slate-500 hover:bg-slate-100"><X size={12} /></button>
+                  </div>
+                ) : a.authorizationNumber ? (
+                  <button onClick={() => startEditAuth(a)} className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100" title="Clique para editar">
+                    <ShieldCheck size={11} /> Autorizado: {a.authorizationNumber}
+                  </button>
+                ) : (
+                  <button onClick={() => startEditAuth(a)} className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-100" title="Clique para adicionar numero de autorizacao">
+                    <ShieldAlert size={11} /> Sem autorizacao
+                  </button>
+                )}
+              </div>
+            )}
+            {a.notes && <p className="text-xs text-slate-400 mt-1">{a.notes}</p>}
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {a.status === 'scheduled' && (
+            <button onClick={() => handleStatusChange(a.id, 'confirmed')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 flex items-center gap-1"><Check size={14} />Confirmar</button>
+          )}
+          {a.status === 'confirmed' && (
+            <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1"><UserCheck size={14} />Presente</button>
+          )}
+          {canRevert && (a.status === 'confirmed' || a.status === 'present' || a.status === 'attended') && (
+            <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
+              <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : a.status === 'attended' ? 'Desfazer atendido' : 'Desconfirmar'}
+            </button>
+          )}
+          {a.status === 'in_attendance' && (
+            <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium flex items-center gap-1">Em atendimento...</span>
+          )}
+          {a.status === 'attended' && (
+            <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1 animate-pulse"><Check size={14} />Realizado</button>
+          )}
+          {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && (
+            <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">Realizado</button>
+          )}
+          {a.status !== 'in_attendance' && a.status !== 'attended' && (
+            <button onClick={() => handleStatusChange(a.id, 'no_show')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1"><AlertTriangle size={14} />Faltou</button>
+          )}
+          {a.status !== 'in_attendance' && a.status !== 'attended' && (
+            <button onClick={() => handleCancel(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1"><XCircle size={14} />Cancelar</button>
+          )}
+          {canRevert && (
+            <button onClick={() => setDeleteConfirmId(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1" title="Excluir permanentemente"><Trash2 size={14} />Excluir</button>
+          )}
+        </div>
+      </div>
+      <div className="pt-2 border-t border-slate-100">
+        <StatusTimeline status={a.status} />
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -1033,170 +1198,205 @@ export function SchedulingPage() {
         <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" /></div>
       ) : (
         <>
-          {/* List View */}
+          {/* List View — Agenda Modes */}
           {view === 'list' && (
-            <div className="space-y-6">
-              {/* Upcoming */}
-              <div>
-                <h3 className="font-semibold text-slate-800 mb-3">Proximos ({upcomingAppointments.length})</h3>
-                {upcomingAppointments.length === 0 ? (
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
-                    <p className="text-sm text-slate-500">Nenhum agendamento proximo.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {upcomingAppointments.map((a) => (
-                      <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                          <div className="flex items-start gap-4">
-                            <div className="bg-[#EFF6FF] rounded-lg p-3 text-center min-w-[60px]">
-                              <p className="text-xs text-[#1E3A5F] font-medium">{format(new Date(a.date), 'MMM', { locale: ptBR }).toUpperCase()}</p>
-                              <p className="text-xl font-bold text-[#1E3A5F]">{format(new Date(a.date), 'dd')}</p>
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium text-slate-800">{a.customer?.name || a.name}</span>
-                                {(() => {
-                                  const pt = a.paymentType || 'PARTICULAR';
-                                  if (pt === 'CONVENIO') {
-                                    const nome = a.convenio?.nome || (a.convenioId ? conveniosLookup[a.convenioId]?.nome : null) || 'Convenio';
-                                    return (
-                                      <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{nome}</span>
-                                    );
-                                  }
-                                  return (
-                                    <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Particular</span>
-                                  );
-                                })()}
-                                {a.customer && <span className="text-xs bg-[#EFF6FF] text-[#1E3A5F] px-1.5 py-0.5 rounded">Paciente vinculado</span>}
-                                {a.doctor ? (
-                                  <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
-                                    <Stethoscope size={11} /> {a.doctor.name}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">
-                                    <AlertTriangle size={11} /> Sem medico
-                                  </span>
-                                )}
-                                <button
-                                  onClick={() => openDoctorEdit(a)}
-                                  title="Editar medico"
-                                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
-                                >
-                                  <UserCog size={13} />
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
-                                <span className="flex items-center gap-1"><Clock size={14} />{format(new Date(a.date), 'HH:mm')}</span>
-                                <span className="flex items-center gap-1"><Phone size={14} />{a.phone}</span>
-                              </div>
-                              {/* Authorization badge — only for convenio appointments */}
-                              {a.paymentType === 'CONVENIO' && a.customerId && convenioMap[a.customerId] && (
-                                <div className="mt-2">
-                                  {authEditingId === a.id ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <input
-                                        type="text"
-                                        value={authEditValue}
-                                        onChange={(e) => setAuthEditValue(e.target.value)}
-                                        placeholder="Numero de autorizacao"
-                                        className="px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
-                                        autoFocus
-                                      />
-                                      <button
-                                        onClick={() => saveAuth(a.id)}
-                                        disabled={savingAuthId === a.id}
-                                        className="p-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                      >
-                                        <Check size={12} />
-                                      </button>
-                                      <button
-                                        onClick={cancelEditAuth}
-                                        className="p-1 rounded bg-slate-50 text-slate-500 hover:bg-slate-100"
-                                      >
-                                        <X size={12} />
-                                      </button>
-                                    </div>
-                                  ) : a.authorizationNumber ? (
-                                    <button
-                                      onClick={() => startEditAuth(a)}
-                                      className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100"
-                                      title="Clique para editar"
-                                    >
-                                      <ShieldCheck size={11} /> Autorizado: {a.authorizationNumber}
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => startEditAuth(a)}
-                                      className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-100"
-                                      title="Clique para adicionar numero de autorizacao"
-                                    >
-                                      <ShieldAlert size={11} /> Sem autorizacao
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                              {a.notes && <p className="text-xs text-slate-400 mt-1">{a.notes}</p>}
-                            </div>
-                          </div>
-                          <div className="flex gap-2 flex-wrap">
-                            {a.status === 'scheduled' && (
-                              <button onClick={() => handleStatusChange(a.id, 'confirmed')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 flex items-center gap-1">
-                                <Check size={14} />Confirmar
-                              </button>
-                            )}
-                            {a.status === 'confirmed' && (
-                              <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1">
-                                <UserCheck size={14} />Presente
-                              </button>
-                            )}
-                            {canRevert && (a.status === 'confirmed' || a.status === 'present' || a.status === 'attended') && (
-                              <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
-                                <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : a.status === 'attended' ? 'Desfazer atendido' : 'Desconfirmar'}
-                              </button>
-                            )}
-                            {a.status === 'in_attendance' && (
-                              <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium flex items-center gap-1">
-                                Em atendimento...
-                              </span>
-                            )}
-                            {a.status === 'attended' && (
-                              <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1 animate-pulse">
-                                <Check size={14} />Realizado
-                              </button>
-                            )}
-                            {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && (
-                              <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">
-                                Realizado
-                              </button>
-                            )}
-                            {a.status !== 'in_attendance' && a.status !== 'attended' && (
-                              <button onClick={() => handleStatusChange(a.id, 'no_show')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
-                                <AlertTriangle size={14} />Faltou
-                              </button>
-                            )}
-                            {a.status !== 'in_attendance' && a.status !== 'attended' && (
-                              <button onClick={() => handleCancel(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1">
-                                <XCircle size={14} />Cancelar
-                              </button>
-                            )}
-                            {canRevert && (
-                              <button onClick={() => setDeleteConfirmId(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1" title="Excluir permanentemente">
-                                <Trash2 size={14} />Excluir
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {/* Status Timeline */}
-                        <div className="pt-2 border-t border-slate-100">
-                          <StatusTimeline status={a.status} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            <div className="space-y-4">
+              {/* Mode selector + navigation */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-wrap items-center gap-3">
+                <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                  {(['diario', 'semanal', 'mensal'] as const).map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setAgendaMode(m)}
+                      className={`px-4 py-1.5 text-sm font-medium transition-colors ${agendaMode === m ? 'bg-[#1E3A5F] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {m === 'diario' ? 'Diario' : m === 'semanal' ? 'Semanal' : 'Mensal'}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => navigateAgenda(-1)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"><ChevronLeft size={18} /></button>
+                  <span className="text-sm font-semibold text-slate-800 min-w-[180px] text-center capitalize">
+                    {agendaMode === 'diario' && format(agendaDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                    {agendaMode === 'semanal' && `${format(agendaWeekStart, 'dd MMM', { locale: ptBR })} - ${format(addDays(agendaWeekStart, 6), 'dd MMM yyyy', { locale: ptBR })}`}
+                    {agendaMode === 'mensal' && format(agendaDate, 'MMMM yyyy', { locale: ptBR })}
+                  </span>
+                  <button onClick={() => navigateAgenda(1)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"><ChevronRight size={18} /></button>
+                </div>
+                <button
+                  onClick={() => setAgendaDate(new Date())}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#EFF6FF] text-[#1E3A5F] hover:bg-[#DBEAFE]"
+                >
+                  Hoje
+                </button>
+                <span className="text-xs text-slate-400 ml-auto">{agendaActive.length} agendamento(s)</span>
               </div>
 
+              {loadingAgenda ? (
+                <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" /></div>
+              ) : (
+                <>
+                  {/* DIARIO */}
+                  {agendaMode === 'diario' && (() => {
+                    const dateStr = format(agendaDate, 'yyyy-MM-dd');
+                    const dayAppts = agendaActive.filter(a => format(new Date(a.date), 'yyyy-MM-dd') === dateStr);
+                    const doctorsToday = agendaDoctorsForDay(dateStr);
+                    const dayKeyMap: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+                    const dayKey = dayKeyMap[agendaDate.getDay()];
+
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="lg:col-span-2 space-y-3">
+                          <h3 className="font-semibold text-slate-800">Agendamentos do dia ({dayAppts.length})</h3>
+                          {dayAppts.length === 0 ? (
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+                              <p className="text-sm text-slate-500">Nenhum agendamento para este dia.</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {dayAppts.map(a => renderAppointmentCard(a))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-4">
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                            <h4 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                              <Stethoscope size={16} className="text-emerald-600" /> Medicos do dia
+                            </h4>
+                            {doctorsToday.length === 0 ? (
+                              <p className="text-sm text-slate-500 text-center py-4">Nenhum medico neste dia</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {doctorsToday.map(d => {
+                                  const h = d.horarios![dayKey] as DoctorHorario;
+                                  const shifts: string[] = [];
+                                  if (h.manha) shifts.push(`${h.manha.inicio} - ${h.manha.fim}`);
+                                  if (h.tarde) shifts.push(`${h.tarde.inicio} - ${h.tarde.fim}`);
+                                  if (shifts.length === 0 && h.inicio && h.fim) shifts.push(`${h.inicio} - ${h.fim}`);
+                                  const doctorApptCount = dayAppts.filter(a => a.doctorId === d.id).length;
+                                  return (
+                                    <div key={d.id} className="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <span className="text-sm font-semibold text-slate-800">{d.name}</span>
+                                          {d.especialidade && <p className="text-xs text-slate-500">{d.especialidade}</p>}
+                                        </div>
+                                        <span className="text-xs bg-[#EFF6FF] text-[#1E3A5F] px-2 py-0.5 rounded-full font-medium">{doctorApptCount} consulta{doctorApptCount !== 1 ? 's' : ''}</span>
+                                      </div>
+                                      {shifts.map((s, i) => (
+                                        <div key={i} className="flex items-center gap-1.5 mt-1">
+                                          <Clock size={12} className="text-slate-400" />
+                                          <span className="text-xs text-slate-600">{s}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* SEMANAL */}
+                  {agendaMode === 'semanal' && (() => {
+                    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(agendaWeekStart, i));
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-3">
+                        {weekDays.map(day => {
+                          const dayStr = format(day, 'yyyy-MM-dd');
+                          const dayAppts = agendaByDay.get(dayStr) || [];
+                          const today = isToday(day);
+                          return (
+                            <div key={dayStr} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${today ? 'border-[#2563EB] ring-1 ring-[#2563EB]' : 'border-slate-200'}`}>
+                              <div className={`px-3 py-2 text-center ${today ? 'bg-[#1E3A5F] text-white' : 'bg-slate-50'}`}>
+                                <p className={`text-xs font-medium capitalize ${today ? 'text-white/80' : 'text-slate-500'}`}>{format(day, 'EEE', { locale: ptBR })}</p>
+                                <p className={`text-lg font-bold ${today ? 'text-white' : 'text-slate-800'}`}>{format(day, 'dd')}</p>
+                              </div>
+                              <div className="p-2 space-y-1.5 min-h-[120px] max-h-[400px] overflow-y-auto">
+                                {dayAppts.length === 0 && (
+                                  <p className="text-xs text-slate-400 text-center py-4">Sem agendamentos</p>
+                                )}
+                                {dayAppts.map(a => {
+                                  const st = statusMap[a.status];
+                                  const pt = a.paymentType || 'PARTICULAR';
+                                  return (
+                                    <button
+                                      key={a.id}
+                                      onClick={() => { setAgendaMode('diario'); setAgendaDate(day); }}
+                                      className="w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-[#EFF6FF] transition-colors border border-slate-100 hover:border-[#BFDBFE]"
+                                    >
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <span className="text-xs font-semibold text-[#1E3A5F]">{format(new Date(a.date), 'HH:mm')}</span>
+                                        <span className={`text-[9px] px-1 py-0.5 rounded ${st?.cls || ''}`}>{st?.icon}</span>
+                                      </div>
+                                      <p className="text-xs font-medium text-slate-800 truncate">{a.customer?.name || a.name}</p>
+                                      {a.doctor && (
+                                        <p className="text-[10px] text-indigo-600 truncate flex items-center gap-0.5 mt-0.5">
+                                          <Stethoscope size={9} /> {a.doctor.name}
+                                        </p>
+                                      )}
+                                      <span className={`text-[9px] mt-0.5 inline-block px-1 py-0.5 rounded ${pt === 'CONVENIO' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                                        {pt === 'CONVENIO' ? (a.convenio?.nome || conveniosLookup[a.convenioId || '']?.nome || 'Convenio') : 'Particular'}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* MENSAL */}
+                  {agendaMode === 'mensal' && (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="grid grid-cols-7 mb-1">
+                        {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'].map(d => (
+                          <div key={d} className="text-center text-xs font-medium text-slate-500 py-2">{d}</div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7 gap-1">
+                        {agendaMonthDays.map(day => {
+                          const dayStr = format(day, 'yyyy-MM-dd');
+                          const inMonth = isSameMonth(day, agendaDate);
+                          const today = isToday(day);
+                          const dayAppts = agendaByDay.get(dayStr) || [];
+                          const count = dayAppts.length;
+
+                          return (
+                            <button
+                              key={dayStr}
+                              onClick={() => { setAgendaMode('diario'); setAgendaDate(day); }}
+                              disabled={!inMonth}
+                              className={`relative p-2 rounded-lg text-sm transition-colors min-h-[72px] flex flex-col items-center
+                                ${!inMonth ? 'text-slate-300 cursor-default' : 'hover:bg-[#EFF6FF] cursor-pointer'}
+                                ${today ? 'ring-2 ring-[#2563EB] ring-inset font-semibold bg-[#EFF6FF]' : ''}
+                              `}
+                            >
+                              <span className={`text-sm ${inMonth ? 'text-slate-700' : 'text-slate-300'}`}>{format(day, 'd')}</span>
+                              {inMonth && count > 0 && (
+                                <div className="mt-1 flex flex-col items-center gap-0.5">
+                                  <div className="flex gap-0.5">
+                                    {Array.from({ length: Math.min(count, 4) }).map((_, i) => (
+                                      <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />
+                                    ))}
+                                  </div>
+                                  <span className="text-[10px] font-medium text-[#1E3A5F]">{count} consulta{count !== 1 ? 's' : ''}</span>
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
