@@ -615,13 +615,115 @@ export function SchedulingPage() {
   };
 
   // When clicking "Realizado": branch by paymentType.
-  // PARTICULAR → open the new particular-procedure modal.
+  // PARTICULAR → procedures already paid; only check stock materials then complete.
   // CONVENIO / null / undefined → open the existing TUSS modal (unchanged).
   const handleRealized = async (a: Appointment) => {
     if (a.paymentType === 'PARTICULAR') {
-      await openPartModalForCall(a, false);
+      await openStockOnlyModal(a);
     } else {
       await openTussModalForCall(a, false);
+    }
+  };
+
+  // PARTICULAR "Realizado": check if linked procedures have stock templates.
+  // If yes → show stock-only popup. If no → mark completed directly.
+  const [stockOnlyCall, setStockOnlyCall] = useState<Appointment | null>(null);
+  const [stockOnlyMaterials, setStockOnlyMaterials] = useState<{ tpl: MaterialRow[]; extra: MaterialRow[] }[]>([]);
+  const [stockOnlyProcNames, setStockOnlyProcNames] = useState<string[]>([]);
+  const [stockOnlySubmitting, setStockOnlySubmitting] = useState(false);
+  const [stockOnlyError, setStockOnlyError] = useState('');
+
+  const openStockOnlyModal = async (a: Appointment) => {
+    await ensureTemplatesAndProducts();
+    const procs = a.privateProcedureCalls || [];
+    const templates = procedureTemplates || [];
+    const products = inventoryProducts || [];
+
+    const procNames: string[] = [];
+    const matGroups: { tpl: MaterialRow[]; extra: MaterialRow[] }[] = [];
+
+    for (const pc of procs) {
+      const name = pc.privateProcedure.name;
+      procNames.push(name);
+      const tpl = templates.find(
+        (t) => t.name.trim().toLowerCase() === name.trim().toLowerCase() && (!t.procedureType || t.procedureType === 'PARTICULAR'),
+      );
+      if (tpl && tpl.materials.length > 0) {
+        matGroups.push({
+          tpl: tpl.materials.map((m) => {
+            const prod = products.find((p) => p.id === m.productId);
+            return {
+              productId: m.productId,
+              productName: m.productName || prod?.name || '',
+              unit: m.unit || prod?.unit || 'un',
+              quantity: m.quantity,
+              available: prod?.quantity ?? 0,
+            };
+          }),
+          extra: [],
+        });
+      } else {
+        matGroups.push({ tpl: [], extra: [] });
+      }
+    }
+
+    const hasMaterials = matGroups.some(g => g.tpl.length > 0);
+    if (!hasMaterials) {
+      try {
+        await api.patch(`/scheduling/calls/${a.id}`, { status: 'completed' });
+        showToast('Realizacao confirmada!');
+        fetchAppointments(); setAgendaRefresh(r => r + 1);
+      } catch (err: any) {
+        showToast(err?.response?.data?.error?.message || 'Erro ao finalizar');
+      }
+      return;
+    }
+
+    setStockOnlyCall(a);
+    setStockOnlyProcNames(procNames);
+    setStockOnlyMaterials(matGroups);
+    setStockOnlyError('');
+    setStockOnlySubmitting(false);
+  };
+
+  const submitStockOnly = async () => {
+    if (!stockOnlyCall) return;
+    setStockOnlySubmitting(true);
+    setStockOnlyError('');
+    try {
+      const allMats: { productId: string; quantity: number }[] = [];
+      for (const g of stockOnlyMaterials) {
+        for (const m of [...g.tpl, ...g.extra]) {
+          if (m.productId && Number(m.quantity) > 0) {
+            allMats.push({ productId: m.productId, quantity: Number(m.quantity) });
+          }
+        }
+      }
+      if (allMats.length > 0) {
+        try {
+          await api.post(`/scheduling/calls/${stockOnlyCall.id}/inventory`, { materials: allMats });
+        } catch (invErr: any) {
+          const code = invErr?.response?.data?.error?.code;
+          const msg = invErr?.response?.data?.error?.message || 'Erro ao baixar estoque';
+          if (code === 'INSUFFICIENT_STOCK') {
+            setStockOnlyError(msg);
+            try {
+              const { data } = await api.get('/inventory/products', { params: { limit: 500 } });
+              setInventoryProducts(data.data || []);
+            } catch {}
+            return;
+          }
+          throw invErr;
+        }
+      }
+      await api.patch(`/scheduling/calls/${stockOnlyCall.id}`, { status: 'completed' });
+      showToast('Realizacao confirmada!');
+      setStockOnlyCall(null);
+      fetchAppointments(); setAgendaRefresh(r => r + 1);
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao finalizar');
+    } finally {
+      setStockOnlySubmitting(false);
     }
   };
 
@@ -2822,6 +2924,134 @@ export function SchedulingPage() {
               </button>
               <button onClick={handlePermanentDelete} disabled={deleting} className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
                 {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock-only Modal (PARTICULAR "Realizado") */}
+      {stockOnlyCall && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-slate-800">Confirmar materiais e finalizar</h3>
+              <button onClick={() => setStockOnlyCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Paciente: <strong>{stockOnlyCall.customer?.name || stockOnlyCall.name}</strong> — {format(new Date(stockOnlyCall.date), 'dd/MM/yyyy HH:mm')}
+            </p>
+
+            {stockOnlyError && (
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{stockOnlyError}</div>
+            )}
+
+            <div className="space-y-4 mb-6">
+              {stockOnlyMaterials.map((group, gIdx) => {
+                if (group.tpl.length === 0 && group.extra.length === 0) return null;
+                return (
+                  <div key={gIdx} className="bg-slate-50 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">{stockOnlyProcNames[gIdx]}</h4>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-slate-500 border-b border-slate-200">
+                          <th className="text-left pb-2">Material</th>
+                          <th className="text-center pb-2 w-20">Qtd</th>
+                          <th className="text-center pb-2 w-16">Un</th>
+                          <th className="text-center pb-2 w-20">Disp.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.tpl.map((m, mIdx) => (
+                          <tr key={`tpl-${mIdx}`} className="border-b border-slate-100">
+                            <td className="py-2 text-slate-700">{m.productName}</td>
+                            <td className="py-2 text-center">
+                              <input
+                                type="number"
+                                min={0}
+                                value={m.quantity}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setStockOnlyMaterials(prev => prev.map((g, gi) => gi !== gIdx ? g : {
+                                    ...g,
+                                    tpl: g.tpl.map((mm, mi) => mi !== mIdx ? mm : { ...mm, quantity: val }),
+                                  }));
+                                }}
+                                className="w-16 text-center px-1 py-0.5 border border-slate-300 rounded text-sm"
+                              />
+                            </td>
+                            <td className="py-2 text-center text-slate-500">{m.unit}</td>
+                            <td className={`py-2 text-center ${m.available < m.quantity ? 'text-red-600 font-medium' : 'text-slate-500'}`}>{m.available}</td>
+                          </tr>
+                        ))}
+                        {group.extra.map((m, mIdx) => (
+                          <tr key={`extra-${mIdx}`} className="border-b border-slate-100">
+                            <td className="py-2">
+                              <select
+                                value={m.productId}
+                                onChange={(e) => {
+                                  const prod = (inventoryProducts || []).find(p => p.id === e.target.value);
+                                  setStockOnlyMaterials(prev => prev.map((g, gi) => gi !== gIdx ? g : {
+                                    ...g,
+                                    extra: g.extra.map((mm, mi) => mi !== mIdx ? mm : {
+                                      ...mm,
+                                      productId: e.target.value,
+                                      productName: prod?.name || '',
+                                      unit: prod?.unit || 'un',
+                                      available: prod?.quantity ?? 0,
+                                    }),
+                                  }));
+                                }}
+                                className="w-full px-2 py-1 border border-slate-300 rounded text-sm"
+                              >
+                                <option value="">Selecione...</option>
+                                {(inventoryProducts || []).map(p => (
+                                  <option key={p.id} value={p.id}>{p.name} ({p.quantity} {p.unit})</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-2 text-center">
+                              <input
+                                type="number"
+                                min={0}
+                                value={m.quantity}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setStockOnlyMaterials(prev => prev.map((g, gi) => gi !== gIdx ? g : {
+                                    ...g,
+                                    extra: g.extra.map((mm, mi) => mi !== mIdx ? mm : { ...mm, quantity: val }),
+                                  }));
+                                }}
+                                className="w-16 text-center px-1 py-0.5 border border-slate-300 rounded text-sm"
+                              />
+                            </td>
+                            <td className="py-2 text-center text-slate-500">{m.unit}</td>
+                            <td className={`py-2 text-center ${m.available < m.quantity ? 'text-red-600 font-medium' : 'text-slate-500'}`}>{m.available}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStockOnlyMaterials(prev => prev.map((g, gi) => gi !== gIdx ? g : {
+                          ...g,
+                          extra: [...g.extra, { productId: '', productName: '', unit: 'un', quantity: 1, available: 0 }],
+                        }));
+                      }}
+                      className="mt-2 text-xs text-[#2563EB] hover:underline"
+                    >
+                      + Adicionar material
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setStockOnlyCall(null)} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button onClick={submitStockOnly} disabled={stockOnlySubmitting} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+                {stockOnlySubmitting ? 'Finalizando...' : 'Confirmar e finalizar'}
               </button>
             </div>
           </div>
