@@ -377,6 +377,9 @@ router.post('/calls/:id/add-procedure', authenticate, requireTenant, async (req:
     const call = await prisma.scheduledCall.findFirst({ where: { id: callId, tenantId } });
     if (!call) return res.status(404).json({ error: { message: 'Agendamento nao encontrado' } });
 
+    const proc = await prisma.privateProcedure.findFirst({ where: { id: privateProcedureId, tenantId } });
+    if (!proc) return res.status(404).json({ error: { message: 'Procedimento nao encontrado neste tenant' } });
+
     const entry = await prisma.privateProcedureCall.create({
       data: {
         scheduledCallId: callId,

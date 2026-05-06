@@ -455,6 +455,16 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     const paymentType = data.paymentType || 'PARTICULAR';
     const convenioId = paymentType === 'CONVENIO' ? (data.convenioId || null) : null;
 
+    if (convenioId && resolvedTenantId) {
+      const conv = await tx.convenio.findFirst({ where: { id: convenioId, tenantId: resolvedTenantId } });
+      if (!conv) throw new AppError(400, 'INVALID_CONVENIO', 'Convenio nao pertence a este tenant');
+    }
+
+    if (paymentType === 'PARTICULAR' && data.privateProcedureId && resolvedTenantId) {
+      const proc = await tx.privateProcedure.findFirst({ where: { id: data.privateProcedureId, tenantId: resolvedTenantId } });
+      if (!proc) throw new AppError(400, 'INVALID_PROCEDURE', 'Procedimento nao pertence a este tenant');
+    }
+
     const scheduledCall = await tx.scheduledCall.create({
       data: {
         tenantId: resolvedTenantId ?? undefined,
