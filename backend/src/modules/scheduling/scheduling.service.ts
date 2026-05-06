@@ -191,7 +191,7 @@ async function validateBookingWithinHours(params: {
         tenantId: params.tenantId,
         doctorId: params.doctorId,
         date: callDate,
-        status: { notIn: ['cancelled'] },
+        status: { notIn: ['cancelled', 'no_show'] },
         ...(params.excludeCallId ? { NOT: { id: params.excludeCallId } } : {}),
       },
       select: { id: true },
@@ -294,7 +294,7 @@ async function getAvailableSlots(date: string, doctorId?: string | null, tenantI
 
   const where: any = {
     date: { gte: startOfDay, lte: endOfDay },
-    status: { notIn: ['cancelled'] },
+    status: { notIn: ['cancelled', 'no_show'] },
   };
   if (tenantId) where.tenantId = tenantId;
   if (doctorId) where.doctorId = doctorId;
@@ -346,7 +346,7 @@ async function getAvailableDates(tenantId?: string | null) {
   // Single query: fetch booked calls in the range for this tenant
   const bookedWhere: any = {
     date: { gte: startDate, lte: endDate },
-    status: { notIn: ['cancelled'] },
+    status: { notIn: ['cancelled', 'no_show'] },
   };
   if (tenantId) bookedWhere.tenantId = tenantId;
 
@@ -606,7 +606,7 @@ async function getTodayAppointments(tenantId: string) {
     where: {
       tenantId,
       date: { gte: today, lt: tomorrow },
-      status: { notIn: ['cancelled'] },
+      status: { notIn: ['cancelled', 'no_show'] },
     },
     include: {
       customer: { select: { id: true, name: true, phone: true } },

@@ -605,12 +605,13 @@ export function SchedulingPage() {
     } finally { setSaving(false); }
   };
 
-  const handleStatusChange = async (id: string, status: string) => {
+  const handleStatusChange = async (id: string, status: string): Promise<boolean> => {
     setUpdatingId(id);
     try {
       await api.patch(`/scheduling/calls/${id}`, { status });
       fetchAppointments(); setAgendaRefresh(r => r + 1);
-    } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao atualizar status.'); } finally { setUpdatingId(null); }
+      return true;
+    } catch (err: any) { showToast(err?.response?.data?.error?.message || 'Erro ao atualizar status.'); return false; } finally { setUpdatingId(null); }
   };
 
   // When clicking "Realizado": branch by paymentType.
@@ -1114,7 +1115,7 @@ export function SchedulingPage() {
     }
   };
 
-  const activeStatuses = new Set(['scheduled', 'confirmed', 'present', 'in_attendance', 'attended']);
+  const activeStatuses = new Set(['scheduled', 'confirmed', 'awaiting_payment', 'present', 'in_attendance', 'attended']);
 
   const agendaActive = useMemo(() => agendaAppointments.filter(a => activeStatuses.has(a.status)), [agendaAppointments]);
 
@@ -1233,10 +1234,6 @@ export function SchedulingPage() {
                 ))}
               </div>
             )}
-            {/* Add procedure after attendance */}
-            {a.paymentType === 'PARTICULAR' && a.status === 'attended' && (
-              <button onClick={() => { setAddProcCallId(a.id); setAddProcRows([{ procedureId: '', doctorId: '' }]); }} className="mt-1 text-xs text-[#2563EB] hover:underline">+ Adicionar procedimento</button>
-            )}
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -1244,16 +1241,13 @@ export function SchedulingPage() {
             <button onClick={() => handleStatusChange(a.id, 'confirmed')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 flex items-center gap-1"><Check size={14} />Confirmar</button>
           )}
           {a.status === 'confirmed' && a.paymentType === 'PARTICULAR' && (
-            <button onClick={() => handleStatusChange(a.id, 'awaiting_payment')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-medium hover:bg-yellow-100 flex items-center gap-1"><UserCheck size={14} />Confirmar presenca</button>
+            <button onClick={async () => { const ok = await handleStatusChange(a.id, 'awaiting_payment'); if (ok) openPaymentModal(a.id); }} disabled={updatingId === a.id} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1">Efetuar pagamento</button>
           )}
           {a.status === 'confirmed' && a.paymentType !== 'PARTICULAR' && (
             <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1"><UserCheck size={14} />Presente</button>
           )}
           {a.status === 'awaiting_payment' && (
-            <button onClick={() => openPaymentModal(a.id)} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1 animate-pulse">Registrar pagamento</button>
-          )}
-          {a.status === 'attended' && a.paymentType === 'PARTICULAR' && a.privateProcedureCalls && a.privateProcedureCalls.some(pc => pc.paymentStatus !== 'paid') && (
-            <button onClick={() => openPaymentModal(a.id)} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1 animate-pulse">Registrar pagamento</button>
+            <button onClick={() => openPaymentModal(a.id)} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1 animate-pulse">Efetuar pagamento</button>
           )}
           {canRevert && (a.status === 'confirmed' || a.status === 'awaiting_payment' || a.status === 'present' || a.status === 'attended') && (
             <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
@@ -1264,7 +1258,12 @@ export function SchedulingPage() {
             <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium flex items-center gap-1">Em atendimento...</span>
           )}
           {a.status === 'attended' && (
-            <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1 animate-pulse"><Check size={14} />Realizado</button>
+            <>
+              <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1 animate-pulse"><Check size={14} />Realizado</button>
+              {a.paymentType === 'PARTICULAR' && (
+                <button onClick={() => { setAddProcCallId(a.id); setAddProcRows([{ procedureId: '', doctorId: '' }]); }} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 flex items-center gap-1"><Calendar size={14} />Novo procedimento</button>
+              )}
+            </>
           )}
           {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && a.status !== 'awaiting_payment' && (
             <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">Realizado</button>
