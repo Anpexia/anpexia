@@ -391,12 +391,20 @@ export const tussService = {
       include: {
         customer: { select: { id: true, name: true } },
         procedures: { include: { tussProcedure: true } },
+        privateProcedureCalls: { include: { privateProcedure: true } },
       },
       orderBy: { date: 'asc' },
     });
 
     const repasses = await prisma.doctorRepasse.findMany({ where: { tenantId, doctorId } });
-    const repasseMap = new Map(repasses.map((r) => [r.procedureType, r.percentage]));
+    const byTussId = new Map<string, number>();
+    const byPrivateId = new Map<string, number>();
+    const byType = new Map<string, number>();
+    for (const r of repasses) {
+      if (r.tussProcedureId) byTussId.set(r.tussProcedureId, r.percentage);
+      else if (r.privateProcedureId) byPrivateId.set(r.privateProcedureId, r.percentage);
+      else if (r.procedureType) byType.set(r.procedureType, r.percentage);
+    }
 
     let totalProcedimentos = 0;
     let totalRepasse = 0;
@@ -405,7 +413,7 @@ export const tussService = {
     for (const call of calls) {
       for (const p of call.procedures) {
         const valor = p.tussProcedure.value;
-        const pct = repasseMap.get(p.tussProcedure.type) ?? 0;
+        const pct = byTussId.get(p.tussProcedure.id) ?? byType.get(p.tussProcedure.type) ?? 0;
         const repasse = (valor * pct) / 100;
         totalProcedimentos += valor;
         totalRepasse += repasse;
@@ -416,6 +424,27 @@ export const tussService = {
           procedureCode: p.tussProcedure.code,
           procedureDescription: p.tussProcedure.description,
           procedureType: p.tussProcedure.type,
+          value: valor,
+          percentage: pct,
+          repasse,
+        });
+      }
+
+      for (const pp of call.privateProcedureCalls) {
+        const proc = pp.privateProcedure;
+        const valor = Number(proc.value) || 0;
+        if (valor <= 0) continue;
+        const pct = byPrivateId.get(proc.id) ?? byType.get(proc.type) ?? 0;
+        const repasse = (valor * pct) / 100;
+        totalProcedimentos += valor;
+        totalRepasse += repasse;
+        items.push({
+          date: call.date,
+          scheduledCallId: call.id,
+          customerName: call.customer?.name || call.name,
+          procedureCode: null,
+          procedureDescription: proc.name,
+          procedureType: proc.type,
           value: valor,
           percentage: pct,
           repasse,

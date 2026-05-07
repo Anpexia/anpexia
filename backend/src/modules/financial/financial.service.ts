@@ -348,7 +348,7 @@ export const financialService = {
 
     const [doctors, repasses, calls] = await Promise.all([
       prisma.user.findMany({
-        where: { tenantId, role: 'DOCTOR', isActive: true },
+        where: { tenantId, isActive: true, OR: [{ role: 'DOCTOR' }, { role: 'HEALTH_PROFESSIONAL' }, { isProvider: true }] },
         select: { id: true, name: true, especialidade: true },
         orderBy: { name: 'asc' },
       }),
@@ -381,12 +381,21 @@ export const financialService = {
       }),
     ]);
 
-    // Build lookup map: doctorId -> procedureType -> percentage.
-    const repasseMap: Record<string, Record<string, number>> = {};
+    // Build lookup maps: by specific procedure ID (preferred) and by type (legacy fallback).
+    const repasseByTuss: Record<string, Record<string, number>> = {};
+    const repasseByPrivate: Record<string, Record<string, number>> = {};
+    const repasseByType: Record<string, Record<string, number>> = {};
     for (const r of repasses) {
-      if (!r.procedureType) continue;
-      if (!repasseMap[r.doctorId]) repasseMap[r.doctorId] = {};
-      repasseMap[r.doctorId][r.procedureType] = Number(r.percentage) || 0;
+      if (r.tussProcedureId) {
+        if (!repasseByTuss[r.doctorId]) repasseByTuss[r.doctorId] = {};
+        repasseByTuss[r.doctorId][r.tussProcedureId] = Number(r.percentage) || 0;
+      } else if (r.privateProcedureId) {
+        if (!repasseByPrivate[r.doctorId]) repasseByPrivate[r.doctorId] = {};
+        repasseByPrivate[r.doctorId][r.privateProcedureId] = Number(r.percentage) || 0;
+      } else if (r.procedureType) {
+        if (!repasseByType[r.doctorId]) repasseByType[r.doctorId] = {};
+        repasseByType[r.doctorId][r.procedureType] = Number(r.percentage) || 0;
+      }
     }
 
     type ProcedureEntry = {
@@ -435,7 +444,9 @@ export const financialService = {
         if (!tp) continue;
         const value = Number(tp.value) || 0;
         valorFaturado += value;
-        const pct = repasseMap[call.doctorId]?.[tp.type] ?? 0;
+        const pct = repasseByTuss[call.doctorId]?.[tp.id]
+          ?? repasseByType[call.doctorId]?.[tp.type]
+          ?? 0;
         valorRepasse += value * (pct / 100);
         descs.push(tp.description || tp.code);
       }
@@ -445,7 +456,9 @@ export const financialService = {
         if (!pp) continue;
         const value = Number(pp.value) || 0;
         valorFaturado += value;
-        const pct = repasseMap[call.doctorId]?.[pp.type] ?? 0;
+        const pct = repasseByPrivate[call.doctorId]?.[pp.id]
+          ?? repasseByType[call.doctorId]?.[pp.type]
+          ?? 0;
         valorRepasse += value * (pct / 100);
         descs.push(pp.name);
       }

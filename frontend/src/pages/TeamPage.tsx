@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, X, CheckCircle, UserCheck, UserX, Shield, Edit2, Trash2, Clock } from 'lucide-react';
+import { Users, Plus, X, CheckCircle, XCircle, UserCheck, UserX, Shield, Edit2, Trash2, Clock } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import SpecialtyCombobox from '../components/SpecialtyCombobox';
@@ -78,7 +78,7 @@ export function TeamPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
   const [removeConfirm, setRemoveConfirm] = useState<TeamMember | null>(null);
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // Create form
   const [formName, setFormName] = useState('');
@@ -106,7 +106,7 @@ export function TeamPage() {
   const [repasseSearch, setRepasseSearch] = useState('');
   const [savingRepasse, setSavingRepasse] = useState(false);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -134,7 +134,7 @@ export function TeamPage() {
   };
 
   const handleCreate = async () => {
-    if (!formName || !formEmail) { showToast('Preencha todos os campos obrigatorios'); return; }
+    if (!formName || !formEmail) { showToast('Preencha todos os campos obrigatorios', 'error'); return; }
     setSubmitting(true);
     try {
       const isProviderRole = formRole === 'DOCTOR' || formRole === 'HEALTH_PROFESSIONAL';
@@ -153,7 +153,7 @@ export function TeamPage() {
       resetForm();
       fetchMembers();
     } catch (err: any) {
-      showToast(err.response?.data?.error?.message || 'Erro ao criar');
+      showToast(err.response?.data?.error?.message || 'Erro ao criar', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -181,7 +181,7 @@ export function TeamPage() {
       resetForm();
       fetchMembers();
     } catch (err: any) {
-      showToast(err.response?.data?.error?.message || 'Erro ao atualizar');
+      showToast(err.response?.data?.error?.message || 'Erro ao atualizar', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -200,10 +200,10 @@ export function TeamPage() {
     if (!editMember) return;
     setSavingRepasse(true);
     try {
-      const repasses = repasseTuss.filter(r => r.percentage > 0).map(r => ({ procedureId: r.procedureId, percentage: r.percentage }));
+      const repasses = repasseTuss.map(r => ({ procedureId: r.procedureId, percentage: r.percentage }));
       await api.put(`/doctors/${editMember.id}/repasse/tuss`, { repasses });
       showToast('Repasse TUSS salvo!');
-    } catch { showToast('Erro ao salvar repasse'); }
+    } catch (err: any) { showToast(err.response?.data?.error?.message || 'Erro ao salvar repasse TUSS', 'error'); }
     finally { setSavingRepasse(false); }
   };
 
@@ -211,10 +211,10 @@ export function TeamPage() {
     if (!editMember) return;
     setSavingRepasse(true);
     try {
-      const repasses = repassePrivate.filter(r => r.percentage > 0).map(r => ({ procedureId: r.procedureId, percentage: r.percentage }));
+      const repasses = repassePrivate.map(r => ({ procedureId: r.procedureId, percentage: r.percentage }));
       await api.put(`/doctors/${editMember.id}/repasse/private`, { repasses });
       showToast('Repasse Particular salvo!');
-    } catch { showToast('Erro ao salvar repasse'); }
+    } catch (err: any) { showToast(err.response?.data?.error?.message || 'Erro ao salvar repasse particular', 'error'); }
     finally { setSavingRepasse(false); }
   };
 
@@ -223,7 +223,7 @@ export function TeamPage() {
       await api.patch(`/team/${id}/toggle`);
       fetchMembers();
     } catch (err: any) {
-      showToast(err.response?.data?.error?.message || 'Erro ao alterar status');
+      showToast(err.response?.data?.error?.message || 'Erro ao alterar status', 'error');
     }
   };
 
@@ -235,7 +235,7 @@ export function TeamPage() {
       setRemoveConfirm(null);
       fetchMembers();
     } catch (err: any) {
-      showToast(err.response?.data?.error?.message || 'Erro ao remover');
+      showToast(err.response?.data?.error?.message || 'Erro ao remover', 'error');
     }
   };
 
@@ -271,7 +271,7 @@ export function TeamPage() {
       await api.put(`/team/${editMember.id}/horarios`, { horarios, duracaoConsulta });
       showToast('Horarios atualizados!');
     } catch (err: any) {
-      showToast(err.response?.data?.error?.message || 'Erro ao salvar horarios');
+      showToast(err.response?.data?.error?.message || 'Erro ao salvar horarios', 'error');
     } finally {
       setSavingHorarios(false);
     }
@@ -296,8 +296,8 @@ export function TeamPage() {
   return (
     <div className="space-y-6">
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-          <CheckCircle size={16} /> {toast}
+        <div className={`fixed top-4 right-4 z-50 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}>
+          {toast.type === 'error' ? <XCircle size={16} /> : <CheckCircle size={16} />} {toast.msg}
         </div>
       )}
 

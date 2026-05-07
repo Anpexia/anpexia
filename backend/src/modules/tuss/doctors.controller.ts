@@ -84,20 +84,42 @@ doctorsRouter.put(
       const doctorId = req.params.id as string;
       const items: Array<{ procedureId: string; percentage: number }> = req.body.repasses || [];
 
+      const doctor = await prisma.user.findFirst({ where: { id: doctorId, tenantId } });
+      if (!doctor) return res.status(404).json({ success: false, error: { message: 'Médico não encontrado' } });
+
+      const validProcIds = new Set(
+        (await prisma.tussProcedure.findMany({ where: { tenantId }, select: { id: true } })).map(p => p.id),
+      );
+
+      const errors: string[] = [];
+      let updated = 0;
+      let deleted = 0;
+
       for (const item of items) {
         const pct = Number(item.percentage);
-        if (isNaN(pct) || pct < 0 || pct > 100) continue;
+        if (isNaN(pct) || pct < 0 || pct > 100) { errors.push(`Percentual inválido: ${item.percentage}`); continue; }
+        if (!validProcIds.has(item.procedureId)) { errors.push(`Procedimento TUSS não encontrado: ${item.procedureId}`); continue; }
 
-        await prisma.doctorRepasse.upsert({
-          where: {
-            tenantId_doctorId_tussProcedureId: { tenantId, doctorId, tussProcedureId: item.procedureId },
-          },
-          update: { percentage: pct },
-          create: { tenantId, doctorId, tussProcedureId: item.procedureId, percentage: pct },
-        });
+        if (pct === 0) {
+          await prisma.doctorRepasse.deleteMany({
+            where: { tenantId, doctorId, tussProcedureId: item.procedureId },
+          });
+          deleted++;
+        } else {
+          await prisma.doctorRepasse.upsert({
+            where: { tenantId_doctorId_tussProcedureId: { tenantId, doctorId, tussProcedureId: item.procedureId } },
+            update: { percentage: pct },
+            create: { tenantId, doctorId, tussProcedureId: item.procedureId, percentage: pct },
+          });
+          updated++;
+        }
       }
 
-      return success(res, { updated: items.length });
+      if (errors.length > 0) {
+        return res.status(400).json({ success: false, error: { message: errors[0] } });
+      }
+
+      return success(res, { updated, deleted });
     } catch (err) { next(err); }
   },
 );
@@ -141,20 +163,42 @@ doctorsRouter.put(
       const doctorId = req.params.id as string;
       const items: Array<{ procedureId: string; percentage: number }> = req.body.repasses || [];
 
+      const doctor = await prisma.user.findFirst({ where: { id: doctorId, tenantId } });
+      if (!doctor) return res.status(404).json({ success: false, error: { message: 'Médico não encontrado' } });
+
+      const validProcIds = new Set(
+        (await prisma.privateProcedure.findMany({ where: { tenantId, isActive: true }, select: { id: true } })).map(p => p.id),
+      );
+
+      const errors: string[] = [];
+      let updated = 0;
+      let deleted = 0;
+
       for (const item of items) {
         const pct = Number(item.percentage);
-        if (isNaN(pct) || pct < 0 || pct > 100) continue;
+        if (isNaN(pct) || pct < 0 || pct > 100) { errors.push(`Percentual inválido: ${item.percentage}`); continue; }
+        if (!validProcIds.has(item.procedureId)) { errors.push(`Procedimento particular não encontrado: ${item.procedureId}`); continue; }
 
-        await prisma.doctorRepasse.upsert({
-          where: {
-            tenantId_doctorId_privateProcedureId: { tenantId, doctorId, privateProcedureId: item.procedureId },
-          },
-          update: { percentage: pct },
-          create: { tenantId, doctorId, privateProcedureId: item.procedureId, percentage: pct },
-        });
+        if (pct === 0) {
+          await prisma.doctorRepasse.deleteMany({
+            where: { tenantId, doctorId, privateProcedureId: item.procedureId },
+          });
+          deleted++;
+        } else {
+          await prisma.doctorRepasse.upsert({
+            where: { tenantId_doctorId_privateProcedureId: { tenantId, doctorId, privateProcedureId: item.procedureId } },
+            update: { percentage: pct },
+            create: { tenantId, doctorId, privateProcedureId: item.procedureId, percentage: pct },
+          });
+          updated++;
+        }
       }
 
-      return success(res, { updated: items.length });
+      if (errors.length > 0) {
+        return res.status(400).json({ success: false, error: { message: errors[0] } });
+      }
+
+      return success(res, { updated, deleted });
     } catch (err) { next(err); }
   },
 );
