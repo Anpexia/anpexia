@@ -12,6 +12,7 @@ import AuditLogPage from './pages/AuditLogPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import SettingsPage from './pages/SettingsPage';
 import LembretesPage from './pages/LembretesPage';
+import ReunioesPage from './pages/ReunioesPage';
 import Verify2FAPage from './pages/Verify2FAPage';
 import CriarSenhaPage from './pages/CriarSenhaPage';
 import CaptacaoPage from './pages/CaptacaoPage';
@@ -664,7 +665,7 @@ const navItems: NavItem[] = [
   },
   { to: '/financeiro', label: 'Financeiro', icon: CreditCard },
   { to: '/audit-log', label: 'Audit Log', icon: FileSearch },
-  { to: '/lembretes', label: 'Lembretes', icon: Calendar },
+  { to: '/reunioes', label: 'Reunioes', icon: Calendar },
   { to: '/captacao', label: 'Captação', icon: Target, roles: ['SUPER_ADMIN', 'ADMIN', 'OWNER'] },
   { to: '/usuarios', label: 'Usuários', icon: UserCog, roles: ['SUPER_ADMIN', 'ADMIN', 'OWNER'] },
   { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon, roles: ['SUPER_ADMIN', 'ADMIN', 'OWNER'] },
@@ -819,7 +820,8 @@ export default function App() {
         <Route path="automacao" element={<Navigate to="/crm/automacoes" replace />} />
         <Route path="financeiro" element={<BillingPage />} />
         <Route path="audit-log" element={<AuditLogPage />} />
-        <Route path="lembretes" element={<LembretesPage />} />
+        <Route path="reunioes" element={<ReunioesPage />} />
+        <Route path="lembretes" element={<Navigate to="/reunioes" replace />} />
         <Route path="captacao" element={<CaptacaoPage />} />
         <Route path="usuarios" element={<AdminUsersPage />} />
         <Route path="configuracoes" element={<SettingsPage />} />

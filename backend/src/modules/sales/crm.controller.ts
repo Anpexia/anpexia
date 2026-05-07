@@ -275,3 +275,31 @@ adminCrmRouter.get('/leads/:id/tasks', asyncHandler(async (req, res) => {
   });
   return success(res, list);
 }));
+
+// Aggregated meetings & follow-ups across all leads
+adminCrmRouter.get('/meetings', asyncHandler(async (req, res) => {
+  const status = (req.query.status as string) || undefined;
+  const type = (req.query.type as string) || undefined;
+
+  const where: any = {};
+  if (status) where.status = status;
+  if (type) where.type = type;
+  else where.type = { in: ['MEETING', 'FOLLOWUP', 'CALL'] };
+
+  const tasks = await prisma.leadTask.findMany({
+    where,
+    include: { lead: { select: { id: true, name: true, companyName: true, company: true, phone: true, stage: true } } },
+    orderBy: { dueAt: 'asc' },
+  });
+
+  return success(res, tasks);
+}));
+
+adminCrmRouter.patch('/meetings/:taskId', asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  const task = await prisma.leadTask.update({
+    where: { id: req.params.taskId as string },
+    data: { status },
+  });
+  return success(res, task);
+}));
