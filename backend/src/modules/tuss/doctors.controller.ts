@@ -91,32 +91,32 @@ doctorsRouter.put(
         (await prisma.tussProcedure.findMany({ where: { tenantId }, select: { id: true } })).map(p => p.id),
       );
 
-      const errors: string[] = [];
       let updated = 0;
       let deleted = 0;
 
       for (const item of items) {
         const pct = Number(item.percentage);
-        if (isNaN(pct) || pct < 0 || pct > 100) { errors.push(`Percentual inválido: ${item.percentage}`); continue; }
-        if (!validProcIds.has(item.procedureId)) { errors.push(`Procedimento TUSS não encontrado: ${item.procedureId}`); continue; }
+        if (isNaN(pct) || pct < 0 || pct > 100) continue;
+        if (!validProcIds.has(item.procedureId)) continue;
+
+        const existing = await prisma.doctorRepasse.findFirst({
+          where: { tenantId, doctorId, tussProcedureId: item.procedureId },
+        });
 
         if (pct === 0) {
-          await prisma.doctorRepasse.deleteMany({
-            where: { tenantId, doctorId, tussProcedureId: item.procedureId },
-          });
-          deleted++;
+          if (existing) {
+            await prisma.doctorRepasse.delete({ where: { id: existing.id } });
+            deleted++;
+          }
+        } else if (existing) {
+          await prisma.doctorRepasse.update({ where: { id: existing.id }, data: { percentage: pct } });
+          updated++;
         } else {
-          await prisma.doctorRepasse.upsert({
-            where: { tenantId_doctorId_tussProcedureId: { tenantId, doctorId, tussProcedureId: item.procedureId } },
-            update: { percentage: pct },
-            create: { tenantId, doctorId, tussProcedureId: item.procedureId, percentage: pct },
+          await prisma.doctorRepasse.create({
+            data: { tenantId, doctorId, tussProcedureId: item.procedureId, percentage: pct },
           });
           updated++;
         }
-      }
-
-      if (errors.length > 0) {
-        return res.status(400).json({ success: false, error: { message: errors[0] } });
       }
 
       return success(res, { updated, deleted });
@@ -170,32 +170,32 @@ doctorsRouter.put(
         (await prisma.privateProcedure.findMany({ where: { tenantId, isActive: true }, select: { id: true } })).map(p => p.id),
       );
 
-      const errors: string[] = [];
       let updated = 0;
       let deleted = 0;
 
       for (const item of items) {
         const pct = Number(item.percentage);
-        if (isNaN(pct) || pct < 0 || pct > 100) { errors.push(`Percentual inválido: ${item.percentage}`); continue; }
-        if (!validProcIds.has(item.procedureId)) { errors.push(`Procedimento particular não encontrado: ${item.procedureId}`); continue; }
+        if (isNaN(pct) || pct < 0 || pct > 100) continue;
+        if (!validProcIds.has(item.procedureId)) continue;
+
+        const existing = await prisma.doctorRepasse.findFirst({
+          where: { tenantId, doctorId, privateProcedureId: item.procedureId },
+        });
 
         if (pct === 0) {
-          await prisma.doctorRepasse.deleteMany({
-            where: { tenantId, doctorId, privateProcedureId: item.procedureId },
-          });
-          deleted++;
+          if (existing) {
+            await prisma.doctorRepasse.delete({ where: { id: existing.id } });
+            deleted++;
+          }
+        } else if (existing) {
+          await prisma.doctorRepasse.update({ where: { id: existing.id }, data: { percentage: pct } });
+          updated++;
         } else {
-          await prisma.doctorRepasse.upsert({
-            where: { tenantId_doctorId_privateProcedureId: { tenantId, doctorId, privateProcedureId: item.procedureId } },
-            update: { percentage: pct },
-            create: { tenantId, doctorId, privateProcedureId: item.procedureId, percentage: pct },
+          await prisma.doctorRepasse.create({
+            data: { tenantId, doctorId, privateProcedureId: item.procedureId, percentage: pct },
           });
           updated++;
         }
-      }
-
-      if (errors.length > 0) {
-        return res.status(400).json({ success: false, error: { message: errors[0] } });
       }
 
       return success(res, { updated, deleted });
