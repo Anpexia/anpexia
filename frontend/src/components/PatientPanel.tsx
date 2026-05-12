@@ -641,9 +641,9 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const summary = computeSummary(customer);
 
   return (
-    <div className="bg-white rounded-xl w-full">
+    <div className="bg-white rounded-xl w-full flex flex-col max-h-[85vh]">
       {/* Header */}
-      <div className="p-6 border-b border-slate-200">
+      <div className="shrink-0 p-6 border-b border-slate-200">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-semibold text-slate-800 text-lg">{customer.name}</h3>
@@ -697,7 +697,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 px-6 border-b border-slate-200 overflow-x-auto">
+      <div className="shrink-0 flex gap-1 px-6 border-b border-slate-200 overflow-x-auto">
         {([
           { key: 'info', label: 'Informacoes', icon: User },
           { key: 'prontuario', label: 'Prontuario', icon: Heart },
@@ -725,11 +725,29 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
         ))}
       </div>
 
-      {/* Tab Content */}
-      <div className="p-6 max-h-[60vh] overflow-y-auto">
+      {/* Prontuário sub-navigation - fixed outside scroll */}
+      {detailTab === 'prontuario' && (
+        <div className="shrink-0 px-6 pt-3 pb-2 border-b border-slate-100 bg-white">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'dados', label: 'Dados Clinicos', show: true },
+              { key: 'anamnese', label: 'Anamnese', show: true },
+              { key: 'evolucao', label: 'Evolucao', show: true },
+            ].filter(t => t.show).map(t => (
+              <button key={t.key} onClick={() => setProntuarioSection(t.key)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${prontuarioSection === t.key ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab Content — scrollable */}
+      <div className="flex-1 overflow-y-auto p-6 min-h-0">
         {/* INFO TAB — Editable form */}
         {detailTab === 'info' && (
-          <form onSubmit={handleSaveInfo} className="space-y-4">
+          <form id="patient-info-form" onSubmit={handleSaveInfo} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
@@ -839,32 +857,12 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
               <label className="block text-sm font-medium text-slate-700 mb-1">Observacoes</label>
               <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className={inputCls + ' h-20 resize-none'} />
             </div>
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-xs text-slate-400">Cadastrado em {format(new Date(customer.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</p>
-              <button type="submit" disabled={saving} className="px-6 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
-                {saving ? 'Salvando...' : 'Salvar alteracoes'}
-              </button>
-            </div>
           </form>
         )}
 
         {/* PRONTUARIO TAB */}
         {detailTab === 'prontuario' && (
           <div className="space-y-4">
-            {/* Sub-navigation pills */}
-            <div className="flex flex-wrap gap-2">
-              {[
-                { key: 'dados', label: 'Dados Clinicos', show: true },
-                { key: 'anamnese', label: 'Anamnese', show: true },
-                { key: 'evolucao', label: 'Evolucao', show: true },
-              ].filter(t => t.show).map(t => (
-                <button key={t.key} onClick={() => setProntuarioSection(t.key)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${prontuarioSection === t.key ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
             {/* DADOS CLINICOS SECTION */}
             {prontuarioSection === 'dados' && (
               <div className="space-y-6">
@@ -895,9 +893,6 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                       <DictationTextarea value={medForm.clinicalNotes} onChange={(v) => setMedForm({ ...medForm, clinicalNotes: v })} className={inputCls + ' h-20 resize-none'} placeholder="Anotacoes gerais do medico..." />
                     </div>
                   </div>
-                  <button onClick={handleSaveMedical} disabled={savingMed} className="mt-3 px-4 py-2 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
-                    {savingMed ? 'Salvando...' : 'Salvar dados clinicos'}
-                  </button>
                 </div>
 
                 {/* Entries timeline */}
@@ -989,9 +984,6 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                       </div>
                     ))}
 
-                    <button onClick={handleSaveAnamnese} disabled={savingAnamnese} className="w-full py-2.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50 font-medium">
-                      {savingAnamnese ? 'Salvando...' : 'Salvar anamnese'}
-                    </button>
                   </>
                 )}
               </div>
@@ -1261,12 +1253,6 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setShowNewPrescricao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                  <button type="button" onClick={handleAddPrescricao} disabled={savingPrescricao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
-                    {savingPrescricao ? 'Salvando...' : 'Criar prescricao'}
-                  </button>
-                </div>
               </div>
             )}
 
@@ -1366,12 +1352,6 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
                   <DictationTextarea value={atestadoForm.observations} onChange={(v) => setAtestadoForm({ ...atestadoForm, observations: v })} className={inputCls + ' h-16 resize-none'} />
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setShowNewAtestado(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-                  <button type="button" onClick={handleAddAtestado} disabled={savingAtestado} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
-                    {savingAtestado ? 'Emitindo...' : 'Emitir'}
-                  </button>
                 </div>
               </div>
             )}
@@ -1534,6 +1514,62 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
         )}
 
       </div>
+
+      {/* Fixed footer with save buttons */}
+      {(detailTab === 'info' ||
+        (detailTab === 'prontuario' && (prontuarioSection === 'dados' || prontuarioSection === 'anamnese')) ||
+        (detailTab === 'prescricoes' && showNewPrescricao) ||
+        (detailTab === 'atestados' && showNewAtestado)
+      ) && (
+        <div className="shrink-0 px-6 py-3 border-t border-slate-200 bg-white rounded-b-xl">
+          {detailTab === 'info' && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-400">Cadastrado em {format(new Date(customer.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</p>
+              <button type="submit" form="patient-info-form" disabled={saving} className="px-6 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                {saving ? 'Salvando...' : 'Salvar alteracoes'}
+              </button>
+            </div>
+          )}
+
+          {detailTab === 'prontuario' && prontuarioSection === 'dados' && (
+            <button onClick={handleSaveMedical} disabled={savingMed} className="w-full py-2.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50 font-medium">
+              {savingMed ? 'Salvando...' : 'Salvar dados clinicos'}
+            </button>
+          )}
+
+          {detailTab === 'prontuario' && prontuarioSection === 'anamnese' && !loadingAnamnese && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-500">
+                {anamneseSaveStatus === 'saving' && <span className="text-amber-600">Salvando...</span>}
+                {anamneseSaveStatus === 'saved' && <span className="text-emerald-600">Salvo</span>}
+                {anamneseSaveStatus === 'unsaved' && <span className="text-amber-500">Nao salvo</span>}
+                {anamneseSaveStatus === 'error' && <span className="text-red-600">Erro{anamneseError ? `: ${anamneseError}` : ''}</span>}
+              </span>
+              <button onClick={handleSaveAnamnese} disabled={savingAnamnese} className="px-6 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                {savingAnamnese ? 'Salvando...' : 'Salvar anamnese'}
+              </button>
+            </div>
+          )}
+
+          {detailTab === 'prescricoes' && showNewPrescricao && (
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowNewPrescricao(false)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button type="button" onClick={handleAddPrescricao} disabled={savingPrescricao} className="px-6 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                {savingPrescricao ? 'Salvando...' : 'Criar prescricao'}
+              </button>
+            </div>
+          )}
+
+          {detailTab === 'atestados' && showNewAtestado && (
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowNewAtestado(false)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button type="button" onClick={handleAddAtestado} disabled={savingAtestado} className="px-6 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
+                {savingAtestado ? 'Emitindo...' : 'Emitir'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Toast notification */}
       {toastMsg && (
