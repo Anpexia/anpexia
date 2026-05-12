@@ -626,13 +626,18 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
     try {
       const { data } = await api.get(`/customers/${customer.id}/documents/${doc.id}`);
-      const d = data.data;
+      const d = data.data || data;
+      if (!d?.fileData) { showToast('Documento sem dados'); setPreviewDocIndex(null); return; }
+      if (typeof d.fileData === 'string' && d.fileData.startsWith('enc:')) {
+        showToast('Erro: documento encriptado'); setPreviewDocIndex(null); return;
+      }
       const byteChars = atob(d.fileData);
       const byteArray = new Uint8Array(byteChars.length);
       for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
-      const blob = new Blob([byteArray], { type: d.fileType });
+      const blob = new Blob([byteArray], { type: d.fileType || doc.fileType });
       setPreviewUrl(URL.createObjectURL(blob));
-    } catch {
+    } catch (err) {
+      console.error('[DOC PREVIEW]', err);
       showToast('Erro ao carregar preview');
       setPreviewDocIndex(null);
     } finally { setPreviewLoading(false); }
@@ -1507,33 +1512,35 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                   const sizeKB = doc.fileSize ? `${Math.round(doc.fileSize / 1024)}KB` : '';
                   const previewable = isDocPreviewable(doc);
                   return (
-                    <div key={doc.id} className={`border border-slate-200 rounded-lg p-3 hover:bg-slate-50/50 transition-colors flex items-center gap-3 ${previewable ? 'cursor-pointer' : ''}`} onClick={() => previewable && openDocPreview(idx)}>
-                      <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                        {previewable ? <Eye size={18} className="text-[#1E3A5F]" /> : <File size={18} className="text-slate-500" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${cat.cls}`}>{cat.label}</span>
-                          <span className={`text-sm font-medium truncate ${previewable ? 'text-[#2563EB]' : 'text-slate-800'}`}>{doc.fileName}</span>
+                    <div key={doc.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                          {previewable ? <Eye size={18} className="text-[#1E3A5F]" /> : <File size={18} className="text-slate-500" />}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {doc.description && <span className="text-xs text-slate-500 truncate">{doc.description}</span>}
-                          <span className="text-xs text-slate-400">{sizeKB}</span>
-                          <span className="text-xs text-slate-400">por {doc.uploaderName}</span>
-                          <span className="text-xs text-slate-400">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${cat.cls}`}>{cat.label}</span>
+                            <span className="text-sm font-medium truncate text-slate-800">{doc.fileName}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {doc.description && <span className="text-xs text-slate-500 truncate">{doc.description}</span>}
+                            <span className="text-xs text-slate-400">{sizeKB}</span>
+                            <span className="text-xs text-slate-400">por {doc.uploaderName}</span>
+                            <span className="text-xs text-slate-400">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 mt-2 ml-12">
                         {previewable && (
-                          <button onClick={() => openDocPreview(idx)} className="p-1.5 text-[#1E3A5F] hover:bg-[#EFF6FF] rounded" title="Visualizar">
-                            <Eye size={16} />
+                          <button onClick={() => openDocPreview(idx)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#1E3A5F] hover:bg-[#15304F] rounded-lg transition-colors">
+                            <Eye size={14} /> Visualizar
                           </button>
                         )}
-                        <button onClick={() => handleDownloadDoc(doc.id)} className="p-1.5 text-[#1E3A5F] hover:bg-[#EFF6FF] rounded" title="Baixar">
-                          <Download size={16} />
+                        <button onClick={() => handleDownloadDoc(doc.id)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1E3A5F] bg-[#EFF6FF] hover:bg-[#DBEAFE] rounded-lg transition-colors">
+                          <Download size={14} /> Baixar
                         </button>
-                        <button onClick={() => handleDeleteDoc(doc.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Remover">
-                          <Trash2 size={16} />
+                        <button onClick={() => handleDeleteDoc(doc.id)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                          <Trash2 size={14} /> Remover
                         </button>
                       </div>
                     </div>
