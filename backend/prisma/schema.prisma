@@ -1079,6 +1079,7 @@ enum PrescriptionType {
   EXAME_EXTERNO
   OCULOS
   EXAME_INTERNO
+  OUTRO
 }
 
 // ==========================================

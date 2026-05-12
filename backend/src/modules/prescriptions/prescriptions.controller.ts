@@ -54,7 +54,9 @@ prescriptionsRouter.post('/prescriptions', async (req: Request, res: Response, n
 
     // Pack items/oculosData into the data JSON field if sent at top level
     if (!body.data) {
-      if (body.type === 'OCULOS' && body.oculosData) {
+      if (body.type === 'OUTRO' && body.content != null) {
+        body.data = { title: body.title || 'Prescricao', content: body.content };
+      } else if (body.type === 'OCULOS' && body.oculosData) {
         body.data = { od: body.oculosData.od || { esferico: body.oculosData.od_esferico, cilindrico: body.oculosData.od_cilindrico, eixo: body.oculosData.od_eixo, adicao: body.oculosData.od_adicao, dnp: body.oculosData.od_dnp }, oe: body.oculosData.oe || { esferico: body.oculosData.oe_esferico, cilindrico: body.oculosData.oe_cilindrico, eixo: body.oculosData.oe_eixo, adicao: body.oculosData.oe_adicao, dnp: body.oculosData.oe_dnp }, lensType: body.oculosData.tipoLente, validade: body.oculosData.validade, observacoes: body.oculosData.observacoes };
       } else if (body.items) {
         if (body.type === 'MEDICAMENTO') {

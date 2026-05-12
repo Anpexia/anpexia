@@ -199,6 +199,9 @@ export async function generatePrescriptionPdf(tenantId: string, prescriptionId: 
     case 'EXAME_INTERNO':
       renderExameInterno(doc, data);
       break;
+    case 'OUTRO':
+      renderOutro(doc, data);
+      break;
   }
 
   // Date
@@ -290,4 +293,13 @@ function renderExameInterno(doc: PDFKit.PDFDocument, data: Record<string, any>) 
     if (exam.urgency) doc.text(`   Urgência: ${exam.urgency}`);
     doc.moveDown(0.5);
   });
+}
+
+function renderOutro(doc: PDFKit.PDFDocument, data: Record<string, any>) {
+  const title = data.title || 'PRESCRIÇÃO';
+  doc.fontSize(16).font('Helvetica-Bold').text(title.toUpperCase(), { align: 'center' });
+  doc.moveDown(1);
+
+  const content = data.content || '';
+  doc.fontSize(12).font('Helvetica').text(content, { align: 'left', lineGap: 4 });
 }

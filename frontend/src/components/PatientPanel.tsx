@@ -174,6 +174,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const [prescricaoItems, setPrescricaoItems] = useState<any[]>([]);
   const [prescricaoOculos, setPrescricaoOculos] = useState({ od_esferico: '', od_cilindrico: '', od_eixo: '', od_adicao: '', od_dnp: '', oe_esferico: '', oe_cilindrico: '', oe_eixo: '', oe_adicao: '', oe_dnp: '', tipoLente: '', validade: '', observacoes: '' });
   const [savingPrescricao, setSavingPrescricao] = useState(false);
+  const [prescricaoOutro, setPrescricaoOutro] = useState({ title: '', content: '' });
 
   // Exam types for autocomplete
   const [examTypesList, setExamTypesList] = useState<{ id: string; name: string; category: string; ativo: boolean }[]>([]);
@@ -474,7 +475,10 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
     setSavingPrescricao(true);
     try {
       const body: any = { patientId: customer.id, type: prescricaoType };
-      if (prescricaoType === 'OCULOS') {
+      if (prescricaoType === 'OUTRO') {
+        body.title = prescricaoOutro.title;
+        body.content = prescricaoOutro.content;
+      } else if (prescricaoType === 'OCULOS') {
         body.oculosData = prescricaoOculos;
       } else {
         body.items = prescricaoItems;
@@ -482,6 +486,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
       await api.post(`/prescriptions`, body);
       setShowNewPrescricao(false);
       setPrescricaoItems([]);
+      setPrescricaoOutro({ title: '', content: '' });
       setPrescricaoOculos({ od_esferico: '', od_cilindrico: '', od_eixo: '', od_adicao: '', od_dnp: '', oe_esferico: '', oe_cilindrico: '', oe_eixo: '', oe_adicao: '', oe_dnp: '', tipoLente: '', validade: '', observacoes: '' });
       await fetchPrescricoes(customer.id);
       showToast('Prescricao criada!');
@@ -1142,13 +1147,14 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
               <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
-                  <select value={prescricaoType} onChange={(e) => { setPrescricaoType(e.target.value); setPrescricaoItems([]); }} className={inputCls}>
+                  <select value={prescricaoType} onChange={(e) => { setPrescricaoType(e.target.value); setPrescricaoItems([]); setPrescricaoOutro({ title: '', content: '' }); }} className={inputCls}>
                     <option value="MEDICAMENTO">Medicamento</option>
                     <option value="EXAME_EXTERNO">Exame Externo</option>
                     <option value="EXAME_INTERNO">Exame Interno</option>
                     {['CLINICA_MEDICA', 'CLINICA_OFTALMOLOGICA', 'CLINICA_GERAL'].includes(user?.tenant?.segment || '') && (
                       <option value="OCULOS">Oculos</option>
                     )}
+                    <option value="OUTRO">Outro</option>
                   </select>
                 </div>
 
@@ -1235,6 +1241,26 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                   </div>
                 )}
 
+                {/* OUTRO form */}
+                {prescricaoType === 'OUTRO' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Titulo (opcional)</label>
+                      <input type="text" value={prescricaoOutro.title} onChange={(e) => setPrescricaoOutro({ ...prescricaoOutro, title: e.target.value })} className={inputCls} placeholder="Ex: Prescricao personalizada, Orientacoes..." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Conteudo da prescricao</label>
+                      <DictationTextarea
+                        value={prescricaoOutro.content}
+                        onChange={(v) => setPrescricaoOutro({ ...prescricaoOutro, content: v })}
+                        className={inputCls + ' resize-y'}
+                        style={{ minHeight: '60vh', maxHeight: '80vh' }}
+                        placeholder="Cole ou digite o conteudo completo da prescricao aqui..."
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={() => setShowNewPrescricao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
                   <button type="button" onClick={handleAddPrescricao} disabled={savingPrescricao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
@@ -1256,12 +1282,14 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                     EXAME_EXTERNO: { label: 'Exame Externo', cls: 'bg-amber-100 text-amber-700' },
                     OCULOS: { label: 'Oculos', cls: 'bg-violet-100 text-violet-700' },
                     EXAME_INTERNO: { label: 'Exame Interno', cls: 'bg-emerald-100 text-emerald-700' },
+                    OUTRO: { label: 'Outro', cls: 'bg-slate-100 text-slate-700' },
                   };
                   const tl = typeLabels[p.type] || { label: p.type, cls: 'bg-gray-100 text-gray-600' };
                   const itemCount = p.items?.length || 0;
                   const description = p.type === 'MEDICAMENTO' && itemCount > 0
                     ? `${itemCount} medicamento(s)`
                     : p.type === 'OCULOS' ? 'Receita de oculos'
+                    : p.type === 'OUTRO' ? (p.title || 'Prescricao personalizada')
                     : p.items?.map((item: any) => item.name).join(', ') || p.type;
                   return (
                     <div key={p.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50/50 transition-colors">

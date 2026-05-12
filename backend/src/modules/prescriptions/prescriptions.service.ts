@@ -4,7 +4,7 @@ import { AppError } from '../../shared/middleware/error-handler';
 interface CreatePrescriptionData {
   patientId: string;
   doctorId: string;
-  type: 'MEDICAMENTO' | 'EXAME_EXTERNO' | 'OCULOS' | 'EXAME_INTERNO';
+  type: 'MEDICAMENTO' | 'EXAME_EXTERNO' | 'OCULOS' | 'EXAME_INTERNO' | 'OUTRO';
   data: any;
 }
 
@@ -43,6 +43,8 @@ export const prescriptionsService = {
         type: p.type,
         items,
         oculosData,
+        content: p.type === 'OUTRO' ? data.content : undefined,
+        title: p.type === 'OUTRO' ? data.title : undefined,
         createdAt: p.createdAt,
         doctorId: p.doctorId,
       };

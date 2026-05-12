@@ -9,9 +9,10 @@ interface Props {
   className?: string;
   placeholder?: string;
   required?: boolean;
+  style?: React.CSSProperties;
 }
 
-export function DictationTextarea({ value, onChange, className = '', placeholder, required }: Props) {
+export function DictationTextarea({ value, onChange, className = '', placeholder, required, style }: Props) {
   const [recording, setRecording] = useState(false);
   const recognitionRef = useRef<any>(null);
 
@@ -60,6 +61,7 @@ export function DictationTextarea({ value, onChange, className = '', placeholder
         className={className}
         placeholder={placeholder}
         required={required}
+        style={style}
       />
       {hasSpeech && (
         <button
