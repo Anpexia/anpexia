@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, Plus, Trash2, Paperclip, File } from 'lucide-react';
+import { X, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, Plus, Trash2, Paperclip, File, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -192,6 +192,9 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docCategory, setDocCategory] = useState('OUTRO');
   const [docDescription, setDocDescription] = useState('');
+  const [previewDocIndex, setPreviewDocIndex] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Convenio state
   const [conveniosList, setConveniosList] = useState<any[]>([]);
@@ -603,6 +606,63 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
       showToast('Documento removido');
     } catch { showToast('Erro ao remover documento'); }
   };
+
+  const isDocPreviewable = (doc: any) => {
+    const ft = (doc.fileType || '').toLowerCase();
+    if (ft.startsWith('image/') || ft === 'application/pdf') return true;
+    const ext = (doc.fileName || '').toLowerCase().split('.').pop();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'].includes(ext || '');
+  };
+
+  const openDocPreview = async (index: number) => {
+    const doc = documents[index];
+    if (!customer || !doc) return;
+    if (!isDocPreviewable(doc)) { handleDownloadDoc(doc.id); return; }
+
+    setPreviewDocIndex(index);
+    setPreviewLoading(true);
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
+
+    try {
+      const { data } = await api.get(`/customers/${customer.id}/documents/${doc.id}`);
+      const d = data.data;
+      const byteChars = atob(d.fileData);
+      const byteArray = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([byteArray], { type: d.fileType });
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch {
+      showToast('Erro ao carregar preview');
+      setPreviewDocIndex(null);
+    } finally { setPreviewLoading(false); }
+  };
+
+  const navigatePreview = (dir: 1 | -1) => {
+    if (previewDocIndex === null) return;
+    let next = previewDocIndex + dir;
+    while (next >= 0 && next < documents.length) {
+      if (isDocPreviewable(documents[next])) { openDocPreview(next); return; }
+      next += dir;
+    }
+  };
+
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewDocIndex(null);
+    setPreviewUrl(null);
+  };
+
+  useEffect(() => {
+    if (previewDocIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePreview();
+      if (e.key === 'ArrowLeft') navigatePreview(-1);
+      if (e.key === 'ArrowRight') navigatePreview(1);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewDocIndex, documents]);
 
   // Convenio handlers
   const handleSaveConvenio = async () => {
@@ -1433,7 +1493,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
               <p className="text-sm text-slate-500 text-center py-8">Nenhum documento salvo para este paciente.</p>
             ) : (
               <div className="space-y-2">
-                {documents.map((doc: any) => {
+                {documents.map((doc: any, idx: number) => {
                   const catLabels: Record<string, { label: string; cls: string }> = {
                     EXAME: { label: 'Exame', cls: 'bg-blue-100 text-blue-700' },
                     LAUDO: { label: 'Laudo', cls: 'bg-purple-100 text-purple-700' },
@@ -1444,15 +1504,16 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                   };
                   const cat = catLabels[doc.category] || catLabels.OUTRO;
                   const sizeKB = doc.fileSize ? `${Math.round(doc.fileSize / 1024)}KB` : '';
+                  const previewable = isDocPreviewable(doc);
                   return (
-                    <div key={doc.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50/50 transition-colors flex items-center gap-3">
+                    <div key={doc.id} className={`border border-slate-200 rounded-lg p-3 hover:bg-slate-50/50 transition-colors flex items-center gap-3 ${previewable ? 'cursor-pointer' : ''}`} onClick={() => previewable && openDocPreview(idx)}>
                       <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                        <File size={18} className="text-slate-500" />
+                        {previewable ? <Eye size={18} className="text-[#1E3A5F]" /> : <File size={18} className="text-slate-500" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${cat.cls}`}>{cat.label}</span>
-                          <span className="text-sm font-medium text-slate-800 truncate">{doc.fileName}</span>
+                          <span className={`text-sm font-medium truncate ${previewable ? 'text-[#2563EB]' : 'text-slate-800'}`}>{doc.fileName}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           {doc.description && <span className="text-xs text-slate-500 truncate">{doc.description}</span>}
@@ -1461,7 +1522,12 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                           <span className="text-xs text-slate-400">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: ptBR })}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                        {previewable && (
+                          <button onClick={() => openDocPreview(idx)} className="p-1.5 text-[#1E3A5F] hover:bg-[#EFF6FF] rounded" title="Visualizar">
+                            <Eye size={16} />
+                          </button>
+                        )}
                         <button onClick={() => handleDownloadDoc(doc.id)} className="p-1.5 text-[#1E3A5F] hover:bg-[#EFF6FF] rounded" title="Baixar">
                           <Download size={16} />
                         </button>
@@ -1571,9 +1637,53 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
         </div>
       )}
 
+      {/* Document Preview Modal */}
+      {previewDocIndex !== null && (
+        <div className="fixed inset-0 z-[70] bg-black/90 flex flex-col" onClick={closePreview}>
+          <div className="shrink-0 flex items-center justify-between px-6 py-3" onClick={e => e.stopPropagation()}>
+            <span className="text-white text-sm font-medium truncate max-w-[60%]">
+              {documents[previewDocIndex]?.fileName}
+              {documents[previewDocIndex]?.description && <span className="text-white/60 ml-2">— {documents[previewDocIndex].description}</span>}
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-white/50 text-xs mr-3">{previewDocIndex + 1} / {documents.filter(isDocPreviewable).length}</span>
+              <button onClick={() => handleDownloadDoc(documents[previewDocIndex]?.id)} className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors" title="Baixar">
+                <Download size={20} />
+              </button>
+              <button onClick={closePreview} className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors" title="Fechar (Esc)">
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 flex items-center justify-center min-h-0 px-16 pb-6" onClick={e => e.stopPropagation()}>
+            {previewLoading ? (
+              <p className="text-white/70 text-sm">Carregando preview...</p>
+            ) : previewUrl && (documents[previewDocIndex]?.fileType || '').startsWith('image/') ? (
+              <img src={previewUrl} alt={documents[previewDocIndex]?.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+            ) : previewUrl && (documents[previewDocIndex]?.fileType || '') === 'application/pdf' ? (
+              <iframe src={previewUrl} className="w-full h-full bg-white rounded-lg shadow-2xl" title={documents[previewDocIndex]?.fileName} />
+            ) : (
+              <p className="text-white/70 text-sm">Preview nao disponivel para este tipo de arquivo.</p>
+            )}
+          </div>
+
+          {previewDocIndex > 0 && documents.slice(0, previewDocIndex).some(isDocPreviewable) && (
+            <button onClick={(e) => { e.stopPropagation(); navigatePreview(-1); }} className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors" title="Anterior">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+          )}
+          {previewDocIndex < documents.length - 1 && documents.slice(previewDocIndex + 1).some(isDocPreviewable) && (
+            <button onClick={(e) => { e.stopPropagation(); navigatePreview(1); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors" title="Proximo">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Toast notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[60] bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg text-sm animate-fade-in">
+        <div className="fixed bottom-6 right-6 z-[80] bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg text-sm animate-fade-in">
           {toastMsg}
         </div>
       )}
