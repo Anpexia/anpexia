@@ -532,6 +532,7 @@ export function FilaPage() {
                 customerId={attendingItem.customer.id}
                 initialTab="prontuario"
                 onPatientUpdated={() => fetchQueue()}
+                doctorId={attendingItem.doctorId || undefined}
               />
             </div>
           </div>

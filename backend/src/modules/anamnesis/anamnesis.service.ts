@@ -8,10 +8,6 @@ export const anamnesisService = {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!anamnesis) {
-      throw new AppError(404, 'ANAMNESIS_NOT_FOUND', 'Anamnese nao encontrada');
-    }
-
     return anamnesis;
   },
 

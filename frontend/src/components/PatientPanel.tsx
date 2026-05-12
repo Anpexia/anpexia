@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, Plus, Trash2, Paperclip, File } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -120,11 +120,13 @@ export interface PatientPanelProps {
   initialTab?: DetailTab;
   /** Called after patient info is saved, so parent can refresh its own data */
   onPatientUpdated?: () => void;
+  /** Doctor performing the attendance — used as author of anamnesis */
+  doctorId?: string;
 }
 
 // ==================== Component ====================
 
-export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', onPatientUpdated }: PatientPanelProps) {
+export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', onPatientUpdated, doctorId: doctorIdProp }: PatientPanelProps) {
   const { user } = useAuth();
   const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
   const numberInputRef = useCallback((node: HTMLInputElement | null) => { if (node) node.dataset.numberInput = 'true'; }, []);
@@ -151,6 +153,11 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const [anamneseData, setAnamneseData] = useState<any>({});
   const [loadingAnamnese, setLoadingAnamnese] = useState(false);
   const [savingAnamnese, setSavingAnamnese] = useState(false);
+  const [anamnesisId, setAnamnesisId] = useState<string | null>(null);
+  const [anamneseSaveStatus, setAnamneseSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'unsaved'>('idle');
+  const [anamneseError, setAnamneseError] = useState<string>('');
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const anamneseDataRef = useRef<any>({});
 
   // Evolucao state
   const [evolucoes, setEvolucoes] = useState<any[]>([]);
@@ -364,20 +371,70 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
     setLoadingAnamnese(true);
     try {
       const { data } = await api.get(`/anamnesis/${patientId}`);
-      setAnamneseData(data.data || {});
-    } catch { setAnamneseData({}); }
+      if (data.data) {
+        setAnamneseData(data.data.data || {});
+        anamneseDataRef.current = data.data.data || {};
+        setAnamnesisId(data.data.id);
+        setAnamneseSaveStatus('saved');
+      } else {
+        setAnamneseData({});
+        anamneseDataRef.current = {};
+        setAnamnesisId(null);
+        setAnamneseSaveStatus('idle');
+      }
+    } catch {
+      setAnamneseData({});
+      anamneseDataRef.current = {};
+      setAnamnesisId(null);
+      setAnamneseSaveStatus('idle');
+    }
     finally { setLoadingAnamnese(false); }
   };
 
-  const handleSaveAnamnese = async () => {
+  const saveAnamnese = async (dataToSave?: any) => {
     if (!customer) return;
+    const payload = dataToSave || anamneseDataRef.current;
+    const resolvedDoctorId = doctorIdProp || user?.id;
     setSavingAnamnese(true);
+    setAnamneseSaveStatus('saving');
+    setAnamneseError('');
     try {
-      await api.post(`/anamnesis/${customer.id}`, { data: anamneseData });
-      showToast('Anamnese salva com sucesso!');
-    } catch { showToast('Erro ao salvar anamnese'); }
-    finally { setSavingAnamnese(false); }
+      if (anamnesisId) {
+        await api.put(`/anamnesis/${customer.id}/${anamnesisId}`, { data: payload });
+      } else {
+        const { data } = await api.post(`/anamnesis/${customer.id}`, { doctorId: resolvedDoctorId, data: payload });
+        setAnamnesisId(data.data?.id || data.id);
+      }
+      setAnamneseSaveStatus('saved');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.error || 'Erro ao salvar anamnese';
+      setAnamneseError(typeof msg === 'string' ? msg : 'Erro ao salvar anamnese');
+      setAnamneseSaveStatus('error');
+      showToast(typeof msg === 'string' ? msg : 'Erro ao salvar anamnese');
+    } finally {
+      setSavingAnamnese(false);
+    }
   };
+
+  const handleSaveAnamnese = () => saveAnamnese();
+
+  const handleAnamneseFieldChange = (key: string, value: string) => {
+    const updated = { ...anamneseData, [key]: value };
+    setAnamneseData(updated);
+    anamneseDataRef.current = updated;
+    setAnamneseSaveStatus('unsaved');
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveAnamnese(updated);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, []);
 
   // Fetch evolucoes
   const fetchEvolucoes = async (patientId: string) => {
@@ -902,13 +959,27 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                   <p className="text-sm text-slate-500 text-center py-8">Carregando anamnese...</p>
                 ) : (
                   <>
+                    {/* Status indicator */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">
+                        {anamneseSaveStatus === 'saving' && <span className="text-amber-600">Salvando automaticamente...</span>}
+                        {anamneseSaveStatus === 'saved' && <span className="text-emerald-600">Salvo</span>}
+                        {anamneseSaveStatus === 'unsaved' && <span className="text-amber-500">Alteracoes nao salvas</span>}
+                        {anamneseSaveStatus === 'error' && <span className="text-red-600">Erro ao salvar{anamneseError ? `: ${anamneseError}` : ''}</span>}
+                      </span>
+                      {anamneseSaveStatus === 'saved' && <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />}
+                      {anamneseSaveStatus === 'unsaved' && <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />}
+                      {anamneseSaveStatus === 'error' && <span className="inline-block w-2 h-2 rounded-full bg-red-500" />}
+                      {anamneseSaveStatus === 'saving' && <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
+                    </div>
+
                     {getSegmentConfig(user?.tenant?.segment).anamnese.map(field => (
                       <div key={field.key}>
                         <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
                         {field.type === 'textarea' ? (
-                          <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => setAnamneseData({ ...anamneseData, [field.key]: v })} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
+                          <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => handleAnamneseFieldChange(field.key, v)} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
                         ) : (
-                          <input type={field.type === 'number' ? 'number' : 'text'} value={anamneseData[field.key] || ''} onChange={(e) => setAnamneseData({ ...anamneseData, [field.key]: e.target.value })} className={inputCls} placeholder={field.placeholder} />
+                          <input type={field.type === 'number' ? 'number' : 'text'} value={anamneseData[field.key] || ''} onChange={(e) => handleAnamneseFieldChange(field.key, e.target.value)} className={inputCls} placeholder={field.placeholder} />
                         )}
                       </div>
                     ))}

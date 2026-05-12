@@ -22,11 +22,8 @@ anamnesisRouter.get('/anamnesis/:patientId', async (req: Request, res: Response,
 
 anamnesisRouter.post('/anamnesis/:patientId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { doctorId, data } = req.body;
-
-    if (!doctorId) {
-      return res.status(400).json({ error: 'doctorId is required' });
-    }
+    const { data } = req.body;
+    const doctorId = req.body.doctorId || req.auth!.userId;
 
     const anamnesis = await anamnesisService.create(
       req.auth!.tenantId!,
