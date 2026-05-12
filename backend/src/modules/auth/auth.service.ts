@@ -145,39 +145,40 @@ export const authService = {
       await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
     }
 
-    // Trusted-device check (2FA layer)
-    let trusted = false;
-    if (deviceId) {
-      const td = await prisma.trustedDevice.findUnique({
-        where: { userId_deviceId: { userId: user.id, deviceId } },
-      });
-      trusted = !!td;
-    }
-
-    if (!trusted) {
-      // Send email code, require 2FA challenge
-      const code = generateEmailCode();
-      await storeEmailCode(user.id, code);
-      try {
-        await sendEmailCode(user.email, user.name, code);
-      } catch (err) {
-        console.error('[AUTH] Falha ao enviar código por email:', err);
+    // 2FA check — only when user has opted in
+    if (user.twoFactorEnabled) {
+      let trusted = false;
+      if (deviceId) {
+        const td = await prisma.trustedDevice.findUnique({
+          where: { userId_deviceId: { userId: user.id, deviceId } },
+        });
+        trusted = !!td;
       }
-      await logAction({
-        userId: user.id,
-        userEmail: user.email,
-        userRole: user.role,
-        tenantId: user.tenantId,
-        action: 'LOGIN_2FA_REQUIRED',
-        entity: 'User',
-        entityId: user.id,
-        ipAddress,
-      });
-      throw new AppError(403, 'DEVICE_NOT_TRUSTED', 'Dispositivo não confiável. Verifique seu email para o código de acesso.', {
-        userId: user.id,
-        email: user.email,
-        twoFactorEnabled: user.twoFactorEnabled,
-      });
+
+      if (!trusted) {
+        const code = generateEmailCode();
+        await storeEmailCode(user.id, code);
+        try {
+          await sendEmailCode(user.email, user.name, code);
+        } catch (err) {
+          console.error('[AUTH] Falha ao enviar código por email:', err);
+        }
+        await logAction({
+          userId: user.id,
+          userEmail: user.email,
+          userRole: user.role,
+          tenantId: user.tenantId,
+          action: 'LOGIN_2FA_REQUIRED',
+          entity: 'User',
+          entityId: user.id,
+          ipAddress,
+        });
+        throw new AppError(403, 'DEVICE_NOT_TRUSTED', 'Dispositivo não confiável. Verifique seu email para o código de acesso.', {
+          userId: user.id,
+          email: user.email,
+          twoFactorEnabled: user.twoFactorEnabled,
+        });
+      }
     }
 
     await prisma.user.update({
