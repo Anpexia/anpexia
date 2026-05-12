@@ -303,3 +303,34 @@ adminCrmRouter.patch('/meetings/:taskId', asyncHandler(async (req, res) => {
   });
   return success(res, task);
 }));
+
+// Admin settings — meeting reminders config
+adminCrmRouter.get('/settings/meeting-reminders', asyncHandler(async (_req, res) => {
+  const settings = await prisma.adminSettings.findUnique({ where: { key: 'meeting_reminders' } });
+  const defaults = {
+    reminder24hEnabled: true,
+    reminder1hEnabled: true,
+    emailEnabled: true,
+    emailRecipients: [],
+  };
+  return success(res, settings ? { ...defaults, ...(settings.value as Record<string, any>) } : defaults);
+}));
+
+adminCrmRouter.put('/settings/meeting-reminders', asyncHandler(async (req, res) => {
+  const { reminder24hEnabled, reminder1hEnabled, emailEnabled, emailRecipients } = req.body;
+
+  const value = {
+    reminder24hEnabled: reminder24hEnabled !== false,
+    reminder1hEnabled: reminder1hEnabled !== false,
+    emailEnabled: emailEnabled !== false,
+    emailRecipients: Array.isArray(emailRecipients) ? emailRecipients.filter((e: any) => typeof e === 'string' && e.includes('@')) : [],
+  };
+
+  const settings = await prisma.adminSettings.upsert({
+    where: { key: 'meeting_reminders' },
+    update: { value },
+    create: { key: 'meeting_reminders', value },
+  });
+
+  return success(res, settings.value);
+}));

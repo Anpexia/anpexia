@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, Building2, Phone, User, ChevronDown, CheckCircle, AlertTriangle, Filter } from 'lucide-react';
+import { Calendar, Clock, Building2, Phone, CheckCircle, AlertTriangle, Filter, Settings, Mail, Plus, X, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -24,7 +24,15 @@ interface MeetingTask {
   lead: LeadInfo;
 }
 
+interface ReminderSettings {
+  reminder24hEnabled: boolean;
+  reminder1hEnabled: boolean;
+  emailEnabled: boolean;
+  emailRecipients: string[];
+}
+
 type FilterStatus = 'ALL' | 'PENDING' | 'DONE';
+type TabId = 'reunioes' | 'configuracoes';
 
 function classifyDate(dueAt: string): { label: string; group: string; isOverdue: boolean } {
   const now = new Date();
@@ -59,6 +67,51 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function ReunioesPage() {
+  const [activeTab, setActiveTab] = useState<TabId>('reunioes');
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Reunioes</h2>
+        <p className="text-sm text-gray-500 mt-1">Agenda comercial — reunioes, follow-ups e configuracoes</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('reunioes')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'reunioes'
+              ? 'border-[#1E3A5F] text-[#1E3A5F]'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Calendar size={16} className="inline mr-1.5 -mt-0.5" />
+          Reunioes
+        </button>
+        <button
+          onClick={() => setActiveTab('configuracoes')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'configuracoes'
+              ? 'border-[#1E3A5F] text-[#1E3A5F]'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Settings size={16} className="inline mr-1.5 -mt-0.5" />
+          Configuracoes
+        </button>
+      </div>
+
+      {activeTab === 'reunioes' ? <MeetingsTab /> : <ConfigTab />}
+    </div>
+  );
+}
+
+// ================================================================
+// Tab 1: Reunioes (existing functionality)
+// ================================================================
+
+function MeetingsTab() {
   const [meetings, setMeetings] = useState<MeetingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterStatus>('ALL');
@@ -132,14 +185,8 @@ export default function ReunioesPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Reunioes</h2>
-          <p className="text-sm text-gray-500 mt-1">Agenda comercial com leads</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <p className="text-gray-500">Carregando...</p>
-        </div>
+      <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+        <p className="text-gray-500">Carregando...</p>
       </div>
     );
   }
@@ -230,11 +277,7 @@ export default function ReunioesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Reunioes</h2>
-          <p className="text-sm text-gray-500 mt-1">Agenda comercial — reunioes, follow-ups e ligacoes com leads</p>
-        </div>
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-gray-400" />
           <select
@@ -282,6 +325,195 @@ export default function ReunioesPage() {
           <div className="space-y-1">
             {renderGroups(followupGroups)}
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ================================================================
+// Tab 2: Configuracoes de lembretes
+// ================================================================
+
+function ConfigTab() {
+  const [settings, setSettings] = useState<ReminderSettings>({
+    reminder24hEnabled: true,
+    reminder1hEnabled: true,
+    emailEnabled: true,
+    emailRecipients: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+
+  useEffect(() => {
+    api.get('/admin/settings/meeting-reminders')
+      .then(({ data }) => setSettings(data.data || data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const { data } = await api.put('/admin/settings/meeting-reminders', settings);
+      setSettings(data.data || data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  const addEmail = () => {
+    const email = newEmail.trim().toLowerCase();
+    if (!email || !email.includes('@')) return;
+    if (settings.emailRecipients.includes(email)) return;
+    setSettings(s => ({ ...s, emailRecipients: [...s.emailRecipients, email] }));
+    setNewEmail('');
+  };
+
+  const removeEmail = (email: string) => {
+    setSettings(s => ({ ...s, emailRecipients: s.emailRecipients.filter(e => e !== email) }));
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+        <p className="text-gray-500">Carregando...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      {/* Email notification settings */}
+      <div className="bg-white rounded-lg shadow-sm p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+            <Mail size={20} className="text-[#1E3A5F]" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">Lembretes por Email</h3>
+            <p className="text-sm text-gray-500">Receba emails antes de reunioes e follow-ups</p>
+          </div>
+        </div>
+
+        {/* Master toggle */}
+        <div className="flex items-center justify-between py-3 border-t border-gray-100">
+          <div>
+            <p className="text-sm font-medium text-gray-800">Ativar lembretes por email</p>
+            <p className="text-xs text-gray-500">Envia emails para os destinatarios configurados</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.emailEnabled}
+              onChange={e => setSettings(s => ({ ...s, emailEnabled: e.target.checked }))}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#1E3A5F]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1E3A5F]"></div>
+          </label>
+        </div>
+
+        {settings.emailEnabled && (
+          <>
+            {/* Reminder windows */}
+            <div className="space-y-3 py-3 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-800">Horarios dos lembretes</p>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.reminder24hEnabled}
+                  onChange={e => setSettings(s => ({ ...s, reminder24hEnabled: e.target.checked }))}
+                  className="w-4 h-4 text-[#1E3A5F] border-gray-300 rounded focus:ring-[#1E3A5F]"
+                />
+                <div>
+                  <span className="text-sm text-gray-700">24 horas antes</span>
+                  <p className="text-xs text-gray-400">Lembrete enviado 1 dia antes da reuniao</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.reminder1hEnabled}
+                  onChange={e => setSettings(s => ({ ...s, reminder1hEnabled: e.target.checked }))}
+                  className="w-4 h-4 text-[#1E3A5F] border-gray-300 rounded focus:ring-[#1E3A5F]"
+                />
+                <div>
+                  <span className="text-sm text-gray-700">1 hora antes</span>
+                  <p className="text-xs text-gray-400">Lembrete enviado 1 hora antes da reuniao</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Email recipients */}
+            <div className="space-y-3 py-3 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-800">Destinatarios</p>
+              <p className="text-xs text-gray-500">Adicione os emails que devem receber os lembretes</p>
+
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addEmail())}
+                  placeholder="email@exemplo.com"
+                  className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/30 focus:border-[#1E3A5F]"
+                />
+                <button
+                  onClick={addEmail}
+                  disabled={!newEmail.includes('@')}
+                  className="px-3 py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#15304F] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                >
+                  <Plus size={16} /> Adicionar
+                </button>
+              </div>
+
+              {settings.emailRecipients.length > 0 ? (
+                <div className="space-y-2">
+                  {settings.emailRecipients.map(email => (
+                    <div key={email} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <Mail size={14} className="text-gray-400" />
+                        {email}
+                      </div>
+                      <button
+                        onClick={() => removeEmail(email)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                  Nenhum destinatario configurado. Adicione pelo menos um email.
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Save button */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#15304F] disabled:opacity-50 flex items-center gap-2"
+        >
+          <Save size={16} />
+          {saving ? 'Salvando...' : 'Salvar configuracoes'}
+        </button>
+        {saved && (
+          <span className="text-sm text-green-600 flex items-center gap-1">
+            <CheckCircle size={16} /> Salvo com sucesso!
+          </span>
         )}
       </div>
     </div>

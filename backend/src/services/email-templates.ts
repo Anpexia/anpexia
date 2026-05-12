@@ -143,3 +143,65 @@ export async function sendCancellationEmail(
 
   return sendEmail({ to: data.email, subject: `Consulta cancelada - ${tenantName}`, html });
 }
+
+// Admin meeting reminder (not tenant-scoped)
+export async function sendMeetingReminderEmail(
+  recipients: string[],
+  task: { leadName: string; companyName?: string | null; type: string; dueAt: Date; responsible?: string | null },
+  windowLabel: string,
+) {
+  if (recipients.length === 0) return null;
+
+  const typeLabel: Record<string, string> = {
+    MEETING: 'Reuniao',
+    FOLLOWUP: 'Follow-up',
+    CALL: 'Ligacao',
+    PROPOSAL: 'Proposta',
+    OTHER: 'Outro',
+  };
+
+  const dateStr = new Date(task.dueAt).toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+  const timeStr = new Date(task.dueAt).toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const ln = escapeHtml(task.leadName);
+  const cn = task.companyName ? escapeHtml(task.companyName) : '';
+  const resp = task.responsible ? escapeHtml(task.responsible) : 'Nao definido';
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden">
+      <div style="background:#1E3A5F;padding:20px 24px">
+        <h1 style="color:#fff;margin:0;font-size:20px">Anpexia Admin</h1>
+      </div>
+      <div style="padding:24px">
+        <h2 style="color:#1E3A5F;margin-top:0">Lembrete: ${typeLabel[task.type] || task.type} ${windowLabel}</h2>
+        <p>Voce tem um compromisso agendado:</p>
+        <div style="background:#f0f7ff;border-left:4px solid #1E3A5F;padding:16px;margin:16px 0;border-radius:4px">
+          <p style="margin:0"><strong>Lead:</strong> ${ln}${cn ? ` (${cn})` : ''}</p>
+          <p style="margin:4px 0 0"><strong>Tipo:</strong> ${typeLabel[task.type] || task.type}</p>
+          <p style="margin:4px 0 0"><strong>Data:</strong> ${dateStr}</p>
+          <p style="margin:4px 0 0"><strong>Horario:</strong> ${timeStr}</p>
+          <p style="margin:4px 0 0"><strong>Responsavel:</strong> ${resp}</p>
+        </div>
+        <p><a href="https://admin.anpexia.com.br/reunioes" style="color:#1E3A5F;font-weight:bold">Ver no painel</a></p>
+      </div>
+      <div style="background:#f8f9fa;padding:16px 24px;border-top:1px solid #eee">
+        <p style="color:#aaa;font-size:11px;margin:0">&copy; 2026 Anpexia &mdash; anpexia.com.br</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: recipients,
+    subject: `Lembrete ${windowLabel}: ${typeLabel[task.type] || task.type} com ${task.leadName}`,
+    html,
+  });
+}

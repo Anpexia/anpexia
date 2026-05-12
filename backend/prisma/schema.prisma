@@ -770,6 +770,8 @@ model LeadTask {
   responsible   String?
   status        String   @default("PENDING") // PENDING, DONE
   googleEventId String?  @map("google_event_id")
+  reminder24hSentAt DateTime? @map("reminder_24h_sent_at")
+  reminder1hSentAt  DateTime? @map("reminder_1h_sent_at")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -1410,4 +1412,18 @@ model ExamType {
   @@unique([tenantId, name])
   @@index([tenantId])
   @@map("exam_types")
+}
+
+// ==========================================
+// ADMIN SETTINGS (global, not per-tenant)
+// ==========================================
+
+model AdminSettings {
+  id        String @id @default(cuid())
+  key       String @unique
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_settings")
 }

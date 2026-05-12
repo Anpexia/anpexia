@@ -635,6 +635,103 @@ async function sendBirthdayGreetings() {
 }
 
 // ============================================================
+// JOB 10: Meeting reminders for admin — 24h and 1h (every 15 min)
+// ============================================================
+async function sendMeetingReminders() {
+  try {
+    const settings = await prisma.adminSettings.findUnique({ where: { key: 'meeting_reminders' } });
+    const config = (settings?.value as Record<string, any>) || {};
+
+    const reminder24hEnabled = config.reminder24hEnabled !== false;
+    const reminder1hEnabled = config.reminder1hEnabled !== false;
+    const emailEnabled = config.emailEnabled !== false;
+    const emailRecipients: string[] = config.emailRecipients || [];
+
+    if (!emailEnabled || emailRecipients.length === 0) return;
+
+    const now = new Date();
+
+    // --- 24h reminder ---
+    if (reminder24hEnabled) {
+      const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const in24hEnd = new Date(in24h.getTime() + 15 * 60 * 1000);
+
+      const tasks24h = await prisma.leadTask.findMany({
+        where: {
+          dueAt: { gte: in24h, lt: in24hEnd },
+          status: 'PENDING',
+          type: { in: ['MEETING', 'FOLLOWUP', 'CALL'] },
+          reminder24hSentAt: null,
+        },
+        include: { lead: { select: { name: true, companyName: true, company: true } } },
+      });
+
+      for (const task of tasks24h) {
+        try {
+          const { sendMeetingReminderEmail } = await import('../services/email-templates');
+          await sendMeetingReminderEmail(emailRecipients, {
+            leadName: task.lead.name,
+            companyName: task.lead.companyName || task.lead.company,
+            type: task.type,
+            dueAt: task.dueAt,
+            responsible: task.responsible,
+          }, 'em 24h');
+
+          await prisma.leadTask.update({
+            where: { id: task.id },
+            data: { reminder24hSentAt: now },
+          });
+
+          console.log(`${TAG} Meeting 24h reminder sent for task ${task.id}`);
+        } catch (err) {
+          console.error(`${TAG} Failed 24h meeting reminder for ${task.id}:`, err);
+        }
+      }
+    }
+
+    // --- 1h reminder ---
+    if (reminder1hEnabled) {
+      const in1h = new Date(now.getTime() + 60 * 60 * 1000);
+      const in1hEnd = new Date(in1h.getTime() + 15 * 60 * 1000);
+
+      const tasks1h = await prisma.leadTask.findMany({
+        where: {
+          dueAt: { gte: in1h, lt: in1hEnd },
+          status: 'PENDING',
+          type: { in: ['MEETING', 'FOLLOWUP', 'CALL'] },
+          reminder1hSentAt: null,
+        },
+        include: { lead: { select: { name: true, companyName: true, company: true } } },
+      });
+
+      for (const task of tasks1h) {
+        try {
+          const { sendMeetingReminderEmail } = await import('../services/email-templates');
+          await sendMeetingReminderEmail(emailRecipients, {
+            leadName: task.lead.name,
+            companyName: task.lead.companyName || task.lead.company,
+            type: task.type,
+            dueAt: task.dueAt,
+            responsible: task.responsible,
+          }, 'em 1h');
+
+          await prisma.leadTask.update({
+            where: { id: task.id },
+            data: { reminder1hSentAt: now },
+          });
+
+          console.log(`${TAG} Meeting 1h reminder sent for task ${task.id}`);
+        } catch (err) {
+          console.error(`${TAG} Failed 1h meeting reminder for ${task.id}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`${TAG} sendMeetingReminders error:`, err);
+  }
+}
+
+// ============================================================
 // INIT: Register all cron jobs
 // ============================================================
 export function initCronJobs() {
@@ -677,6 +774,11 @@ export function initCronJobs() {
     await sendReactivationMessages();
   }, { timezone: 'America/Sao_Paulo' });
 
+  // Every 15 min: admin meeting reminders (24h + 1h)
+  cron.schedule('*/15 * * * *', async () => {
+    await sendMeetingReminders();
+  }, { timezone: 'America/Sao_Paulo' });
+
   // Every 5 min: WhatsApp connection health check
   cron.schedule('*/5 * * * *', async () => {
     await checkWhatsAppConnections();
@@ -688,6 +790,7 @@ export function initCronJobs() {
   console.log(`${TAG} Cron jobs registered:`);
   console.log(`${TAG}   - Message queues: every 1 min`);
   console.log(`${TAG}   - Appointment reminders: every 30 min`);
+  console.log(`${TAG}   - Meeting reminders (admin): every 15 min`);
   console.log(`${TAG}   - WhatsApp health check: every 5 min`);
   console.log(`${TAG}   - Stock/expiry alerts (OWNER): daily 8:00 AM`);
   console.log(`${TAG}   - Birthday greetings: daily 9:00 AM`);
