@@ -66,7 +66,12 @@ publicLeadsRouter.post('/', publicLimiter, asyncHandler(async (req, res) => {
 
 // ============ Admin router ============
 export const adminCrmRouter = Router();
-adminCrmRouter.use(authenticate, requireRole('SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR', 'OWNER'));
+adminCrmRouter.use(authenticate, requireRole('SUPER_ADMIN', 'ADMIN', 'GERENTE', 'VENDEDOR', 'OWNER'), (req: Request, _res: Response, next: NextFunction) => {
+  if (req.auth?.tenantId) {
+    throw new AppError(403, 'FORBIDDEN', 'CRM é restrito ao painel administrativo');
+  }
+  next();
+});
 
 // Automations — placed before /leads/:id (different path so no conflict)
 adminCrmRouter.get('/automations', asyncHandler(async (_req, res) => {
