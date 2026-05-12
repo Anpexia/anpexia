@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, Plus, Trash2, Paperclip, File, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -1637,9 +1638,9 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
         </div>
       )}
 
-      {/* Document Preview Modal */}
-      {previewDocIndex !== null && (
-        <div className="fixed inset-0 z-[70] bg-black/90 flex flex-col" onClick={closePreview}>
+      {/* Document Preview Modal — portaled to body to escape parent z-index stacking context */}
+      {previewDocIndex !== null && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/90 flex flex-col" onClick={closePreview}>
           <div className="shrink-0 flex items-center justify-between px-6 py-3" onClick={e => e.stopPropagation()}>
             <span className="text-white text-sm font-medium truncate max-w-[60%]">
               {documents[previewDocIndex]?.fileName}
@@ -1678,14 +1679,16 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
 
-      {/* Toast notification */}
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[80] bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg text-sm animate-fade-in">
+      {/* Toast notification — portaled to body */}
+      {toastMsg && createPortal(
+        <div className="fixed bottom-6 right-6 z-[9999] bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg text-sm animate-fade-in">
           {toastMsg}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
