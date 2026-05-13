@@ -4,7 +4,7 @@ import { AppError } from '../../shared/middleware/error-handler';
 
 export type ProcedureType = string;
 
-const DEFAULT_TYPES: string[] = ['CONSULTA', 'EXAME', 'CIRURGIA', 'TERAPIA', 'OUTROS'];
+const DEFAULT_TYPES: string[] = ['CONSULTAS', 'EXAMES', 'CIRURGIA', 'PROCEDIMENTOS', 'ATENDIMENTOS', 'OUTROS'];
 
 async function getTenantRepasseTypes(tenantId: string): Promise<string[]> {
   const rows = await prisma.repasseType.findMany({
