@@ -9,7 +9,6 @@ export const privateProceduresRouter = Router();
 
 privateProceduresRouter.use(authenticate);
 privateProceduresRouter.use(requireTenant);
-privateProceduresRouter.use(requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'));
 
 privateProceduresRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -20,7 +19,7 @@ privateProceduresRouter.get('/', async (req: Request, res: Response, next: NextF
   }
 });
 
-privateProceduresRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
+privateProceduresRouter.post('/', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const procedure = await privateProceduresService.create(req.auth!.tenantId!, req.body);
     await createAuditLog({
@@ -35,7 +34,7 @@ privateProceduresRouter.post('/', async (req: Request, res: Response, next: Next
   }
 });
 
-privateProceduresRouter.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
+privateProceduresRouter.put('/:id', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const procedure = await privateProceduresService.update(
       req.auth!.tenantId!,
@@ -54,7 +53,7 @@ privateProceduresRouter.put('/:id', async (req: Request, res: Response, next: Ne
   }
 });
 
-privateProceduresRouter.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+privateProceduresRouter.delete('/:id', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await privateProceduresService.remove(req.auth!.tenantId!, req.params.id as string);
     await createAuditLog({
@@ -74,7 +73,6 @@ export const privateProcedureCallsRouter = Router();
 
 privateProcedureCallsRouter.use(authenticate);
 privateProcedureCallsRouter.use(requireTenant);
-privateProcedureCallsRouter.use(requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'));
 
 privateProcedureCallsRouter.post(
   '/calls/:id/private-procedure',
