@@ -1322,7 +1322,7 @@ export function SchedulingPage() {
     let cancelled = false;
     setLoadingReturnSlots(true);
     api.get(`/scheduling/available-slots/${returnForm.date}`, {
-      params: { doctorId: returnForm.doctorId },
+      params: { doctorId: returnForm.doctorId, tenantId: user?.tenant?.id },
     })
       .then(({ data }) => { if (!cancelled) setReturnSlots(data.data || []); })
       .catch(() => { if (!cancelled) setReturnSlots([]); })
