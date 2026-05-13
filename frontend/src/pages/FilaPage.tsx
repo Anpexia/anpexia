@@ -182,10 +182,7 @@ export function FilaPage() {
   const inAttendance = queue.filter(q => q.status === 'in_attendance');
   const attended = queue.filter(q => q.status === 'attended');
 
-  waiting.sort((a, b) => {
-    if (!a.checkinAt || !b.checkinAt) return 0;
-    return new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime();
-  });
+  waiting.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const totalActive = waiting.length + called.length + inAttendance.length + attended.length;
 

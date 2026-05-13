@@ -482,7 +482,7 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
         customer: { select: { id: true, name: true, phone: true } },
         doctor: { select: { id: true, name: true } },
       },
-      orderBy: { checkinAt: 'asc' },
+      orderBy: { date: 'asc' },
     });
 
     return success(res, queue);
