@@ -191,6 +191,8 @@ export function SchedulingPage() {
   // Private procedures list (for booking PARTICULAR)
   interface BookPrivProc { id: string; name: string; value: number | null; type: string }
   const [bookPrivProcedures, setBookPrivProcedures] = useState<BookPrivProc[]>([]);
+  // Repasse warning for booking
+  const [repasseWarning, setRepasseWarning] = useState('');
   // Tenant-wide convenios lookup (for rendering badges and booking modal)
   const [conveniosLookup, setConveniosLookup] = useState<Record<string, ConvenioOption>>({});
 
@@ -562,6 +564,29 @@ export function SchedulingPage() {
     setBookSlots([]);
     setBookCalMonth(startOfMonth(new Date()));
   }, [showBookModal, bookForm.doctorId]);
+
+  useEffect(() => {
+    if (!showBookModal || bookPaymentType !== 'PARTICULAR' || !bookForm.doctorId || !bookProcedureId) {
+      setRepasseWarning('');
+      return;
+    }
+    let cancelled = false;
+    api.get(`/doctors/${bookForm.doctorId}/repasse/private`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const items: { procedureId: string; name: string; percentage: number }[] = data.data || [];
+        const match = items.find(i => i.procedureId === bookProcedureId);
+        if (!match || match.percentage <= 0) {
+          const procName = bookPrivProcedures.find(p => p.id === bookProcedureId)?.name || 'este procedimento';
+          const docName = doctors.find(d => d.id === bookForm.doctorId)?.name || 'o medico';
+          setRepasseWarning(`Repasse nao configurado para "${procName}" com Dr. ${docName}. Configure antes de registrar o pagamento.`);
+        } else {
+          setRepasseWarning('');
+        }
+      })
+      .catch(() => { if (!cancelled) setRepasseWarning(''); });
+    return () => { cancelled = true; };
+  }, [showBookModal, bookPaymentType, bookForm.doctorId, bookProcedureId, bookPrivProcedures, doctors]);
 
   const selectCustomerForBooking = (c: CustomerSearch) => {
     setSelectedBookCustomer(c);
@@ -2342,6 +2367,12 @@ export function SchedulingPage() {
                         ))}
                       </select>
                     )}
+                  </div>
+                )}
+                {repasseWarning && bookPaymentType === 'PARTICULAR' && (
+                  <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                    <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700">{repasseWarning}</p>
                   </div>
                 )}
               </div>

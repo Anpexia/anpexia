@@ -454,13 +454,13 @@ export const financialService = {
       for (const ppc of (call as any).privateProcedureCalls || []) {
         const pp = ppc.privateProcedure;
         if (!pp) continue;
-        const value = Number(pp.value) || 0;
+        const value = ppc.finalAmount != null ? Number(ppc.finalAmount) : (Number(pp.value) || 0);
         valorFaturado += value;
         const pct = repasseByPrivate[call.doctorId]?.[pp.id]
           ?? repasseByType[call.doctorId]?.[pp.type]
           ?? 0;
         valorRepasse += value * (pct / 100);
-        descs.push(pp.name);
+        descs.push(pp.name + (Number(ppc.discountPercent) > 0 ? ` (${ppc.discountPercent}% desc.)` : ''));
       }
 
       const patientName = call.customer?.name || call.name || 'Paciente';

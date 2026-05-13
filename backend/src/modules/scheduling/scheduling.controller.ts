@@ -375,8 +375,25 @@ router.post('/calls/:id/pay', authenticate, requireTenant, async (req: Request, 
 
     const procedures = await prisma.privateProcedureCall.findMany({
       where: { id: { in: procedureCallIds }, scheduledCallId: callId },
-      include: { privateProcedure: { select: { value: true } } },
+      include: { privateProcedure: { select: { id: true, name: true, value: true } } },
     });
+
+    if (call.doctorId) {
+      const repasses = await prisma.doctorRepasse.findMany({
+        where: { tenantId, doctorId: call.doctorId },
+      });
+      const configuredProcIds = new Set(repasses.filter(r => r.privateProcedureId).map(r => r.privateProcedureId!));
+      const missing = procedures.filter(p => !configuredProcIds.has(p.privateProcedureId));
+      if (missing.length > 0) {
+        const names = missing.map(p => p.privateProcedure.name).join(', ');
+        return res.status(400).json({
+          error: {
+            code: 'MISSING_REPASSE',
+            message: `Repasse nao configurado para: ${names}. Configure o repasse do medico antes de registrar o pagamento.`,
+          },
+        });
+      }
+    }
 
     for (const p of procedures) {
       const discountPct = discounts?.[p.id] ?? 0;
