@@ -832,7 +832,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                 <input type="text" value={formData.cpfCnpj} onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })} className={inputCls} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Data de nascimento</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Data de nascimento{formData.birthDate && (() => { const b = new Date(formData.birthDate + 'T00:00:00'); const now = new Date(); let y = now.getFullYear() - b.getFullYear(); let m = now.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && now.getDate() < b.getDate())) { y--; m += 12; } if (now.getDate() < b.getDate()) m--; if (m < 0) m += 12; return y >= 2 ? <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{y} anos</span> : <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{y * 12 + m} meses</span>; })()}</label>
                 <input type="date" value={formData.birthDate} onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })} className={inputCls} />
               </div>
               <div>
