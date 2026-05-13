@@ -887,7 +887,7 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
   // Private (particular) procedures
   for (const pp of call.privateProcedureCalls) {
     const proc = pp.privateProcedure;
-    const valor = Number(proc.value) || 0;
+    const valor = pp.finalAmount != null ? Number(pp.finalAmount) : (Number(proc.value) || 0);
     if (valor <= 0) continue;
     const effectiveDoctorId = pp.doctorId || call.doctorId;
     const effectiveDoctorName = effectiveDoctorId ? doctorNames.get(effectiveDoctorId) : null;
@@ -897,7 +897,7 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
         tenantId,
         type: 'INCOME',
         category: 'Procedimentos',
-        description: `${proc.name} - ${patientName} - ${dateIso}`,
+        description: `${proc.name} - ${patientName} - ${dateIso}${Number(pp.discountPercent) > 0 ? ` (desconto ${pp.discountPercent}%)` : ''}`,
         amount: new Prisma.Decimal(valor),
         date: call.date,
         paymentMethod: 'DINHEIRO',

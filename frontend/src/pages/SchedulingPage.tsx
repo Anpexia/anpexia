@@ -195,11 +195,13 @@ export function SchedulingPage() {
   const [conveniosLookup, setConveniosLookup] = useState<Record<string, ConvenioOption>>({});
 
   // Payment modal
-  interface PaymentSummary { items: Array<{ id: string; procedureId: string; name: string; type: string; value: number; paymentStatus: string; paymentMethod: string | null; paidAt: string | null }>; total: number; paid: number; pending: number }
+  interface PaymentSummaryItem { id: string; procedureId: string; name: string; type: string; value: number; discountPercent: number; finalAmount: number; paymentStatus: string; paymentMethod: string | null; paidAt: string | null }
+  interface PaymentSummary { items: PaymentSummaryItem[]; total: number; totalFinal: number; paid: number; pending: number }
   const [paymentCallId, setPaymentCallId] = useState<string | null>(null);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('PIX');
   const [payingIds, setPayingIds] = useState(false);
+  const [paymentDiscounts, setPaymentDiscounts] = useState<Record<string, number>>({});
 
   // Add procedure modal (post-attendance) — supports multiple procedures
   const [addProcCallId, setAddProcCallId] = useState<string | null>(null);
@@ -457,9 +459,15 @@ export function SchedulingPage() {
     setPaymentCallId(callId);
     setPaymentMethod('PIX');
     setPayingIds(false);
+    setPaymentDiscounts({});
     try {
       const { data } = await api.get(`/scheduling/calls/${callId}/payment-summary`);
       setPaymentSummary(data.data);
+      const existing: Record<string, number> = {};
+      for (const item of (data.data?.items || [])) {
+        if (item.discountPercent > 0) existing[item.id] = item.discountPercent;
+      }
+      if (Object.keys(existing).length > 0) setPaymentDiscounts(existing);
     } catch { setPaymentSummary(null); }
   };
 
@@ -469,7 +477,17 @@ export function SchedulingPage() {
     if (unpaidIds.length === 0) return;
     setPayingIds(true);
     try {
-      await api.post(`/scheduling/calls/${paymentCallId}/pay`, { procedureCallIds: unpaidIds, paymentMethod });
+      const discountsToSend: Record<string, number> = {};
+      for (const id of unpaidIds) {
+        if (paymentDiscounts[id] && paymentDiscounts[id] > 0) {
+          discountsToSend[id] = paymentDiscounts[id];
+        }
+      }
+      await api.post(`/scheduling/calls/${paymentCallId}/pay`, {
+        procedureCallIds: unpaidIds,
+        paymentMethod,
+        discounts: Object.keys(discountsToSend).length > 0 ? discountsToSend : undefined,
+      });
       showToast('Pagamento registrado!');
       setPaymentCallId(null);
       setPaymentSummary(null);
@@ -3176,39 +3194,84 @@ export function SchedulingPage() {
       )}
 
       {/* Payment Modal */}
-      {paymentCallId && (
+      {paymentCallId && (() => {
+        const computedItems = paymentSummary?.items.map(item => {
+          const discPct = item.paymentStatus === 'paid' ? item.discountPercent : (paymentDiscounts[item.id] ?? 0);
+          const finalVal = item.paymentStatus === 'paid' ? item.finalAmount : item.value * (1 - discPct / 100);
+          return { ...item, discPct, finalVal };
+        }) || [];
+        const computedPending = computedItems.filter(i => i.paymentStatus !== 'paid').reduce((s, i) => s + i.finalVal, 0);
+        const computedTotal = computedItems.reduce((s, i) => s + i.finalVal, 0);
+
+        return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 pb-4 shrink-0">
               <h3 className="font-semibold text-slate-800">Registrar pagamento</h3>
               <button onClick={() => { setPaymentCallId(null); setPaymentSummary(null); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
             {!paymentSummary ? (
               <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1E3A5F]" /></div>
             ) : (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  {paymentSummary.items.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">{item.name}</p>
-                        <p className="text-xs text-slate-500">{item.type}</p>
+              <>
+              <div className="px-6 pb-4 space-y-4 overflow-y-auto flex-1">
+                <div className="space-y-3">
+                  {computedItems.map(item => (
+                    <div key={item.id} className="p-3 bg-slate-50 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{item.name}</p>
+                          <p className="text-xs text-slate-500">{item.type}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-sm font-semibold ${item.discPct > 0 ? 'text-slate-400 line-through' : 'text-slate-800'}`}>R$ {Number(item.value).toFixed(2)}</p>
+                          {item.paymentStatus === 'paid' && <span className="text-xs text-emerald-600">Pago</span>}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-slate-800">R$ {Number(item.value).toFixed(2)}</p>
-                        {item.paymentStatus === 'paid' ? (
-                          <span className="text-xs text-emerald-600">Pago</span>
-                        ) : (
-                          <span className="text-xs text-amber-600">Pendente</span>
-                        )}
-                      </div>
+                      {item.paymentStatus !== 'paid' ? (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-slate-500 whitespace-nowrap">Desconto:</label>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={paymentDiscounts[item.id] ?? 0}
+                              onChange={(e) => {
+                                const v = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                setPaymentDiscounts(d => ({ ...d, [item.id]: v }));
+                              }}
+                              className="w-16 px-2 py-1 text-xs border border-slate-300 rounded text-right focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                            />
+                            <span className="text-xs text-slate-500">%</span>
+                          </div>
+                          {item.discPct > 0 && (
+                            <div className="flex items-center gap-2 ml-auto text-xs">
+                              <span className="text-red-500">- R$ {(item.value * item.discPct / 100).toFixed(2)}</span>
+                              <span className="font-semibold text-emerald-700">R$ {item.finalVal.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : item.discPct > 0 ? (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-slate-500">Desconto: {item.discPct}%</span>
+                          <span className="text-red-500">- R$ {(item.value * item.discPct / 100).toFixed(2)}</span>
+                          <span className="font-semibold text-emerald-700 ml-auto">R$ {item.finalVal.toFixed(2)}</span>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
                 <div className="border-t border-slate-200 pt-3">
+                  {paymentSummary.total !== computedTotal && (
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-400">Subtotal:</span>
+                      <span className="text-slate-400 line-through">R$ {paymentSummary.total.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-slate-600">Total:</span>
-                    <span className="font-semibold">R$ {paymentSummary.total.toFixed(2)}</span>
+                    <span className="font-semibold">R$ {computedTotal.toFixed(2)}</span>
                   </div>
                   {paymentSummary.paid > 0 && (
                     <div className="flex justify-between text-sm mb-1">
@@ -3218,39 +3281,43 @@ export function SchedulingPage() {
                   )}
                   <div className="flex justify-between text-sm">
                     <span className="text-amber-600">Pendente:</span>
-                    <span className="font-semibold text-amber-600">R$ {paymentSummary.pending.toFixed(2)}</span>
+                    <span className="font-semibold text-amber-600">R$ {computedPending.toFixed(2)}</span>
                   </div>
                 </div>
-                {paymentSummary.pending > 0 && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Forma de pagamento</label>
-                      <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]">
-                        <option value="PIX">PIX</option>
-                        <option value="CARTAO_CREDITO">Cartao de credito</option>
-                        <option value="CARTAO_DEBITO">Cartao de debito</option>
-                        <option value="DINHEIRO">Dinheiro</option>
-                      </select>
-                    </div>
-                    <button
-                      onClick={handlePay}
-                      disabled={payingIds}
-                      className="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      {payingIds ? 'Processando...' : `Confirmar pagamento — R$ ${paymentSummary.pending.toFixed(2)}`}
-                    </button>
-                  </>
+                {computedPending > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Forma de pagamento</label>
+                    <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]">
+                      <option value="PIX">PIX</option>
+                      <option value="CARTAO_CREDITO">Cartao de credito</option>
+                      <option value="CARTAO_DEBITO">Cartao de debito</option>
+                      <option value="DINHEIRO">Dinheiro</option>
+                    </select>
+                  </div>
                 )}
-                {paymentSummary.pending === 0 && (
+                {computedPending === 0 && paymentSummary.pending === 0 && (
                   <div className="text-center py-2">
                     <p className="text-sm text-emerald-600 font-medium">Todos os procedimentos pagos!</p>
                   </div>
                 )}
               </div>
+              {computedPending > 0 && (
+                <div className="shrink-0 p-6 pt-4 border-t border-slate-200 shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
+                  <button
+                    onClick={handlePay}
+                    disabled={payingIds}
+                    className="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {payingIds ? 'Processando...' : `Confirmar pagamento — R$ ${computedPending.toFixed(2)}`}
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Add Procedure Modal (post-attendance) — multiple procedures with doctor */}
       {addProcCallId && (

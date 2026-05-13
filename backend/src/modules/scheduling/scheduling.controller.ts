@@ -329,21 +329,29 @@ router.get('/calls/:id/payment-summary', authenticate, requireTenant, async (req
       include: { privateProcedure: { select: { id: true, name: true, value: true, type: true } } },
     });
 
-    const items = procedures.map(p => ({
-      id: p.id,
-      procedureId: p.privateProcedureId,
-      name: p.privateProcedure.name,
-      type: p.privateProcedure.type,
-      value: p.privateProcedure.value ?? 0,
-      paymentStatus: p.paymentStatus || 'pending',
-      paymentMethod: p.paymentMethod,
-      paidAt: p.paidAt,
-    }));
+    const items = procedures.map(p => {
+      const originalValue = Number(p.privateProcedure.value) || 0;
+      const discountPct = Number(p.discountPercent) || 0;
+      const finalVal = p.finalAmount != null ? Number(p.finalAmount) : originalValue;
+      return {
+        id: p.id,
+        procedureId: p.privateProcedureId,
+        name: p.privateProcedure.name,
+        type: p.privateProcedure.type,
+        value: originalValue,
+        discountPercent: discountPct,
+        finalAmount: finalVal,
+        paymentStatus: p.paymentStatus || 'pending',
+        paymentMethod: p.paymentMethod,
+        paidAt: p.paidAt,
+      };
+    });
 
     const total = items.reduce((s, i) => s + i.value, 0);
-    const paid = items.filter(i => i.paymentStatus === 'paid').reduce((s, i) => s + i.value, 0);
+    const totalFinal = items.reduce((s, i) => s + i.finalAmount, 0);
+    const paid = items.filter(i => i.paymentStatus === 'paid').reduce((s, i) => s + i.finalAmount, 0);
 
-    return success(res, { items, total, paid, pending: total - paid });
+    return success(res, { items, total, totalFinal, paid, pending: totalFinal - paid });
   } catch (err) { next(err); }
 });
 
@@ -352,7 +360,11 @@ router.post('/calls/:id/pay', authenticate, requireTenant, async (req: Request, 
   try {
     const tenantId = req.auth!.tenantId!;
     const callId = req.params.id as string;
-    const { procedureCallIds, paymentMethod } = req.body as { procedureCallIds: string[]; paymentMethod: string };
+    const { procedureCallIds, paymentMethod, discounts } = req.body as {
+      procedureCallIds: string[];
+      paymentMethod: string;
+      discounts?: Record<string, number>;
+    };
 
     if (!procedureCallIds?.length || !paymentMethod) {
       return res.status(400).json({ error: { message: 'procedureCallIds e paymentMethod sao obrigatorios' } });
@@ -361,10 +373,26 @@ router.post('/calls/:id/pay', authenticate, requireTenant, async (req: Request, 
     const call = await prisma.scheduledCall.findFirst({ where: { id: callId, tenantId } });
     if (!call) return res.status(404).json({ error: { message: 'Agendamento nao encontrado' } });
 
-    await prisma.privateProcedureCall.updateMany({
+    const procedures = await prisma.privateProcedureCall.findMany({
       where: { id: { in: procedureCallIds }, scheduledCallId: callId },
-      data: { paymentStatus: 'paid', paymentMethod, paidAt: new Date() },
+      include: { privateProcedure: { select: { value: true } } },
     });
+
+    for (const p of procedures) {
+      const discountPct = discounts?.[p.id] ?? 0;
+      const originalValue = Number(p.privateProcedure.value) || 0;
+      const finalAmount = originalValue * (1 - discountPct / 100);
+      await prisma.privateProcedureCall.update({
+        where: { id: p.id },
+        data: {
+          paymentStatus: 'paid',
+          paymentMethod,
+          paidAt: new Date(),
+          discountPercent: discountPct,
+          finalAmount: Math.round(finalAmount * 100) / 100,
+        },
+      });
+    }
 
     // If all procedures are now paid and status is awaiting_payment, transition to present
     if (call.status === 'awaiting_payment') {

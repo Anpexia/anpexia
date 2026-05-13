@@ -1396,6 +1396,8 @@ model PrivateProcedureCall {
   paymentStatus      String?          @default("pending") @map("payment_status")
   paymentMethod      String?          @map("payment_method")
   paidAt             DateTime?        @map("paid_at")
+  discountPercent    Decimal          @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  finalAmount        Decimal?         @map("final_amount") @db.Decimal(10, 2)
   createdAt          DateTime         @default(now()) @map("created_at")
 
   @@map("private_procedure_calls")
