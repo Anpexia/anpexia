@@ -245,7 +245,7 @@ router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRol
     const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId } });
     if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
 
-    const revertMap: Record<string, string> = { confirmed: 'scheduled', awaiting_payment: 'confirmed', present: 'confirmed', attended: 'in_attendance', completed: 'attended' };
+    const revertMap: Record<string, string> = { confirmed: 'scheduled', awaiting_payment: 'confirmed', present: 'confirmed', attended: 'present', completed: 'attended' };
     const newStatus = revertMap[call.status];
     if (!newStatus) throw new AppError(400, 'INVALID_REVERT', 'Status não pode ser revertido');
 
@@ -258,7 +258,7 @@ router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRol
           data: { paymentStatus: 'pending', paymentMethod: null, paidAt: null, discountPercent: 0, finalAmount: null },
         });
       }
-      if (newStatus === 'confirmed' || newStatus === 'scheduled') {
+      if (['confirmed', 'scheduled', 'present'].includes(newStatus)) {
         updateData.calledAt = null;
       }
       // When reverting back to a queue-visible status, update checkinAt to now
