@@ -763,7 +763,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
       </div>
 
       {/* Tabs */}
-      <div className="shrink-0 flex gap-1 px-6 border-b border-slate-200 overflow-x-auto">
+      <div className="shrink-0 flex gap-1 px-6 border-b border-slate-200 overflow-x-auto shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
         {([
           { key: 'info', label: 'Informacoes', icon: User },
           { key: 'prontuario', label: 'Prontuario', icon: Heart },
@@ -793,7 +793,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
       {/* Prontuário sub-navigation - fixed outside scroll */}
       {detailTab === 'prontuario' && (
-        <div className="shrink-0 px-6 pt-3 pb-2 border-b border-slate-100 bg-white">
+        <div className="shrink-0 px-6 pt-3 pb-2 border-b border-slate-100 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
           <div className="flex flex-wrap gap-2">
             {[
               { key: 'dados', label: 'Dados Clinicos', show: true },
@@ -1595,7 +1595,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
         (detailTab === 'prescricoes' && showNewPrescricao) ||
         (detailTab === 'atestados' && showNewAtestado)
       ) && (
-        <div className="shrink-0 px-6 py-3 border-t border-slate-200 bg-white rounded-b-xl">
+        <div className="shrink-0 px-6 py-3 border-t border-slate-200 bg-white rounded-b-xl shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
           {detailTab === 'info' && (
             <div className="flex items-center justify-between">
               <p className="text-xs text-slate-400">Cadastrado em {format(new Date(customer.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</p>

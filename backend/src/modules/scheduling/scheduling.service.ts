@@ -446,13 +446,31 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     });
   }
 
+  // Return appointment validations
+  const isReturn = !!data.isReturn && !!data.originalCallId;
+  if (isReturn) {
+    const original = await prisma.scheduledCall.findUnique({ where: { id: data.originalCallId! } });
+    if (!original) throw new AppError(400, 'INVALID_ORIGINAL', 'Agendamento original nao encontrado');
+    if (tenantId && original.tenantId !== tenantId) throw new AppError(400, 'INVALID_ORIGINAL', 'Agendamento original nao pertence a este tenant');
+    if (original.status !== 'completed') throw new AppError(400, 'ORIGINAL_NOT_COMPLETED', 'Agendamento original ainda nao foi realizado');
+    if (original.isReturn) throw new AppError(400, 'RETURN_OF_RETURN', 'Nao e possivel agendar retorno de um retorno');
+    const existingReturn = await prisma.scheduledCall.findUnique({ where: { originalCallId: data.originalCallId! } });
+    if (existingReturn) throw new AppError(400, 'RETURN_EXISTS', 'Ja existe um retorno agendado para esta consulta');
+    const settings = await prisma.tenantSettings.findUnique({ where: { tenantId: tenantId || original.tenantId || '' } });
+    const windowDays = settings?.returnWindowDays ?? 30;
+    const deadline = new Date(original.date);
+    deadline.setDate(deadline.getDate() + windowDays);
+    const returnDate = new Date(`${data.date}T${data.time || '12:00'}:00${SP_OFFSET}`);
+    if (returnDate > deadline) throw new AppError(400, 'RETURN_EXPIRED', `Prazo de retorno expirado. Limite: ${deadline.toISOString().slice(0, 10)}`);
+  }
+
   const call = await prisma.$transaction(async (tx) => {
     // Create the scheduled call
     // Resolve tenantId: explicit param > customer's tenant > null
     const resolvedTenantId = tenantId || customer?.tenantId || null;
 
     // Default paymentType to PARTICULAR; only store convenioId when CONVENIO
-    const paymentType = data.paymentType || 'PARTICULAR';
+    const paymentType = isReturn ? 'RETURN' : (data.paymentType || 'PARTICULAR');
     const convenioId = paymentType === 'CONVENIO' ? (data.convenioId || null) : null;
 
     if (convenioId && resolvedTenantId) {
@@ -480,6 +498,8 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
         doctorId: data.doctorId || undefined,
         paymentType,
         convenioId: convenioId ?? undefined,
+        isReturn,
+        originalCallId: isReturn ? data.originalCallId! : undefined,
       },
     });
 
@@ -495,7 +515,7 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
       }
     }
 
-    if (paymentType === 'PARTICULAR' && data.privateProcedureId) {
+    if (paymentType === 'PARTICULAR' && data.privateProcedureId && !isReturn) {
       await tx.privateProcedureCall.create({
         data: {
           scheduledCallId: scheduledCall.id,
@@ -576,6 +596,7 @@ async function listCalls(tenantId: string, filters: {
         doctor: { select: { id: true, name: true } },
         procedures: { include: { tussProcedure: { select: { id: true, code: true, description: true, type: true, value: true } }, doctor: { select: { id: true, name: true } } } },
         privateProcedureCalls: { include: { privateProcedure: { select: { id: true, name: true, type: true, value: true } }, doctor: { select: { id: true, name: true } } } },
+        returnCall: { select: { id: true, date: true, status: true } },
         _count: { select: { privateProcedureCalls: true } },
       },
       // checkinAt and calledAt are included automatically (no explicit select = all scalar fields)
@@ -929,8 +950,8 @@ async function updateCallStatus(id: string, data: UpdateCallStatusInput, tenantI
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    // Block "completed" if PARTICULAR has unpaid procedures
-    if (data.status === 'completed' && call.paymentType === 'PARTICULAR') {
+    // Block "completed" if PARTICULAR has unpaid procedures (skip for return appointments)
+    if (data.status === 'completed' && call.paymentType === 'PARTICULAR' && !call.isReturn) {
       const unpaid = await tx.privateProcedureCall.count({
         where: { scheduledCallId: id, paymentStatus: { not: 'paid' } },
       });
@@ -951,8 +972,8 @@ async function updateCallStatus(id: string, data: UpdateCallStatusInput, tenantI
       data: updateData,
     });
 
-    // If completed, create financial entries (revenue + repasse)
-    if (data.status === 'completed' && call.tenantId) {
+    // If completed, create financial entries (revenue + repasse) — skip for return appointments
+    if (data.status === 'completed' && call.tenantId && !call.isReturn) {
       await applyFinancialsForCompletedCall(tx, id, call.tenantId);
     }
 

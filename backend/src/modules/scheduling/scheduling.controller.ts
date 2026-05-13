@@ -153,6 +153,26 @@ router.patch('/calls/:id', authenticate, requireTenant, async (req: Request, res
   return success(res, call);
 });
 
+// GET /calls/:id/return-eligibility — check if a completed call can have a return scheduled
+router.get('/calls/:id/return-eligibility', authenticate, requireTenant, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const tenantId = req.auth!.tenantId!;
+  const call = await prisma.scheduledCall.findUnique({
+    where: { id },
+    include: { returnCall: { select: { id: true } } },
+  }) as any;
+  if (!call || call.tenantId !== tenantId) return success(res, { eligible: false, reason: 'Agendamento nao encontrado' });
+  if (call.status !== 'completed') return success(res, { eligible: false, reason: 'Agendamento nao foi realizado' });
+  if (call.isReturn) return success(res, { eligible: false, reason: 'Nao e possivel agendar retorno de um retorno' });
+  if (call.returnCall) return success(res, { eligible: false, reason: 'Ja existe retorno agendado', hasReturn: true });
+  const settings = await prisma.tenantSettings.findUnique({ where: { tenantId } });
+  const windowDays = settings?.returnWindowDays ?? 30;
+  const deadline = new Date(call.date);
+  deadline.setDate(deadline.getDate() + windowDays);
+  if (new Date() > deadline) return success(res, { eligible: false, reason: 'Prazo de retorno expirado' });
+  return success(res, { eligible: true, deadline: deadline.toISOString().slice(0, 10), windowDays });
+});
+
 // POST /calls/:id/procedures — link TUSS procedures to a realized call (append)
 router.post('/calls/:id/procedures', authenticate, requireTenant, async (req: Request, res: Response, next) => {
   try {

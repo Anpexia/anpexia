@@ -843,6 +843,8 @@ model ScheduledCall {
   confirmationSentAt   DateTime? @map("confirmation_sent_at")
   reminderSentAt       DateTime? @map("reminder_sent_at")
   cancelConfirmPending Boolean  @default(false) @map("cancel_confirm_pending")
+  isReturn             Boolean  @default(false) @map("is_return")
+  originalCallId       String?  @unique @map("original_call_id")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -850,6 +852,8 @@ model ScheduledCall {
   lead       Lead?                    @relation(fields: [leadId], references: [id])
   customer   Customer?                @relation(fields: [customerId], references: [id])
   doctor     User?                    @relation("DoctorScheduledCalls", fields: [doctorId], references: [id])
+  originalCall ScheduledCall?         @relation("ReturnAppointment", fields: [originalCallId], references: [id])
+  returnCall   ScheduledCall?         @relation("ReturnAppointment")
   procedures ScheduledCallProcedure[]
   privateProcedureCalls PrivateProcedureCall[]
 
@@ -858,6 +862,7 @@ model ScheduledCall {
   @@index([customerId])
   @@index([doctorId])
   @@index([checkinAt])
+  @@index([originalCallId])
   @@map("scheduled_calls")
 }
 
@@ -1243,6 +1248,7 @@ model TenantSettings {
   emailLembrete    Boolean @default(true) @map("email_lembrete")
   emailCancelamento Boolean @default(true) @map("email_cancelamento")
   rolePermissions  Json?   @map("role_permissions")
+  returnWindowDays Int     @default(30) @map("return_window_days")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

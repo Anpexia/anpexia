@@ -910,25 +910,26 @@ export function InventoryPage() {
 
       {/* Create/Edit Modal */}
       {(modalMode === 'create' || modalMode === 'edit') && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 pb-4 shrink-0">
               <h3 className="font-semibold text-slate-800">{modalMode === 'create' ? 'Novo produto' : 'Editar produto'}</h3>
               <button onClick={() => { setModalMode('closed'); setScannedCode(''); }} className="text-slate-400 hover:text-slate-500"><X size={20} /></button>
             </div>
+            <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
+              <div className="px-6 pb-4 space-y-4 overflow-y-auto flex-1">
             {modalMode === 'create' && scannedCode && scanSource === 'cosmos' && (
-              <div className="mb-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2">
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2">
                 <Sparkles size={14} className="text-emerald-500" />
                 <span className="text-xs text-emerald-700">Produto encontrado na base Cosmos Bluesoft — codigo <span className="font-mono font-semibold">{scannedCode}</span>. Dados preenchidos automaticamente, edite se necessario.</span>
               </div>
             )}
             {modalMode === 'create' && scannedCode && !scanSource && (
-              <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
                 <Barcode size={14} className="text-amber-500" />
                 <span className="text-xs text-amber-700">Codigo <span className="font-mono font-semibold">{scannedCode}</span> nao encontrado. Preencha manualmente.</span>
               </div>
             )}
-            <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
@@ -1035,7 +1036,8 @@ export function InventoryPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="shrink-0 flex gap-3 p-6 pt-4 border-t border-slate-200 shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
                 <button type="button" onClick={() => setModalMode('closed')} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar'}</button>
               </div>

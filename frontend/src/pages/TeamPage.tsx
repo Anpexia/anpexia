@@ -472,8 +472,8 @@ export function TeamPage() {
       {/* Edit Modal */}
       {editMember && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setEditMember(null)}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 pb-4 shrink-0">
               <h2 className="text-lg font-semibold text-slate-800">Editar Membro</h2>
               <button onClick={() => setEditMember(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
@@ -484,7 +484,7 @@ export function TeamPage() {
               const providerActive = isProviderRole || formIsProvider;
               return providerActive;
             })() && (
-              <div className="border-b border-slate-200 flex gap-1 mb-4 overflow-x-auto">
+              <div className="border-b border-slate-200 flex gap-1 px-6 overflow-x-auto shrink-0 sticky top-0 bg-white z-10 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
                 {([['dados', 'Dados'], ['horarios', 'Horarios'], ['repasse_tuss', 'Repasse TUSS'], ['repasse_particular', 'Repasse Particular']] as const).map(([k, label]) => (
                   <button key={k} onClick={() => { setEditTab(k); setRepasseSearch(''); }}
                     className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${editTab === k ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
@@ -494,7 +494,7 @@ export function TeamPage() {
               </div>
             )}
 
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="space-y-4 overflow-y-auto flex-1 p-6 pt-4">
               {/* Tab: Dados */}
               {editTab === 'dados' && (
                 <>

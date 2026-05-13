@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -92,6 +92,9 @@ interface Appointment {
   convenio?: { id: string; nome: string } | null;
   procedures?: CallProcedure[];
   privateProcedureCalls?: CallPrivateProcedure[];
+  isReturn?: boolean;
+  originalCallId?: string | null;
+  returnCall?: { id: string; date: string; status: string } | null;
   createdAt: string;
 }
 
@@ -294,6 +297,15 @@ export function SchedulingPage() {
   // Toast
   const [toastMsg, setToastMsg] = useState('');
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 4000); };
+
+  // Return appointment
+  const [returnPromptCall, setReturnPromptCall] = useState<Appointment | null>(null);
+  const [returnModalCall, setReturnModalCall] = useState<Appointment | null>(null);
+  const [returnForm, setReturnForm] = useState({ doctorId: '', date: '', time: '', notes: 'Retorno' });
+  const [returnCalMonth, setReturnCalMonth] = useState(() => startOfMonth(new Date()));
+  const [returnSlots, setReturnSlots] = useState<{ time: string; available: boolean }[]>([]);
+  const [loadingReturnSlots, setLoadingReturnSlots] = useState(false);
+  const [savingReturn, setSavingReturn] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -673,6 +685,7 @@ export function SchedulingPage() {
         await api.patch(`/scheduling/calls/${a.id}`, { status: 'completed' });
         showToast('Realizacao confirmada!');
         fetchAppointments(); setAgendaRefresh(r => r + 1);
+        if (!a.isReturn) setReturnPromptCall(a);
       } catch (err: any) {
         showToast(err?.response?.data?.error?.message || 'Erro ao finalizar');
       }
@@ -718,6 +731,7 @@ export function SchedulingPage() {
       }
       await api.patch(`/scheduling/calls/${stockOnlyCall.id}`, { status: 'completed' });
       showToast('Realizacao confirmada!');
+      if (!stockOnlyCall.isReturn) setReturnPromptCall(stockOnlyCall);
       setStockOnlyCall(null);
       fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) {
@@ -938,6 +952,9 @@ export function SchedulingPage() {
             ? 'Procedimentos registrados!'
             : 'Realizacao confirmada!',
       );
+      if (!tussEditMode && !tussAlreadyCompleted && tussModalCall && !tussModalCall.isReturn) {
+        setReturnPromptCall(tussModalCall);
+      }
       setTussModalCall(null);
       fetchAppointments(); setAgendaRefresh(r => r + 1);
     } catch (err: any) {
@@ -1217,7 +1234,7 @@ export function SchedulingPage() {
     }
   };
 
-  const activeStatuses = new Set(['scheduled', 'confirmed', 'awaiting_payment', 'present', 'in_attendance', 'attended']);
+  const activeStatuses = new Set(['scheduled', 'confirmed', 'awaiting_payment', 'present', 'in_attendance', 'attended', 'completed']);
 
   const agendaActive = useMemo(() => agendaAppointments.filter(a => activeStatuses.has(a.status)), [agendaAppointments]);
 
@@ -1263,8 +1280,67 @@ export function SchedulingPage() {
 
   const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
-  const renderAppointmentCard = (a: Appointment) => (
-    <div key={a.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+  const openReturnModal = (a: Appointment) => {
+    setReturnModalCall(a);
+    setReturnForm({ doctorId: a.doctorId || '', date: '', time: '', notes: 'Retorno' });
+    setReturnCalMonth(startOfMonth(new Date()));
+    setReturnSlots([]);
+  };
+
+  const handleBookReturn = async () => {
+    if (!returnModalCall || !returnForm.date || !returnForm.time) return;
+    setSavingReturn(true);
+    try {
+      await api.post('/scheduling/book', {
+        name: returnModalCall.customer?.name || returnModalCall.name,
+        phone: returnModalCall.customer?.phone || returnModalCall.phone,
+        email: returnModalCall.customer?.email || returnModalCall.email || undefined,
+        date: returnForm.date,
+        time: returnForm.time,
+        notes: returnForm.notes || 'Retorno',
+        customerId: returnModalCall.customerId || undefined,
+        doctorId: returnForm.doctorId || undefined,
+        isReturn: true,
+        originalCallId: returnModalCall.id,
+      });
+      showToast('Retorno agendado com sucesso!');
+      setReturnModalCall(null);
+      fetchAppointments();
+      setAgendaRefresh(r => r + 1);
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao agendar retorno');
+    } finally {
+      setSavingReturn(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!returnModalCall || !returnForm.doctorId || !returnForm.date) {
+      setReturnSlots([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingReturnSlots(true);
+    api.get(`/scheduling/available-slots/${returnForm.date}`, {
+      params: { doctorId: returnForm.doctorId },
+    })
+      .then(({ data }) => { if (!cancelled) setReturnSlots(data.data || []); })
+      .catch(() => { if (!cancelled) setReturnSlots([]); })
+      .finally(() => { if (!cancelled) setLoadingReturnSlots(false); });
+    return () => { cancelled = true; };
+  }, [returnModalCall, returnForm.doctorId, returnForm.date]);
+
+  const isReturnEligible = (a: Appointment) => {
+    if (a.status !== 'completed' || a.isReturn || a.returnCall) return false;
+    const deadline = new Date(a.date);
+    deadline.setDate(deadline.getDate() + 30);
+    return new Date() <= deadline;
+  };
+
+  const renderAppointmentCard = (a: Appointment) => {
+    const isCompleted = a.status === 'completed';
+    return (
+    <div key={a.id} className={`rounded-xl border shadow-sm p-4 space-y-3 ${isCompleted ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200'}`}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-start gap-4">
           <div className="bg-[#EFF6FF] rounded-lg p-3 text-center min-w-[60px]">
@@ -1280,8 +1356,15 @@ export function SchedulingPage() {
               ) : (
                 <span className="font-medium text-slate-800">{a.name}</span>
               )}
+              {a.isReturn && (
+                <span className="text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium flex items-center gap-1"><RotateCcw size={10} />Retorno</span>
+              )}
+              {a.returnCall && (
+                <span className="text-xs bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded">Retorno em {format(new Date(a.returnCall.date), 'dd/MM')}</span>
+              )}
               {(() => {
                 const pt = a.paymentType || 'PARTICULAR';
+                if (pt === 'RETURN') return null;
                 if (pt === 'CONVENIO') {
                   const nome = a.convenio?.nome || (a.convenioId ? conveniosLookup[a.convenioId]?.nome : null) || 'Convenio';
                   return <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{nome}</span>;
@@ -1339,27 +1422,33 @@ export function SchedulingPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {a.status === 'scheduled' && (
+          {isCompleted && isReturnEligible(a) && (
+            <button onClick={() => openReturnModal(a)} className="px-3 py-1.5 bg-sky-50 text-sky-700 rounded-lg text-xs font-medium hover:bg-sky-100 flex items-center gap-1"><RotateCcw size={14} />Agendar Retorno</button>
+          )}
+          {isCompleted && !isReturnEligible(a) && (
+            <span className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-xs">Realizado</span>
+          )}
+          {!isCompleted && a.status === 'scheduled' && (
             <button onClick={() => handleStatusChange(a.id, 'confirmed')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 flex items-center gap-1"><Check size={14} />Confirmar</button>
           )}
-          {a.status === 'confirmed' && a.paymentType === 'PARTICULAR' && (
+          {!isCompleted && a.status === 'confirmed' && a.paymentType === 'PARTICULAR' && (
             <button onClick={async () => { const ok = await handleStatusChange(a.id, 'awaiting_payment'); if (ok) openPaymentModal(a.id); }} disabled={updatingId === a.id} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1">Efetuar pagamento</button>
           )}
-          {a.status === 'confirmed' && a.paymentType !== 'PARTICULAR' && (
+          {!isCompleted && a.status === 'confirmed' && a.paymentType !== 'PARTICULAR' && (
             <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1"><UserCheck size={14} />Presente</button>
           )}
-          {a.status === 'awaiting_payment' && (
+          {!isCompleted && a.status === 'awaiting_payment' && (
             <button onClick={() => openPaymentModal(a.id)} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1 animate-pulse">Efetuar pagamento</button>
           )}
-          {canRevert && (a.status === 'confirmed' || a.status === 'awaiting_payment' || a.status === 'present' || a.status === 'attended') && (
+          {!isCompleted && canRevert && (a.status === 'confirmed' || a.status === 'awaiting_payment' || a.status === 'present' || a.status === 'attended') && (
             <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
               <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : a.status === 'attended' ? 'Desfazer atendido' : a.status === 'awaiting_payment' ? 'Desfazer presenca' : 'Desconfirmar'}
             </button>
           )}
-          {a.status === 'in_attendance' && (
+          {!isCompleted && a.status === 'in_attendance' && (
             <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium flex items-center gap-1">Em atendimento...</span>
           )}
-          {a.status === 'attended' && (
+          {!isCompleted && a.status === 'attended' && (
             <>
               <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1 animate-pulse"><Check size={14} />Realizado</button>
               {a.paymentType === 'PARTICULAR' && (
@@ -1370,13 +1459,13 @@ export function SchedulingPage() {
           {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && a.status !== 'awaiting_payment' && (
             <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">Realizado</button>
           )}
-          {a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && (
+          {!isCompleted && a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && (
             <button onClick={() => handleStatusChange(a.id, 'no_show')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1"><AlertTriangle size={14} />Faltou</button>
           )}
-          {a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && (
+          {!isCompleted && a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && (
             <button onClick={() => handleCancel(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1"><XCircle size={14} />Cancelar</button>
           )}
-          {canRevert && (
+          {!isCompleted && canRevert && (
             <button onClick={() => setDeleteConfirmId(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1" title="Excluir permanentemente"><Trash2 size={14} />Excluir</button>
           )}
         </div>
@@ -1385,7 +1474,8 @@ export function SchedulingPage() {
         <StatusTimeline status={a.status} />
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div>
@@ -1680,8 +1770,15 @@ export function SchedulingPage() {
                               ) : (
                                 <span className="text-sm font-medium text-slate-800 truncate">{a.name}</span>
                               )}
+                              {a.isReturn && (
+                                <span className="text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium flex items-center gap-1"><RotateCcw size={10} />Retorno</span>
+                              )}
+                              {a.returnCall && (
+                                <span className="text-xs bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded">Retorno em {format(new Date(a.returnCall.date), 'dd/MM')}</span>
+                              )}
                               {(() => {
                                 const pt = a.paymentType || 'PARTICULAR';
+                                if (pt === 'RETURN') return null;
                                 if (pt === 'CONVENIO') {
                                   const nome = a.convenio?.nome || (a.convenioId ? conveniosLookup[a.convenioId]?.nome : null) || 'Convenio';
                                   return (
@@ -1757,6 +1854,14 @@ export function SchedulingPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
+                            {isRealized && isReturnEligible(a) && (
+                              <button
+                                onClick={() => openReturnModal(a)}
+                                className="px-2 py-1 text-xs font-medium rounded bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 flex items-center gap-1"
+                              >
+                                <RotateCcw size={12} />Retorno
+                              </button>
+                            )}
                             {isRealized && !hasProcs && a.paymentType !== 'PARTICULAR' && (
                               <button
                                 onClick={() => openRegistrarTussForExisting(a)}
@@ -2104,13 +2209,14 @@ export function SchedulingPage() {
 
       {/* Book Modal */}
       {showBookModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-md p-6 my-8">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 pb-4 shrink-0">
               <h3 className="font-semibold text-slate-800">Novo agendamento</h3>
               <button onClick={() => setShowBookModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
-            <form onSubmit={handleBook} className="space-y-4">
+            <form onSubmit={handleBook} className="flex flex-col flex-1 min-h-0">
+              <div className="px-6 pb-4 space-y-4 overflow-y-auto flex-1">
               {/* Customer Search */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Buscar paciente</label>
@@ -2356,7 +2462,8 @@ export function SchedulingPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Observacoes</label>
                 <textarea value={bookForm.notes} onChange={(e) => setBookForm({ ...bookForm, notes: e.target.value })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Retorno, primeira consulta..." />
               </div>
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="shrink-0 flex gap-3 p-6 pt-4 border-t border-slate-200 shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
                 <button type="button" onClick={() => setShowBookModal(false)} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Agendando...' : 'Agendar'}</button>
               </div>
@@ -2370,37 +2477,41 @@ export function SchedulingPage() {
         const totalMaterialCount = Object.values(tussAllMaterials).reduce((sum, { tpl, extra }) => sum + tpl.length + extra.length, 0);
         const validItems = tussItems.filter(it => it.procedureId);
         return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-slate-800">
-                {tussEditMode ? 'Editar procedimentos TUSS' : 'Confirmar Realização'}
-              </h3>
-              <button onClick={() => setTussModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+            <div className="shrink-0">
+              <div className="flex items-center justify-between p-6 pb-2">
+                <h3 className="font-semibold text-slate-800">
+                  {tussEditMode ? 'Editar procedimentos TUSS' : 'Confirmar Realização'}
+                </h3>
+                <button onClick={() => setTussModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+              </div>
+              <p className="text-xs text-slate-500 px-6 pb-3">
+                Paciente: <strong>{tussModalCall.customer?.name || tussModalCall.name}</strong> — {format(new Date(tussModalCall.date), 'dd/MM/yyyy HH:mm')}
+                {tussModalCall.doctor && <> · Medico: <strong>{tussModalCall.doctor.name}</strong></>}
+              </p>
+
+              {tussModalError && (
+                <div className="mx-6 mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  {tussModalError}
+                </div>
+              )}
+
+              {tussHasMaterials && (
+                <div className="flex border-b border-slate-200 px-6 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
+                  <button type="button" onClick={() => setTussTab('tuss')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'tuss' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                    TUSS
+                  </button>
+                  <button type="button" onClick={() => setTussTab('estoque')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                    Estoque ({totalMaterialCount})
+                  </button>
+                </div>
+              )}
             </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Paciente: <strong>{tussModalCall.customer?.name || tussModalCall.name}</strong> — {format(new Date(tussModalCall.date), 'dd/MM/yyyy HH:mm')}
-              {tussModalCall.doctor && <> · Medico: <strong>{tussModalCall.doctor.name}</strong></>}
-            </p>
 
-            {tussModalError && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {tussModalError}
-              </div>
-            )}
-
-            {tussHasMaterials && (
-              <div className="flex border-b border-slate-200 mb-4 -mx-1">
-                <button type="button" onClick={() => setTussTab('tuss')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'tuss' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-                  TUSS
-                </button>
-                <button type="button" onClick={() => setTussTab('estoque')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${tussTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-                  Estoque ({totalMaterialCount})
-                </button>
-              </div>
-            )}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
 
             {tussLoadingList ? (
               <div className="flex items-center justify-center py-10">
@@ -2570,7 +2681,8 @@ export function SchedulingPage() {
               </div>
             )}
 
-            <div className="flex gap-2 pt-4 mt-2 border-t border-slate-100">
+            </div>
+            <div className="shrink-0 flex gap-2 p-6 pt-4 border-t border-slate-200 shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
               <button onClick={() => setTussModalCall(null)}
                 className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">
                 Cancelar
@@ -2603,39 +2715,43 @@ export function SchedulingPage() {
         const totalPartMaterialCount = Object.values(partAllMaterials).reduce((sum, { tpl, extra }) => sum + tpl.length + extra.length, 0);
         const validPartItems = partItems.filter(it => it.procedureId);
         return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-slate-800">
-                {partRetro ? 'Registrar Procedimentos Particulares' : 'Confirmar Realizacao — Particular'}
-              </h3>
-              <button onClick={() => setPartModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-            </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Paciente: <strong>{partModalCall.customer?.name || partModalCall.name}</strong> — {format(new Date(partModalCall.date), 'dd/MM/yyyy HH:mm')}
-              {partModalCall.doctor && <> · Medico: <strong>{partModalCall.doctor.name}</strong></>}
-            </p>
-
-            {partError && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{partError}</div>
-            )}
-
-            {partHasMaterials && (
-              <div className="flex border-b border-slate-200 mb-4 -mx-1">
-                <button type="button" onClick={() => setPartTab('procedimento')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'procedimento' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-                  Procedimentos
-                </button>
-                <button type="button" onClick={() => setPartTab('estoque')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-                  Estoque {totalPartMaterialCount > 0 && (
-                    <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-[#1E3A5F] text-white rounded-full">
-                      {totalPartMaterialCount}
-                    </span>
-                  )}
-                </button>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+            <div className="shrink-0">
+              <div className="flex items-center justify-between p-6 pb-2">
+                <h3 className="font-semibold text-slate-800">
+                  {partRetro ? 'Registrar Procedimentos Particulares' : 'Confirmar Realizacao — Particular'}
+                </h3>
+                <button onClick={() => setPartModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
               </div>
-            )}
+              <p className="text-xs text-slate-500 px-6 pb-3">
+                Paciente: <strong>{partModalCall.customer?.name || partModalCall.name}</strong> — {format(new Date(partModalCall.date), 'dd/MM/yyyy HH:mm')}
+                {partModalCall.doctor && <> · Medico: <strong>{partModalCall.doctor.name}</strong></>}
+              </p>
+
+              {partError && (
+                <div className="mx-6 mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{partError}</div>
+              )}
+
+              {partHasMaterials && (
+                <div className="flex border-b border-slate-200 px-6 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
+                  <button type="button" onClick={() => setPartTab('procedimento')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'procedimento' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                    Procedimentos
+                  </button>
+                  <button type="button" onClick={() => setPartTab('estoque')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 ${partTab === 'estoque' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                    Estoque {totalPartMaterialCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs bg-[#1E3A5F] text-white rounded-full">
+                        {totalPartMaterialCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
 
             {partLoading ? (
               <div className="flex items-center justify-center py-10">
@@ -2809,7 +2925,8 @@ export function SchedulingPage() {
               </div>
             )}
 
-            <div className="flex gap-2 pt-4 mt-2 border-t border-slate-100">
+            </div>
+            <div className="shrink-0 flex gap-2 p-6 pt-4 border-t border-slate-200 shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
               <button onClick={() => setPartModalCall(null)}
                 className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">
                 Cancelar
@@ -3194,6 +3311,199 @@ export function SchedulingPage() {
           </div>
         </div>
       )}
+
+      {/* Return prompt dialog */}
+      {returnPromptCall && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm p-6 text-center space-y-4">
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+              <Check size={24} className="text-emerald-600" />
+            </div>
+            <h3 className="font-semibold text-slate-800 text-lg">Consulta finalizada!</h3>
+            <p className="text-sm text-slate-600">O paciente deseja agendar retorno?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setReturnPromptCall(null)}
+                className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Nao
+              </button>
+              <button
+                onClick={() => { openReturnModal(returnPromptCall); setReturnPromptCall(null); }}
+                className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A]"
+              >
+                Sim, agendar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return booking modal */}
+      {returnModalCall && (() => {
+        const selectedDoc = doctors.find(d => d.id === returnForm.doctorId);
+        const docHorarios = selectedDoc?.horarios || null;
+        const DAY_MAP: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+        const calStart = startOfWeek(startOfMonth(returnCalMonth), { weekStartsOn: 0 });
+        const calEnd = endOfWeek(endOfMonth(returnCalMonth), { weekStartsOn: 0 });
+        const calDays: Date[] = [];
+        let d = calStart;
+        while (d <= calEnd) { calDays.push(d); d = addDays(d, 1); }
+        const today = new Date();
+        const deadline = new Date(returnModalCall.date);
+        deadline.setDate(deadline.getDate() + 30);
+
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl w-full max-w-md flex flex-col max-h-[90vh]">
+              <div className="flex items-center justify-between p-6 pb-4 shrink-0">
+                <div>
+                  <h3 className="font-semibold text-slate-800">Agendar Retorno</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Prazo ate {format(deadline, 'dd/MM/yyyy')}</p>
+                </div>
+                <button onClick={() => setReturnModalCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+              </div>
+              <div className="px-6 pb-4 space-y-4 overflow-y-auto flex-1">
+                {/* Patient info (locked) */}
+                <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <RotateCcw size={16} className="text-sky-600" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{returnModalCall.customer?.name || returnModalCall.name}</p>
+                      <p className="text-xs text-slate-500">{returnModalCall.customer?.phone || returnModalCall.phone}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Doctor select */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Medico</label>
+                  <select
+                    value={returnForm.doctorId}
+                    onChange={(e) => setReturnForm(prev => ({ ...prev, doctorId: e.target.value, date: '', time: '' }))}
+                    className={inputCls}
+                  >
+                    <option value="">Selecione o medico</option>
+                    {doctors.map((doc) => (
+                      <option key={doc.id} value={doc.id}>
+                        {doc.name}{doc.especialidade ? ` — ${doc.especialidade}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Calendar */}
+                {returnForm.doctorId ? (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Data *</label>
+                    <div className="border border-slate-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <button type="button" onClick={() => setReturnCalMonth(m => subMonths(m, 1))} className="p-1 hover:bg-slate-100 rounded"><ChevronLeft size={16} /></button>
+                        <span className="text-sm font-semibold text-slate-700 capitalize">{format(returnCalMonth, 'MMMM yyyy', { locale: ptBR })}</span>
+                        <button type="button" onClick={() => setReturnCalMonth(m => addMonths(m, 1))} className="p-1 hover:bg-slate-100 rounded"><ChevronRight size={16} /></button>
+                      </div>
+                      <div className="grid grid-cols-7 text-center text-xs text-slate-400 mb-1">
+                        {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((l, i) => <span key={i}>{l}</span>)}
+                      </div>
+                      <div className="grid grid-cols-7 gap-0.5">
+                        {calDays.map((day, i) => {
+                          const dateStr = format(day, 'yyyy-MM-dd');
+                          const inMonth = isSameMonth(day, returnCalMonth);
+                          const isPast = isBefore(day, today) && !isToday(day);
+                          const isAfterDeadline = day > deadline;
+                          const isDisabled = isPast || isAfterDeadline;
+                          const isSelected = returnForm.date === dateStr;
+                          const dayKey = DAY_MAP[day.getDay()];
+                          const doctorWorksThisDay = docHorarios ? !!(docHorarios[dayKey] as DoctorHorario | undefined)?.ativo : false;
+
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => setReturnForm(prev => ({ ...prev, date: dateStr, time: '' }))}
+                              className={`text-xs py-1.5 rounded transition-colors ${
+                                !inMonth ? 'text-slate-300' :
+                                isDisabled ? 'text-slate-300 cursor-not-allowed' :
+                                isSelected ? 'bg-[#1E3A5F] text-white font-bold' :
+                                doctorWorksThisDay ? 'bg-blue-100 text-blue-800 font-medium hover:bg-blue-200' :
+                                'text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              {format(day, 'd')}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {returnForm.date && (
+                        <p className="text-xs text-slate-500 mt-2 text-center">
+                          Selecionado: {format(new Date(returnForm.date + 'T12:00:00'), 'dd/MM/yyyy')}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Slot picker */}
+                    {returnForm.date && (
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Horario *</label>
+                        {loadingReturnSlots ? (
+                          <p className="text-xs text-slate-500">Carregando horarios...</p>
+                        ) : returnSlots.length === 0 ? (
+                          <p className="text-xs text-amber-600">Nenhum horario disponivel neste dia para este medico.</p>
+                        ) : (
+                          <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
+                            {returnSlots.map(slot => (
+                              <button
+                                key={slot.time}
+                                type="button"
+                                disabled={!slot.available}
+                                onClick={() => setReturnForm(prev => ({ ...prev, time: slot.time }))}
+                                className={`text-xs py-1.5 px-1 rounded transition-colors ${
+                                  !slot.available ? 'bg-slate-100 text-slate-400 line-through cursor-not-allowed' :
+                                  returnForm.time === slot.time ? 'bg-[#1E3A5F] text-white font-bold' :
+                                  'bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300'
+                                }`}
+                              >
+                                {slot.time}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center">
+                    <Calendar size={20} className="mx-auto text-slate-400 mb-1" />
+                    <p className="text-xs text-slate-500">Selecione o medico para ver datas e horarios disponiveis</p>
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Observacoes</label>
+                  <textarea
+                    value={returnForm.notes}
+                    onChange={(e) => setReturnForm(prev => ({ ...prev, notes: e.target.value }))}
+                    className={inputCls + ' h-16 resize-none'}
+                    placeholder="Retorno"
+                  />
+                </div>
+              </div>
+              <div className="shrink-0 flex gap-3 p-6 pt-4 border-t border-slate-200 shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
+                <button onClick={() => setReturnModalCall(null)} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button
+                  onClick={handleBookReturn}
+                  disabled={savingReturn || !returnForm.date || !returnForm.time}
+                  className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50"
+                >
+                  {savingReturn ? 'Agendando...' : 'Agendar Retorno'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {toastMsg && (
         <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-lg shadow-lg text-sm z-[9999] max-w-sm">

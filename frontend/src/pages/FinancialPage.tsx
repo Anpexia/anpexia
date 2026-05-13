@@ -1155,8 +1155,8 @@ export function FinancialPage() {
       {/* ==================== MODAL: TRANSACTION ==================== */}
       {txModal !== 'closed' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 shrink-0">
               <h2 className="text-lg font-semibold text-slate-800">
                 {txModal === 'edit' ? 'Editar Lançamento' : 'Novo Lançamento'}
               </h2>
@@ -1167,7 +1167,8 @@ export function FinancialPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSaveTx} className="p-4 space-y-4">
+            <form onSubmit={handleSaveTx} className="flex flex-col flex-1 min-h-0">
+              <div className="p-4 space-y-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
@@ -1280,7 +1281,8 @@ export function FinancialPage() {
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              </div>
+              <div className="shrink-0 flex justify-end gap-3 p-4 border-t border-slate-200 shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
                 <button
                   type="button"
                   onClick={() => { setTxModal('closed'); setTxForm(emptyTxForm); setEditingTxId(null); }}

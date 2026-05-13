@@ -12,6 +12,8 @@ export const bookCallSchema = z.object({
   paymentType: z.enum(['PARTICULAR', 'CONVENIO']).optional(),
   convenioId: z.string().optional().nullable(),
   privateProcedureId: z.string().optional().nullable(),
+  isReturn: z.boolean().optional(),
+  originalCallId: z.string().optional().nullable(),
 });
 
 export const linkProceduresSchema = z.object({
