@@ -93,6 +93,7 @@ interface Appointment {
   procedures?: CallProcedure[];
   privateProcedureCalls?: CallPrivateProcedure[];
   isReturn?: boolean;
+  isEncaixe?: boolean;
   originalCallId?: string | null;
   returnCall?: { id: string; date: string; status: string } | null;
   createdAt: string;
@@ -188,6 +189,7 @@ export function SchedulingPage() {
   const [bookPaymentType, setBookPaymentType] = useState<'PARTICULAR' | 'CONVENIO'>('PARTICULAR');
   const [bookConvenioId, setBookConvenioId] = useState<string>('');
   const [bookProcedureId, setBookProcedureId] = useState<string>('');
+  const [bookEncaixe, setBookEncaixe] = useState(false);
   // Private procedures list (for booking PARTICULAR)
   interface BookPrivProc { id: string; name: string; value: number | null; type: string }
   const [bookPrivProcedures, setBookPrivProcedures] = useState<BookPrivProc[]>([]);
@@ -526,6 +528,7 @@ export function SchedulingPage() {
     setSelectedBookCustomer(null);
     setCustomerSearch('');
     resetPaymentState();
+    setBookEncaixe(false);
     setShowBookModal(true);
   };
 
@@ -534,6 +537,7 @@ export function SchedulingPage() {
     setSelectedBookCustomer(null);
     setCustomerSearch('');
     resetPaymentState();
+    setBookEncaixe(false);
     setShowBookModal(true);
   };
 
@@ -642,6 +646,7 @@ export function SchedulingPage() {
         customerId: bookForm.customerId || undefined,
         doctorId: bookForm.doctorId,
         paymentType: bookPaymentType,
+        isEncaixe: bookEncaixe || undefined,
       };
       if (bookPaymentType === 'CONVENIO') {
         payload.convenioId = bookConvenioId;
@@ -1383,7 +1388,7 @@ export function SchedulingPage() {
   const renderAppointmentCard = (a: Appointment) => {
     const isCompleted = a.status === 'completed';
     return (
-    <div key={a.id} className={`rounded-xl border shadow-sm p-4 space-y-3 ${isCompleted ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200'}`}>
+    <div key={a.id} className={`rounded-xl border shadow-sm p-4 space-y-3 ${isCompleted ? 'bg-slate-50 border-slate-200 opacity-60' : a.isEncaixe ? 'bg-orange-50/30 border-orange-300' : 'bg-white border-slate-200'}`}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-start gap-4">
           <div className="bg-[#EFF6FF] rounded-lg p-3 text-center min-w-[60px]">
@@ -1398,6 +1403,9 @@ export function SchedulingPage() {
                 </button>
               ) : (
                 <span className="font-medium text-slate-800">{a.name}</span>
+              )}
+              {a.isEncaixe && (
+                <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>
               )}
               {a.isReturn && (
                 <span className="text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium flex items-center gap-1"><RotateCcw size={10} />Retorno</span>
@@ -1812,6 +1820,9 @@ export function SchedulingPage() {
                                 </button>
                               ) : (
                                 <span className="text-sm font-medium text-slate-800 truncate">{a.name}</span>
+                              )}
+                              {a.isEncaixe && (
+                                <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>
                               )}
                               {a.isReturn && (
                                 <span className="text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium flex items-center gap-1"><RotateCcw size={10} />Retorno</span>
@@ -2470,31 +2481,56 @@ export function SchedulingPage() {
                       </p>
                     </div>
 
-                    {/* Slot picker */}
+                    {/* Encaixe toggle + Slot picker */}
                     {bookForm.date && (
-                      <div className="mt-3">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Horario *</label>
-                        {loadingBookSlots ? (
-                          <p className="text-xs text-slate-500">Carregando horarios...</p>
-                        ) : bookSlots.length === 0 ? (
-                          <p className="text-xs text-amber-600">Nenhum horario disponivel neste dia para este medico.</p>
+                      <div className="mt-3 space-y-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={bookEncaixe}
+                            onChange={(e) => { setBookEncaixe(e.target.checked); setBookForm(prev => ({ ...prev, time: '' })); }}
+                            className="rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                          />
+                          <span className="text-sm font-medium text-orange-600">Encaixe</span>
+                          <span className="text-xs text-slate-400">— horario livre, sem bloquear agenda</span>
+                        </label>
+                        {bookEncaixe ? (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Horario do encaixe *</label>
+                            <input
+                              type="time"
+                              value={bookForm.time}
+                              onChange={(e) => setBookForm(prev => ({ ...prev, time: e.target.value }))}
+                              className={inputCls}
+                              required
+                            />
+                          </div>
                         ) : (
-                          <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
-                            {bookSlots.map(slot => (
-                              <button
-                                key={slot.time}
-                                type="button"
-                                disabled={!slot.available}
-                                onClick={() => setBookForm(prev => ({ ...prev, time: slot.time }))}
-                                className={`text-xs py-1.5 px-1 rounded transition-colors ${
-                                  !slot.available ? 'bg-slate-100 text-slate-400 line-through cursor-not-allowed' :
-                                  bookForm.time === slot.time ? 'bg-[#1E3A5F] text-white font-bold' :
-                                  'bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300'
-                                }`}
-                              >
-                                {slot.time}
-                              </button>
-                            ))}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Horario *</label>
+                            {loadingBookSlots ? (
+                              <p className="text-xs text-slate-500">Carregando horarios...</p>
+                            ) : bookSlots.length === 0 ? (
+                              <p className="text-xs text-amber-600">Nenhum horario disponivel neste dia para este medico.</p>
+                            ) : (
+                              <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
+                                {bookSlots.map(slot => (
+                                  <button
+                                    key={slot.time}
+                                    type="button"
+                                    disabled={!slot.available}
+                                    onClick={() => setBookForm(prev => ({ ...prev, time: slot.time }))}
+                                    className={`text-xs py-1.5 px-1 rounded transition-colors ${
+                                      !slot.available ? 'bg-slate-100 text-slate-400 line-through cursor-not-allowed' :
+                                      bookForm.time === slot.time ? 'bg-[#1E3A5F] text-white font-bold' :
+                                      'bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300'
+                                    }`}
+                                  >
+                                    {slot.time}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

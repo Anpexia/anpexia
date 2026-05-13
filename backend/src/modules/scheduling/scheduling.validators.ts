@@ -14,6 +14,7 @@ export const bookCallSchema = z.object({
   privateProcedureId: z.string().optional().nullable(),
   isReturn: z.boolean().optional(),
   originalCallId: z.string().optional().nullable(),
+  isEncaixe: z.boolean().optional(),
 });
 
 export const linkProceduresSchema = z.object({

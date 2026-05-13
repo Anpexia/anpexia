@@ -16,6 +16,8 @@ interface QueueItem {
   customerId: string | null;
   customer: { id: string; name: string; phone: string } | null;
   doctor: { id: string; name: string } | null;
+  isEncaixe?: boolean;
+  isReturn?: boolean;
 }
 
 interface Doctor {
@@ -271,7 +273,7 @@ export function FilaPage() {
                             {index + 1}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}</p>
+                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               <span className="flex items-center gap-1"><Clock size={11} /> Agendado: {formatTime(item.date)}</span>
                               {item.checkinAt && <span className="flex items-center gap-1"><UserCheck size={11} /> Chegou: {formatTime(item.checkinAt)}</span>}
@@ -317,7 +319,7 @@ export function FilaPage() {
                             <UserCheck size={16} className="text-blue-600" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}</p>
+                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               <span>Agendado: {formatTime(item.date)}</span>
                               {item.checkinAt && <span>Chegou: {formatTime(item.checkinAt)}</span>}
@@ -366,7 +368,7 @@ export function FilaPage() {
                             <Stethoscope size={16} className="text-emerald-600" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}</p>
+                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               <span>Agendado: {formatTime(item.date)}</span>
                               {item.calledAt && <span className="text-emerald-600 font-medium">Iniciado: {formatTime(item.calledAt)}</span>}
@@ -404,7 +406,7 @@ export function FilaPage() {
                             <CheckCircle2 size={16} className="text-emerald-600" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}</p>
+                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               <span>Agendado: {formatTime(item.date)}</span>
                               {item.checkinAt && <span>Chegou: {formatTime(item.checkinAt)}</span>}
@@ -472,7 +474,7 @@ export function FilaPage() {
                   <tbody className="divide-y divide-slate-100">
                     {historyItems.map(item => (
                       <tr key={item.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium text-slate-800">{item.customer?.name || item.name}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</td>
                         <td className="px-4 py-3 text-slate-600">{item.doctor?.name || '-'}</td>
                         <td className="px-4 py-3 text-slate-600">{new Date(item.date).toLocaleDateString('pt-BR')} {formatTime(item.date)}</td>
                         <td className="px-4 py-3 text-slate-600">{item.checkinAt ? formatTime(item.checkinAt) : '-'}</td>

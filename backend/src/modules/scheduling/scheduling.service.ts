@@ -295,6 +295,7 @@ async function getAvailableSlots(date: string, doctorId?: string | null, tenantI
   const where: any = {
     date: { gte: startOfDay, lte: endOfDay },
     status: { notIn: ['cancelled', 'no_show'] },
+    isEncaixe: false,
   };
   if (tenantId) where.tenantId = tenantId;
   if (doctorId) where.doctorId = doctorId;
@@ -400,9 +401,11 @@ async function getAvailableDates(tenantId?: string | null) {
 
 // Book a call — auto-link to Customer by phone
 async function bookCall(data: BookCallInput, tenantId?: string | null) {
+  const isEncaixe = !!data.isEncaixe;
+
   // If no time specified, pick the first available pre-generated slot for UI compat
   let time = data.time;
-  if (!time) {
+  if (!time && !isEncaixe) {
     const slots = await getAvailableSlots(data.date, data.doctorId, tenantId);
     const firstAvailable = slots.find((s) => s.available);
     if (!firstAvailable) {
@@ -410,14 +413,27 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     }
     time = firstAvailable.time;
   }
+  if (!time) {
+    throw new AppError(400, 'MISSING_TIME', 'Horário é obrigatório para encaixe');
+  }
 
-  // Validate against tenant working hours + per-doctor conflict (no pre-generated slot grid)
-  const { durationMin } = await validateBookingWithinHours({
-    tenantId,
-    date: data.date,
-    time,
-    doctorId: data.doctorId,
-  });
+  let durationMin = 30;
+  if (isEncaixe) {
+    // Encaixe: skip slot validation, just get duration for the appointment
+    if (data.doctorId) {
+      const doc = await prisma.user.findUnique({ where: { id: data.doctorId }, select: { duracaoConsulta: true } });
+      if (doc?.duracaoConsulta) durationMin = doc.duracaoConsulta;
+    }
+  } else {
+    // Regular: validate against tenant working hours + per-doctor conflict
+    const result = await validateBookingWithinHours({
+      tenantId,
+      date: data.date,
+      time,
+      doctorId: data.doctorId,
+    });
+    durationMin = result.durationMin;
+  }
 
   // Build datetime — interpret time as São Paulo (UTC-3)
   const callDate = new Date(`${data.date}T${time}:00${SP_OFFSET}`);
@@ -499,6 +515,7 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
         paymentType,
         convenioId: convenioId ?? undefined,
         isReturn,
+        isEncaixe,
         originalCallId: isReturn ? data.originalCallId! : undefined,
       },
     });
