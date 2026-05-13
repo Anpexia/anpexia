@@ -1479,6 +1479,11 @@ export function SchedulingPage() {
           {isCompleted && !isReturnEligible(a) && (
             <span className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-xs">Realizado</span>
           )}
+          {isCompleted && canRevert && (
+            <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
+              <Undo2 size={14} />Desfazer realizado
+            </button>
+          )}
           {!isCompleted && a.status === 'scheduled' && (
             <button onClick={() => handleStatusChange(a.id, 'confirmed')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 flex items-center gap-1"><Check size={14} />Confirmar</button>
           )}

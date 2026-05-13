@@ -253,6 +253,10 @@ router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRol
       const updateData: any = { status: newStatus };
       if (call.status === 'present') {
         updateData.checkinAt = null;
+        await tx.privateProcedureCall.updateMany({
+          where: { scheduledCallId: id },
+          data: { paymentStatus: 'pending', paymentMethod: null, paidAt: null, discountPercent: 0, finalAmount: null },
+        });
       }
       if (newStatus === 'confirmed' || newStatus === 'scheduled') {
         updateData.calledAt = null;
