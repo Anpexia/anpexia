@@ -484,7 +484,7 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
       where,
       include: {
         customer: { select: { id: true, name: true, phone: true } },
-        doctor: { select: { id: true, name: true } },
+        doctor: { select: { id: true, name: true, salas: true } },
       },
       orderBy: { date: 'asc' },
     });
@@ -574,7 +574,7 @@ router.get('/queue/history', authenticate, requireTenant, async (req: Request, r
       where,
       include: {
         customer: { select: { id: true, name: true, phone: true } },
-        doctor: { select: { id: true, name: true } },
+        doctor: { select: { id: true, name: true, salas: true } },
       },
       orderBy: { checkinAt: 'desc' },
       take: 200,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw, DoorOpen } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -88,7 +88,7 @@ interface Appointment {
   checkinAt: string | null;
   calledAt: string | null;
   customer: { id: string; name: string; phone: string; email: string | null } | null;
-  doctor: { id: string; name: string } | null;
+  doctor: { id: string; name: string; salas?: Record<string, { manha: string | null; tarde: string | null }> | null } | null;
   convenio?: { id: string; nome: string } | null;
   procedures?: CallProcedure[];
   privateProcedureCalls?: CallPrivateProcedure[];
@@ -215,6 +215,20 @@ export function SchedulingPage() {
 
   // Doctors
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [roomsMap, setRoomsMap] = useState<Record<string, string>>({});
+
+  const DAY_KEYS_SCHED = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+  const getRoomName = (a: Appointment): string | null => {
+    if (!a.doctor?.salas) return null;
+    const d = new Date(a.date);
+    const sp = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+    const dayKey = DAY_KEYS_SCHED[sp.getUTCDay()];
+    const hour = sp.getUTCHours();
+    const daySalas = a.doctor.salas[dayKey];
+    if (!daySalas) return null;
+    const roomId = hour < 12 ? daySalas.manha : daySalas.tarde;
+    return roomId ? (roomsMap[roomId] || null) : null;
+  };
 
   // Booking modal: mini-calendar + slot picker
   const [bookCalMonth, setBookCalMonth] = useState(() => startOfMonth(new Date()));
@@ -354,6 +368,15 @@ export function SchedulingPage() {
     } catch {}
   }, []);
 
+  const fetchRooms = useCallback(async () => {
+    try {
+      const { data } = await api.get('/rooms');
+      const map: Record<string, string> = {};
+      for (const r of (data.data || [])) map[r.id] = r.name;
+      setRoomsMap(map);
+    } catch {}
+  }, []);
+
   // Fetch all tenant convenios once to resolve badge names (fallback when the
   // backend's inlined convenio resolve is absent — e.g. during cache lag).
   const fetchConveniosLookup = useCallback(async () => {
@@ -393,7 +416,7 @@ export function SchedulingPage() {
     } catch {}
   }, []);
 
-  useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchConveniosLookup(); fetchBookPrivProcedures(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchConveniosLookup, fetchBookPrivProcedures]);
+  useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchRooms(); fetchConveniosLookup(); fetchBookPrivProcedures(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchRooms, fetchConveniosLookup, fetchBookPrivProcedures]);
 
   useEffect(() => { if (view === 'list') fetchAgenda(agendaDate, agendaMode); }, [view, agendaDate, agendaMode, fetchAgenda, agendaRefresh]);
 
@@ -1434,6 +1457,7 @@ export function SchedulingPage() {
               <button onClick={() => openDoctorEdit(a)} title="Editar medico" className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700">
                 <UserCog size={13} />
               </button>
+              {(() => { const rn = getRoomName(a); return rn ? <span className="inline-flex items-center gap-1 text-xs bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded"><DoorOpen size={11} />{rn}</span> : null; })()}
             </div>
             <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
               <span className="flex items-center gap-1"><Clock size={14} />{format(new Date(a.date), 'HH:mm')}</span>
@@ -1703,6 +1727,7 @@ export function SchedulingPage() {
                                           <Stethoscope size={9} /> {a.doctor.name}
                                         </p>
                                       )}
+                                      {(() => { const rn = getRoomName(a); return rn ? <p className="text-[10px] text-sky-600 truncate flex items-center gap-0.5"><DoorOpen size={9} />{rn}</p> : null; })()}
                                       <span className={`text-[9px] mt-0.5 inline-block px-1 py-0.5 rounded ${pt === 'CONVENIO' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
                                         {pt === 'CONVENIO' ? (a.convenio?.nome || conveniosLookup[a.convenioId || '']?.nome || 'Convenio') : 'Particular'}
                                       </span>
@@ -1867,6 +1892,7 @@ export function SchedulingPage() {
                               >
                                 <UserCog size={12} />
                               </button>
+                              {(() => { const rn = getRoomName(a); return rn ? <span className="inline-flex items-center gap-1 text-xs bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded"><DoorOpen size={11} />{rn}</span> : null; })()}
                               {a.paymentType === 'CONVENIO' && a.customerId && convenioMap[a.customerId] && (
                                 authEditingId === a.id ? (
                                   <div className="flex items-center gap-1.5">

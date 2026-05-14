@@ -70,6 +70,7 @@ model Tenant {
   settings              TenantSettings?
   patientDocuments      PatientDocument[]
   examTypes             ExamType[]
+  rooms                 Room[]
 
   @@map("tenants")
 }
@@ -130,6 +131,7 @@ model User {
   numeroRegistro   String?  @map("numero_registro") // ex: 12345/BA
   duracaoConsulta  Int?     @map("duracao_consulta") // minutos
   horarios         Json?    @map("horarios") // { seg: { ativo, inicio, fim }, ... }
+  salas            Json?    @map("salas") // { seg: { manha: roomId|null, tarde: roomId|null }, ... }
   bio              String?
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime? @map("last_login_at")
@@ -1421,6 +1423,25 @@ model ExamType {
   @@unique([tenantId, name])
   @@index([tenantId])
   @@map("exam_types")
+}
+
+// ==========================================
+// SALAS / ROOMS
+// ==========================================
+
+model Room {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("rooms")
 }
 
 // ==========================================

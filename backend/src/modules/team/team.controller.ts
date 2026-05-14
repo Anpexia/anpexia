@@ -111,6 +111,16 @@ teamRouter.put('/:id/horarios', requireRole('OWNER', 'MANAGER'), async (req: Req
   }
 });
 
+// Update doctor room assignments — OWNER and MANAGER
+teamRouter.put('/:id/salas', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = await teamService.update(req.auth!.tenantId!, req.params.id as string, { salas: req.body.salas });
+    return success(res, user);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Toggle active — OWNER only
 teamRouter.patch('/:id/toggle', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {

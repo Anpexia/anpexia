@@ -610,7 +610,7 @@ async function listCalls(tenantId: string, filters: {
       include: {
         lead: { select: { id: true, name: true, stage: true, company: true } },
         customer: { select: { id: true, name: true, phone: true, email: true } },
-        doctor: { select: { id: true, name: true } },
+        doctor: { select: { id: true, name: true, salas: true } },
         procedures: { include: { tussProcedure: { select: { id: true, code: true, description: true, type: true, value: true } }, doctor: { select: { id: true, name: true } } } },
         privateProcedureCalls: { include: { privateProcedure: { select: { id: true, name: true, type: true, value: true } }, doctor: { select: { id: true, name: true } } } },
         returnCall: { select: { id: true, date: true, status: true } },

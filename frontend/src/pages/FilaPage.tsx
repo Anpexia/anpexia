@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, UserCheck, Phone, Stethoscope, RefreshCw, Play, CheckCircle2, X, AlertTriangle, History } from 'lucide-react';
+import { Clock, UserCheck, Phone, Stethoscope, RefreshCw, Play, CheckCircle2, X, AlertTriangle, History, DoorOpen } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { PatientPanel } from '../components/PatientPanel';
@@ -15,7 +15,7 @@ interface QueueItem {
   doctorId: string | null;
   customerId: string | null;
   customer: { id: string; name: string; phone: string } | null;
-  doctor: { id: string; name: string } | null;
+  doctor: { id: string; name: string; salas?: Record<string, { manha: string | null; tarde: string | null }> | null } | null;
   isEncaixe?: boolean;
   isReturn?: boolean;
 }
@@ -24,6 +24,18 @@ interface Doctor {
   id: string;
   name: string;
   especialidade?: string | null;
+}
+
+const DAY_KEYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+
+function getDoctorRoomId(doctor: QueueItem['doctor']): string | null {
+  if (!doctor?.salas) return null;
+  const now = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const dayKey = DAY_KEYS[now.getUTCDay()];
+  const hour = now.getUTCHours();
+  const daySalas = doctor.salas[dayKey];
+  if (!daySalas) return null;
+  return hour < 12 ? daySalas.manha : daySalas.tarde;
 }
 
 function formatTime(iso: string): string {
@@ -66,6 +78,8 @@ export function FilaPage() {
   const [attendingItem, setAttendingItem] = useState<QueueItem | null>(null);
   const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [roomsMap, setRoomsMap] = useState<Record<string, string>>({});
+
   const isDoctor = user?.role === 'DOCTOR' || user?.role === 'HEALTH_PROFESSIONAL' || !!user?.isProvider;
 
   // Tabs & history
@@ -77,6 +91,15 @@ export function FilaPage() {
   const [historyTo, setHistoryTo] = useState(todayStr);
 
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 4000); };
+
+  const fetchRooms = useCallback(async () => {
+    try {
+      const { data } = await api.get('/rooms');
+      const map: Record<string, string> = {};
+      for (const r of (data.data || [])) map[r.id] = r.name;
+      setRoomsMap(map);
+    } catch {}
+  }, []);
 
   const fetchDoctors = useCallback(async () => {
     try {
@@ -112,7 +135,8 @@ export function FilaPage() {
 
   useEffect(() => {
     fetchDoctors();
-  }, [fetchDoctors]);
+    fetchRooms();
+  }, [fetchDoctors, fetchRooms]);
 
   useEffect(() => {
     if (isDoctor && user?.id) {
@@ -279,6 +303,7 @@ export function FilaPage() {
                             {!isDoctor && item.doctor && (
                               <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
                             )}
+                            {(() => { const rid = getDoctorRoomId(item.doctor); return rid && roomsMap[rid] ? <p className="text-xs text-blue-500 mt-0.5 flex items-center gap-1"><DoorOpen size={11} /> {roomsMap[rid]}</p> : null; })()}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
@@ -325,6 +350,7 @@ export function FilaPage() {
                             {!isDoctor && item.doctor && (
                               <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
                             )}
+                            {(() => { const rid = getDoctorRoomId(item.doctor); return rid && roomsMap[rid] ? <p className="text-xs text-blue-500 mt-0.5 flex items-center gap-1"><DoorOpen size={11} /> {roomsMap[rid]}</p> : null; })()}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -373,6 +399,7 @@ export function FilaPage() {
                             {!isDoctor && item.doctor && (
                               <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
                             )}
+                            {(() => { const rid = getDoctorRoomId(item.doctor); return rid && roomsMap[rid] ? <p className="text-xs text-blue-500 mt-0.5 flex items-center gap-1"><DoorOpen size={11} /> {roomsMap[rid]}</p> : null; })()}
                           </div>
                         </div>
                         <button
@@ -411,6 +438,7 @@ export function FilaPage() {
                             {!isDoctor && item.doctor && (
                               <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1"><Stethoscope size={11} /> {item.doctor.name}</p>
                             )}
+                            {(() => { const rid = getDoctorRoomId(item.doctor); return rid && roomsMap[rid] ? <p className="text-xs text-blue-500 mt-0.5 flex items-center gap-1"><DoorOpen size={11} /> {roomsMap[rid]}</p> : null; })()}
                           </div>
                         </div>
                         <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full shrink-0">Consulta finalizada</span>

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Users, Plus, X, CheckCircle, XCircle, UserCheck, UserX, Shield, Edit2, Trash2, Clock } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Users, Plus, X, CheckCircle, XCircle, UserCheck, UserX, Shield, Edit2, Trash2, Clock, DoorOpen } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import SpecialtyCombobox from '../components/SpecialtyCombobox';
@@ -62,6 +62,7 @@ interface TeamMember {
   especialidade?: string | null;
   rqe?: string | null;
   horarios?: Horarios | null;
+  salas?: Record<string, { manha: string | null; tarde: string | null }> | null;
   duracaoConsulta?: number | null;
   isActive: boolean;
   lastLoginAt: string | null;
@@ -91,7 +92,7 @@ export function TeamPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Edit modal tab
-  const [editTab, setEditTab] = useState<'dados' | 'horarios' | 'repasse_tuss' | 'repasse_particular'>('dados');
+  const [editTab, setEditTab] = useState<'dados' | 'horarios' | 'salas' | 'repasse_tuss' | 'repasse_particular'>('dados');
 
   // Doctor schedule
   const [horarios, setHorarios] = useState<Horarios>(DEFAULT_HORARIOS);
@@ -105,6 +106,19 @@ export function TeamPage() {
   const [loadingRepasse, setLoadingRepasse] = useState(false);
   const [repasseSearch, setRepasseSearch] = useState('');
   const [savingRepasse, setSavingRepasse] = useState(false);
+
+  // Rooms / Salas
+  type DoctorSalas = Record<string, { manha: string | null; tarde: string | null }>;
+  const [availableRooms, setAvailableRooms] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
+  const [doctorSalas, setDoctorSalas] = useState<DoctorSalas>({});
+  const [savingSalas, setSavingSalas] = useState(false);
+
+  const loadRooms = useCallback(async () => {
+    try {
+      const { data } = await api.get('/rooms');
+      setAvailableRooms((data.data || []).filter((r: any) => r.isActive));
+    } catch {}
+  }, []);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
@@ -254,13 +268,18 @@ export function TeamPage() {
     const providerActive = isProviderRole || m.isProvider;
     if (providerActive) {
       loadRepasse(m.id);
+      loadRooms();
       setHorarios(m.horarios ? migrateHorarios(m.horarios) : { ...DEFAULT_HORARIOS });
       setDuracaoConsulta(m.duracaoConsulta || 30);
+      const defaultSalas: Record<string, { manha: string | null; tarde: string | null }> = {};
+      for (const k of DAY_KEYS) defaultSalas[k] = { manha: null, tarde: null };
+      setDoctorSalas(m.salas ? { ...defaultSalas, ...m.salas } : defaultSalas);
     } else {
       setRepasseTuss([]);
       setRepassePrivate([]);
       setHorarios({ ...DEFAULT_HORARIOS });
       setDuracaoConsulta(30);
+      setDoctorSalas({});
     }
   };
 
@@ -274,6 +293,19 @@ export function TeamPage() {
       showToast(err.response?.data?.error?.message || 'Erro ao salvar horarios', 'error');
     } finally {
       setSavingHorarios(false);
+    }
+  };
+
+  const handleSaveSalas = async () => {
+    if (!editMember) return;
+    setSavingSalas(true);
+    try {
+      await api.put(`/team/${editMember.id}/salas`, { salas: doctorSalas });
+      showToast('Salas atualizadas!');
+    } catch (err: any) {
+      showToast(err.response?.data?.error?.message || 'Erro ao salvar salas', 'error');
+    } finally {
+      setSavingSalas(false);
     }
   };
 
@@ -485,7 +517,7 @@ export function TeamPage() {
               return providerActive;
             })() && (
               <div className="border-b border-slate-200 flex gap-1 px-6 overflow-x-auto shrink-0 sticky top-0 bg-white z-10 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
-                {([['dados', 'Dados'], ['horarios', 'Horarios'], ['repasse_tuss', 'Repasse TUSS'], ['repasse_particular', 'Repasse Particular']] as const).map(([k, label]) => (
+                {([['dados', 'Dados'], ['horarios', 'Horarios'], ['salas', 'Salas'], ['repasse_tuss', 'Repasse TUSS'], ['repasse_particular', 'Repasse Particular']] as const).map(([k, label]) => (
                   <button key={k} onClick={() => { setEditTab(k); setRepasseSearch(''); }}
                     className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${editTab === k ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
                     {label}
@@ -627,6 +659,73 @@ export function TeamPage() {
                     className="w-full btn-pill btn-primary justify-center">
                     {savingHorarios ? 'Salvando...' : 'Salvar Horarios'}
                   </button>
+                </>
+              )}
+
+              {/* Tab: Salas */}
+              {editTab === 'salas' && (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <DoorOpen size={18} className="text-slate-600" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-800">Salas por dia e turno</h3>
+                      <p className="text-xs text-slate-500">Defina em qual sala o profissional atende em cada turno.</p>
+                    </div>
+                  </div>
+                  {availableRooms.length === 0 ? (
+                    <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-4 py-6 text-center">
+                      Nenhuma sala cadastrada. Acesse <span className="font-medium">Configuracoes &gt; Salas</span> para criar.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="border border-slate-200 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                              <th className="text-left px-3 py-2 text-slate-600 font-medium">Dia</th>
+                              <th className="text-left px-3 py-2 text-slate-600 font-medium">Manha</th>
+                              <th className="text-left px-3 py-2 text-slate-600 font-medium">Tarde</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {DAY_KEYS.map(day => (
+                              <tr key={day} className="hover:bg-slate-50">
+                                <td className="px-3 py-2 font-medium text-slate-700">{DAY_LABELS[day]}</td>
+                                <td className="px-3 py-2">
+                                  <select
+                                    value={doctorSalas[day]?.manha || ''}
+                                    onChange={e => setDoctorSalas(prev => ({ ...prev, [day]: { ...prev[day], manha: e.target.value || null } }))}
+                                    className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                                  >
+                                    <option value="">— Nenhuma —</option>
+                                    {availableRooms.map(r => (
+                                      <option key={r.id} value={r.id}>{r.name}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <select
+                                    value={doctorSalas[day]?.tarde || ''}
+                                    onChange={e => setDoctorSalas(prev => ({ ...prev, [day]: { ...prev[day], tarde: e.target.value || null } }))}
+                                    className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                                  >
+                                    <option value="">— Nenhuma —</option>
+                                    {availableRooms.map(r => (
+                                      <option key={r.id} value={r.id}>{r.name}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <button onClick={handleSaveSalas} disabled={savingSalas}
+                        className="w-full btn-pill btn-primary justify-center mt-3">
+                        {savingSalas ? 'Salvando...' : 'Salvar Salas'}
+                      </button>
+                    </>
+                  )}
                 </>
               )}
 

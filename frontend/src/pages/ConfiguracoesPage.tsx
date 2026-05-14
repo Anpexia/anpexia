@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, X, List, Lock, CheckCircle, XCircle, RefreshCw, Loader2, QrCode, Unplug, FlaskConical } from 'lucide-react';
+import { Building2, Clock, Mail, Shield, Wifi, FileCode, Plus, Edit2, Trash2, Download, ShieldCheck, ShieldOff, Smartphone, X, List, Lock, CheckCircle, XCircle, RefreshCw, Loader2, QrCode, Unplug, FlaskConical, DoorOpen } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
-type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'procedimentos' | 'permissoes' | 'seguranca' | 'exames';
+type Tab = 'clinica' | 'convenios' | 'horarios' | 'whatsapp' | 'email' | 'tuss' | 'procedimentos' | 'permissoes' | 'seguranca' | 'exames' | 'salas';
 
 interface PrivateProcedureItem {
   id: string;
@@ -321,6 +321,7 @@ export function ConfiguracoesPage() {
     { key: 'exames', label: 'Tipos de Exame', icon: FlaskConical },
     ...(canManageTuss ? [{ key: 'tuss' as Tab, label: 'Procedimentos TUSS', icon: FileCode }] : []),
     ...(canManageTuss ? [{ key: 'procedimentos' as Tab, label: 'Procedimentos', icon: List }] : []),
+    { key: 'salas', label: 'Salas', icon: DoorOpen },
     { key: 'horarios', label: 'Horarios', icon: Clock },
     ...(canManageTuss ? [{ key: 'permissoes' as Tab, label: 'Permissoes', icon: Lock }] : []),
     { key: 'whatsapp', label: 'WhatsApp', icon: Wifi },
@@ -460,6 +461,12 @@ export function ConfiguracoesPage() {
   const [editExamName, setEditExamName] = useState('');
   const [editExamCategory, setEditExamCategory] = useState('');
 
+  // Rooms / Salas
+  const [rooms, setRooms] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [editingRoom, setEditingRoom] = useState<string | null>(null);
+  const [editRoomName, setEditRoomName] = useState('');
+
   // Repasse types
   const [repasseTypes, setRepasseTypes] = useState<RepasseTypeItem[]>([]);
 
@@ -589,6 +596,13 @@ export function ConfiguracoesPage() {
     } catch {}
   }, [user?.tenant?.segment]);
 
+  const loadRooms = useCallback(async () => {
+    try {
+      const { data } = await api.get('/rooms');
+      setRooms(data.data || []);
+    } catch {}
+  }, []);
+
   const loadTuss = useCallback(async () => {
     if (!canManageTuss) return;
     try {
@@ -618,6 +632,7 @@ export function ConfiguracoesPage() {
 
   useEffect(() => { loadSettings(); loadConvenios(); }, [loadSettings, loadConvenios]);
   useEffect(() => { if (tab === 'exames') loadExamTypes(); }, [tab, loadExamTypes]);
+  useEffect(() => { if (tab === 'salas') loadRooms(); }, [tab, loadRooms]);
   useEffect(() => { if (tab === 'tuss') { loadTuss(); loadRepasseTypes(); } }, [tab, loadTuss, loadRepasseTypes]);
   useEffect(() => { if (tab === 'procedimentos') { loadPrivateProcedures(); loadRepasseTypes(); } }, [tab, loadPrivateProcedures, loadRepasseTypes]);
   useEffect(() => { if (tab === 'permissoes') loadRolePermissions(); }, [tab, loadRolePermissions]);
@@ -876,6 +891,46 @@ export function ConfiguracoesPage() {
 
   const examCategories = [...new Set(examTypes.map(e => e.category))].sort();
 
+  // Room handlers
+  const createRoom = async () => {
+    const name = newRoomName.trim();
+    if (!name) return;
+    try {
+      await api.post('/rooms', { name });
+      setNewRoomName('');
+      loadRooms();
+      flash('Sala criada');
+    } catch (err: any) {
+      flash(err?.response?.data?.error?.message || 'Erro ao criar sala');
+    }
+  };
+
+  const updateRoom = async (id: string) => {
+    const name = editRoomName.trim();
+    if (!name) return;
+    try {
+      await api.put(`/rooms/${id}`, { name });
+      setEditingRoom(null);
+      loadRooms();
+    } catch (err: any) {
+      flash(err?.response?.data?.error?.message || 'Erro ao atualizar');
+    }
+  };
+
+  const toggleRoom = async (id: string, isActive: boolean) => {
+    try {
+      await api.put(`/rooms/${id}`, { isActive: !isActive });
+      loadRooms();
+    } catch {}
+  };
+
+  const deleteRoom = async (id: string) => {
+    try {
+      await api.delete(`/rooms/${id}`);
+      loadRooms();
+    } catch { flash('Erro ao excluir sala'); }
+  };
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
 
   return (
@@ -1082,6 +1137,78 @@ export function ConfiguracoesPage() {
             );
           })}
           {examTypes.length === 0 && <p className="text-sm text-gray-500 text-center py-4">Nenhum tipo de exame cadastrado. Os exames padrao do seu segmento serao criados automaticamente.</p>}
+        </div>
+      )}
+
+      {/* SALAS TAB */}
+      {tab === 'salas' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Salas e Consultorios</h2>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newRoomName}
+              onChange={e => setNewRoomName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createRoom()}
+              placeholder="Nome da sala (ex: Consultorio 1)"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={createRoom}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5"
+            >
+              <Plus size={16} /> Criar Sala
+            </button>
+          </div>
+          <div className="space-y-2">
+            {rooms.map(room => (
+              <div key={room.id} className="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                {editingRoom === room.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="text"
+                      value={editRoomName}
+                      onChange={e => setEditRoomName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && updateRoom(room.id)}
+                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      autoFocus
+                    />
+                    <button onClick={() => updateRoom(room.id)} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Salvar</button>
+                    <button onClick={() => setEditingRoom(null)} className="text-gray-500 hover:text-gray-700 text-sm">Cancelar</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <DoorOpen size={16} className={room.isActive ? 'text-blue-500' : 'text-gray-300'} />
+                      <span className={`text-sm font-medium ${room.isActive ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{room.name}</span>
+                      {!room.isActive && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Inativa</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleRoom(room.id, room.isActive)}
+                        className={`text-xs px-2 py-1 rounded ${room.isActive ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                      >
+                        {room.isActive ? 'Desativar' : 'Ativar'}
+                      </button>
+                      <button
+                        onClick={() => { setEditingRoom(room.id); setEditRoomName(room.name); }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        onClick={() => deleteRoom(room.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+            {rooms.length === 0 && <p className="text-sm text-gray-500 text-center py-4">Nenhuma sala cadastrada. Crie salas para organizar os atendimentos.</p>}
+          </div>
         </div>
       )}
 
