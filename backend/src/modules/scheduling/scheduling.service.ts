@@ -127,6 +127,20 @@ function parseDayShifts(dh: any): { ativo: boolean; shifts: Shift[] } {
   return { ativo, shifts: [] };
 }
 
+// Check if a doctor in "period" mode is available on a specific date
+async function isDoctorInPeriod(doctorId: string, dateStr: string): Promise<boolean> {
+  const date = new Date(dateStr + 'T00:00:00Z');
+  const period = await prisma.doctorAvailabilityPeriod.findFirst({
+    where: {
+      doctorId,
+      startDate: { lte: date },
+      endDate: { gte: date },
+    },
+    select: { id: true },
+  });
+  return !!period;
+}
+
 // Validate that a booking request fits within tenant working hours and has no
 // conflict with an existing call for the same doctor at the same datetime.
 async function validateBookingWithinHours(params: {
@@ -149,8 +163,17 @@ async function validateBookingWithinHours(params: {
   if (params.doctorId) {
     const doctor = await prisma.user.findUnique({
       where: { id: params.doctorId },
-      select: { horarios: true, duracaoConsulta: true },
+      select: { horarios: true, duracaoConsulta: true, scheduleMode: true },
     });
+
+    // Period mode: check if doctor is available on this date
+    if (doctor?.scheduleMode === 'period') {
+      const inPeriod = await isDoctorInPeriod(params.doctorId, params.date);
+      if (!inPeriod) {
+        throw new AppError(400, 'OUTSIDE_PERIOD', 'Este médico não está disponível nesta data');
+      }
+    }
+
     if (doctor?.horarios && typeof doctor.horarios === 'object') {
       const parsed = parseDayShifts((doctor.horarios as any)[key]);
       isDayActive = parsed.ativo;
@@ -241,8 +264,15 @@ async function getAvailableSlots(date: string, doctorId?: string | null, tenantI
   if (doctorId) {
     const doctor = await prisma.user.findUnique({
       where: { id: doctorId },
-      select: { horarios: true, duracaoConsulta: true },
+      select: { horarios: true, duracaoConsulta: true, scheduleMode: true },
     });
+
+    // Period mode: return empty if date is outside any registered period
+    if (doctor?.scheduleMode === 'period') {
+      const inPeriod = await isDoctorInPeriod(doctorId, date);
+      if (!inPeriod) return [];
+    }
+
     if (doctor?.horarios && typeof doctor.horarios === 'object') {
       const parsed = parseDayShifts((doctor.horarios as any)[dayKey]);
       isDayActive = parsed.ativo;

@@ -31,6 +31,7 @@ export const teamService = {
         rqe: true,
         horarios: true,
         salas: true,
+        scheduleMode: true,
         duracaoConsulta: true,
         isActive: true,
         lastLoginAt: true,
@@ -58,6 +59,7 @@ export const teamService = {
         duracaoConsulta: true,
         horarios: true,
         salas: true,
+        scheduleMode: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -154,6 +156,7 @@ export const teamService = {
         rqe: true,
         horarios: true,
         salas: true,
+        scheduleMode: true,
         duracaoConsulta: true,
         isActive: true,
         createdAt: true,

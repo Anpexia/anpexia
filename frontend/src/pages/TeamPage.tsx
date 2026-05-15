@@ -52,6 +52,12 @@ function migrateHorarios(raw: any): Horarios {
   return result;
 }
 
+interface AvailabilityPeriod {
+  id: string;
+  startDate: string;
+  endDate: string;
+}
+
 interface TeamMember {
   id: string;
   name: string;
@@ -63,6 +69,7 @@ interface TeamMember {
   rqe?: string | null;
   horarios?: Horarios | null;
   salas?: Record<string, { manha: string | null; tarde: string | null }> | null;
+  scheduleMode?: string;
   duracaoConsulta?: number | null;
   isActive: boolean;
   lastLoginAt: string | null;
@@ -107,6 +114,13 @@ export function TeamPage() {
   const [repasseSearch, setRepasseSearch] = useState('');
   const [savingRepasse, setSavingRepasse] = useState(false);
 
+  // Schedule mode & periods
+  const [scheduleMode, setScheduleMode] = useState<'fixed' | 'period'>('fixed');
+  const [periods, setPeriods] = useState<AvailabilityPeriod[]>([]);
+  const [newPeriodStart, setNewPeriodStart] = useState('');
+  const [newPeriodEnd, setNewPeriodEnd] = useState('');
+  const [savingMode, setSavingMode] = useState(false);
+
   // Rooms / Salas
   type DoctorSalas = Record<string, { manha: string | null; tarde: string | null }>;
   const [availableRooms, setAvailableRooms] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
@@ -119,6 +133,46 @@ export function TeamPage() {
       setAvailableRooms((data.data || []).filter((r: any) => r.isActive));
     } catch {}
   }, []);
+
+  const loadPeriods = async (doctorId: string) => {
+    try {
+      const { data } = await api.get(`/team/${doctorId}/availability-periods`);
+      setPeriods(data.data || []);
+    } catch { setPeriods([]); }
+  };
+
+  const handleAddPeriod = async () => {
+    if (!editMember || !newPeriodStart || !newPeriodEnd) return;
+    try {
+      await api.post(`/team/${editMember.id}/availability-periods`, { startDate: newPeriodStart, endDate: newPeriodEnd });
+      setNewPeriodStart('');
+      setNewPeriodEnd('');
+      loadPeriods(editMember.id);
+      showToast('Periodo adicionado');
+    } catch (err: any) {
+      showToast(err.response?.data?.error?.message || 'Erro ao adicionar periodo', 'error');
+    }
+  };
+
+  const handleDeletePeriod = async (periodId: string) => {
+    if (!editMember) return;
+    try {
+      await api.delete(`/team/${editMember.id}/availability-periods/${periodId}`);
+      loadPeriods(editMember.id);
+    } catch { showToast('Erro ao excluir periodo', 'error'); }
+  };
+
+  const handleChangeScheduleMode = async (mode: 'fixed' | 'period') => {
+    if (!editMember) return;
+    setSavingMode(true);
+    try {
+      await api.put(`/team/${editMember.id}/schedule-mode`, { mode });
+      setScheduleMode(mode);
+      showToast(mode === 'fixed' ? 'Agenda fixa ativada' : 'Agenda por periodo ativada');
+    } catch (err: any) {
+      showToast(err.response?.data?.error?.message || 'Erro ao alterar modo', 'error');
+    } finally { setSavingMode(false); }
+  };
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
@@ -269,6 +323,8 @@ export function TeamPage() {
     if (providerActive) {
       loadRepasse(m.id);
       loadRooms();
+      loadPeriods(m.id);
+      setScheduleMode((m.scheduleMode as 'fixed' | 'period') || 'fixed');
       setHorarios(m.horarios ? migrateHorarios(m.horarios) : { ...DEFAULT_HORARIOS });
       setDuracaoConsulta(m.duracaoConsulta || 30);
       const defaultSalas: Record<string, { manha: string | null; tarde: string | null }> = {};
@@ -280,6 +336,8 @@ export function TeamPage() {
       setHorarios({ ...DEFAULT_HORARIOS });
       setDuracaoConsulta(30);
       setDoctorSalas({});
+      setScheduleMode('fixed');
+      setPeriods([]);
     }
   };
 
@@ -597,6 +655,77 @@ export function TeamPage() {
                       <p className="text-xs text-slate-500">Configure os dias, horarios e duracao de consulta deste medico.</p>
                     </div>
                   </div>
+
+                  {/* Schedule Mode Toggle */}
+                  <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">Modo de agenda</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleChangeScheduleMode('fixed')}
+                        disabled={savingMode}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${scheduleMode === 'fixed' ? 'bg-[#1E3A5F] text-white border-[#1E3A5F]' : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'}`}
+                      >
+                        Agenda fixa
+                      </button>
+                      <button
+                        onClick={() => handleChangeScheduleMode('period')}
+                        disabled={savingMode}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${scheduleMode === 'period' ? 'bg-[#1E3A5F] text-white border-[#1E3A5F]' : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'}`}
+                      >
+                        Agenda por periodo
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1.5">
+                      {scheduleMode === 'fixed'
+                        ? 'O medico atende toda semana nos dias configurados abaixo.'
+                        : 'O medico so aparece como disponivel dentro dos periodos cadastrados abaixo.'}
+                    </p>
+                  </div>
+
+                  {/* Availability Periods (only shown in period mode) */}
+                  {scheduleMode === 'period' && (
+                    <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/50 mb-2">
+                      <label className="block text-xs font-semibold text-slate-700 mb-2">Periodos de atendimento</label>
+                      {periods.length === 0 && (
+                        <p className="text-xs text-amber-700 mb-2">Nenhum periodo cadastrado. O medico nao aparecera como disponivel ate que periodos sejam adicionados.</p>
+                      )}
+                      {periods.length > 0 && (
+                        <div className="space-y-1.5 mb-3">
+                          {periods.map(p => {
+                            const startStr = new Date(p.startDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                            const endStr = new Date(p.endDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                            const isSameDay = p.startDate.slice(0, 10) === p.endDate.slice(0, 10);
+                            return (
+                              <div key={p.id} className="flex items-center justify-between px-3 py-2 bg-white border border-amber-200 rounded-lg">
+                                <span className="text-sm text-slate-700">
+                                  {isSameDay ? startStr : `${startStr} — ${endStr}`}
+                                </span>
+                                <button onClick={() => handleDeletePeriod(p.id)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <label className="block text-[11px] text-slate-600 mb-0.5">De</label>
+                          <input type="date" value={newPeriodStart} onChange={e => { setNewPeriodStart(e.target.value); if (!newPeriodEnd) setNewPeriodEnd(e.target.value); }}
+                            className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[11px] text-slate-600 mb-0.5">Ate</label>
+                          <input type="date" value={newPeriodEnd} onChange={e => setNewPeriodEnd(e.target.value)} min={newPeriodStart}
+                            className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                        </div>
+                        <button onClick={handleAddPeriod} disabled={!newPeriodStart || !newPeriodEnd}
+                          className="px-3 py-1.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-40 flex items-center gap-1 shrink-0">
+                          <Plus size={14} /> Adicionar
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50 mb-1">
                     <label className="block text-xs font-medium text-slate-700 mb-1">Duracao da consulta (minutos)</label>

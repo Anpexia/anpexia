@@ -132,6 +132,7 @@ model User {
   duracaoConsulta  Int?     @map("duracao_consulta") // minutos
   horarios         Json?    @map("horarios") // { seg: { ativo, inicio, fim }, ... }
   salas            Json?    @map("salas") // { seg: { manha: roomId|null, tarde: roomId|null }, ... }
+  scheduleMode     String   @default("fixed") @map("schedule_mode") // "fixed" | "period"
   bio              String?
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime? @map("last_login_at")
@@ -152,6 +153,7 @@ model User {
   trustedDevices TrustedDevice[]
   procedureDoctorLinks  ScheduledCallProcedure[] @relation("ProcedureDoctor")
   privateProcDoctorLinks PrivateProcedureCall[]   @relation("PrivateProcedureDoctor")
+  availabilityPeriods DoctorAvailabilityPeriod[]
 
   @@unique([email, tenantId])
   @@map("users")
@@ -1423,6 +1425,26 @@ model ExamType {
   @@unique([tenantId, name])
   @@index([tenantId])
   @@map("exam_types")
+}
+
+// ==========================================
+// DISPONIBILIDADE POR PERIODO
+// ==========================================
+
+model DoctorAvailabilityPeriod {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  doctorId  String   @map("doctor_id")
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+
+  doctor User @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@index([tenantId])
+  @@index([doctorId, startDate, endDate])
+  @@map("doctor_availability_periods")
 }
 
 // ==========================================

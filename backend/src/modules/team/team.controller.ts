@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { teamService } from './team.service';
-import { success, created } from '../../shared/utils/response';
+import { availabilityService } from './availability.service';
+import { success, created, noContent } from '../../shared/utils/response';
 import { authenticate, requireTenant, requireRole } from '../../shared/middleware/auth';
 import { logAction, getClientIp } from '../../services/auditLog.service';
 
@@ -140,4 +141,42 @@ teamRouter.delete('/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, 
   } catch (err) {
     next(err);
   }
+});
+
+// --- Availability Periods ---
+
+// Update schedule mode — OWNER and MANAGER
+teamRouter.put('/:id/schedule-mode', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { mode } = req.body;
+    if (!['fixed', 'period'].includes(mode)) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_MODE', message: 'Modo invalido' } });
+    }
+    const result = await availabilityService.updateScheduleMode(req.auth!.tenantId!, req.params.id as string, mode);
+    return success(res, result);
+  } catch (err) { next(err); }
+});
+
+// List availability periods for a doctor
+teamRouter.get('/:id/availability-periods', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const periods = await availabilityService.listPeriods(req.auth!.tenantId!, req.params.id as string);
+    return success(res, periods);
+  } catch (err) { next(err); }
+});
+
+// Create availability period
+teamRouter.post('/:id/availability-periods', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const period = await availabilityService.createPeriod(req.auth!.tenantId!, req.params.id as string, req.body);
+    return created(res, period);
+  } catch (err) { next(err); }
+});
+
+// Delete availability period
+teamRouter.delete('/:id/availability-periods/:periodId', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await availabilityService.deletePeriod(req.auth!.tenantId!, req.params.periodId as string);
+    return noContent(res);
+  } catch (err) { next(err); }
 });

@@ -341,7 +341,6 @@ export function InventoryPage() {
 
         Quagga.init({
           inputStream: {
-            name: 'Live',
             type: 'LiveStream',
             target: document.querySelector('#scanner-region') as Element,
             constraints: {
