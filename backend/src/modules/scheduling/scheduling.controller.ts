@@ -129,17 +129,23 @@ router.get('/calls', authenticate, requireTenant, async (req: Request, res: Resp
   const from = req.query.from as string | undefined;
   const to = req.query.to as string | undefined;
 
+  let doctorId = req.query.doctorId as string | undefined;
+
+  const role = req.auth!.role;
+  const canSeeAll = role === 'OWNER' || role === 'MANAGER' || role === 'RECEPTIONIST' || role === 'SUPER_ADMIN';
+  const isProviderRole = role === 'DOCTOR' || role === 'HEALTH_PROFESSIONAL';
+  if (isProviderRole && !canSeeAll) {
+    doctorId = req.auth!.userId;
+  }
+
   const { calls, total } = await schedulingService.listCalls(req.auth!.tenantId!, {
     ...pagination,
     status,
     date,
     from,
     to,
+    doctorId,
   });
-
-  console.log('[AGENDAMENTOS] tenantId:', req.auth!.tenantId);
-  console.log('[AGENDAMENTOS] filtro status:', status, 'data:', date);
-  console.log('[AGENDAMENTOS] total encontrado:', total);
 
   return success(res, calls, paginationMeta(total, pagination.page, pagination.limit));
 });

@@ -217,6 +217,11 @@ export function SchedulingPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [roomsMap, setRoomsMap] = useState<Record<string, string>>({});
 
+  // Doctor filter — doctors only see their own agenda
+  const isProviderRole = user?.role === 'DOCTOR' || user?.role === 'HEALTH_PROFESSIONAL';
+  const canSeeAllAgendas = user?.role === 'OWNER' || user?.role === 'MANAGER' || user?.role === 'RECEPTIONIST' || user?.role === 'SUPER_ADMIN';
+  const [filterDoctorId, setFilterDoctorId] = useState<string>('');
+
   const DAY_KEYS_SCHED = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
   const getRoomName = (a: Appointment): string | null => {
     if (!a.doctor?.salas) return null;
@@ -329,20 +334,24 @@ export function SchedulingPage() {
 
   const fetchAppointments = useCallback(async () => {
     try {
-      const { data } = await api.get('/scheduling/calls');
+      const params: Record<string, string> = {};
+      if (filterDoctorId) params.doctorId = filterDoctorId;
+      const { data } = await api.get('/scheduling/calls', { params });
       setAppointments(data.data);
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [filterDoctorId]);
 
   const fetchHistory = useCallback(async (from: string, to: string) => {
     setLoadingHistory(true);
     try {
-      const { data } = await api.get('/scheduling/calls', { params: { from, to, limit: 500 } });
+      const params: Record<string, string | number> = { from, to, limit: 500 };
+      if (filterDoctorId) params.doctorId = filterDoctorId;
+      const { data } = await api.get('/scheduling/calls', { params });
       const all: Appointment[] = data.data || [];
       const pastStatuses = new Set(['completed', 'cancelled', 'no_show']);
       setHistoryData(all.filter(a => pastStatuses.has(a.status)));
     } catch {} finally { setLoadingHistory(false); }
-  }, []);
+  }, [filterDoctorId]);
 
   const fetchDates = useCallback(async () => {
     try {
@@ -356,10 +365,12 @@ export function SchedulingPage() {
     try {
       const from = format(month, 'yyyy-MM-dd');
       const to = format(endOfMonth(month), 'yyyy-MM-dd');
-      const { data } = await api.get('/scheduling/calls', { params: { from, to, limit: 200 } });
+      const params: Record<string, string | number> = { from, to, limit: 200 };
+      if (filterDoctorId) params.doctorId = filterDoctorId;
+      const { data } = await api.get('/scheduling/calls', { params });
       setMonthAppointments(data.data || []);
     } catch {} finally { setLoadingMonth(false); }
-  }, []);
+  }, [filterDoctorId]);
 
   const fetchDoctors = useCallback(async () => {
     try {
@@ -404,10 +415,12 @@ export function SchedulingPage() {
         from = format(startOfMonth(date), 'yyyy-MM-dd');
         to = format(endOfMonth(date), 'yyyy-MM-dd');
       }
-      const { data } = await api.get('/scheduling/calls', { params: { from, to, limit: 500 } });
+      const params: Record<string, string | number> = { from, to, limit: 500 };
+      if (filterDoctorId) params.doctorId = filterDoctorId;
+      const { data } = await api.get('/scheduling/calls', { params });
       setAgendaAppointments(data.data || []);
     } catch {} finally { setLoadingAgenda(false); }
-  }, []);
+  }, [filterDoctorId]);
 
   const fetchBookPrivProcedures = useCallback(async () => {
     try {
@@ -415,6 +428,12 @@ export function SchedulingPage() {
       setBookPrivProcedures((data.data || []).filter((p: BookPrivProc & { isActive: boolean }) => p.isActive));
     } catch {}
   }, []);
+
+  useEffect(() => {
+    if (isProviderRole && !canSeeAllAgendas && user?.id) {
+      setFilterDoctorId(user.id);
+    }
+  }, [isProviderRole, canSeeAllAgendas, user?.id]);
 
   useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchRooms(); fetchConveniosLookup(); fetchBookPrivProcedures(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchRooms, fetchConveniosLookup, fetchBookPrivProcedures]);
 
@@ -1582,6 +1601,23 @@ export function SchedulingPage() {
           Calendario
         </button>
       </div>
+
+      {/* Doctor filter dropdown — visible only for roles that can see all agendas */}
+      {canSeeAllAgendas && doctors.length > 0 && (
+        <div className="mb-4 flex items-center gap-2">
+          <Stethoscope size={16} className="text-slate-500" />
+          <select
+            value={filterDoctorId}
+            onChange={e => setFilterDoctorId(e.target.value)}
+            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-w-[220px]"
+          >
+            <option value="">Todos os medicos</option>
+            {doctors.map(d => (
+              <option key={d.id} value={d.id}>{d.name}{d.especialidade ? ` — ${d.especialidade}` : ''}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A5F]" /></div>

@@ -616,8 +616,13 @@ async function listCalls(tenantId: string, filters: {
   date?: string;
   from?: string;
   to?: string;
+  doctorId?: string;
 }) {
   const where: Record<string, unknown> = { tenantId };
+
+  if (filters.doctorId) {
+    where.doctorId = filters.doctorId;
+  }
 
   if (filters.status) {
     where.status = filters.status;
