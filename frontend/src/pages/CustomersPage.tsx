@@ -28,6 +28,11 @@ interface Customer {
   address: { cep?: string; street?: string; number?: string; neighborhood?: string; city?: string; state?: string } | null;
   optInWhatsApp: boolean;
   isActive: boolean;
+  responsavelId?: string | null;
+  parentesco?: string | null;
+  usarTelResponsavel?: boolean;
+  responsavel?: { id: string; name: string; phone: string | null } | null;
+  dependentes?: Array<{ id: string; name: string; birthDate: string | null; parentesco: string | null }>;
   tags: Array<{ tag: { id: string; name: string; color: string } }>;
   messagesSent?: Array<{ id: string; body: string; status: string; sentAt: string | null; createdAt: string }>;
   scheduledCalls?: ScheduledCall[];
@@ -42,7 +47,7 @@ interface Customer {
 
 type ModalMode = 'closed' | 'create' | 'detail';
 
-const emptyForm = { name: '', phone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } };
+const emptyForm = { name: '', phone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' }, responsavelId: '', parentesco: '', usarTelResponsavel: false };
 
 export function CustomersPage() {
   const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
@@ -80,6 +85,11 @@ export function CustomersPage() {
 
   const [toastMsg, setToastMsg] = useState('');
 
+  // Responsavel search
+  const [respSearch, setRespSearch] = useState('');
+  const [respResults, setRespResults] = useState<Array<{ id: string; name: string; phone: string | null }>>([]);
+  const [respSelected, setRespSelected] = useState<{ id: string; name: string; phone: string | null } | null>(null);
+
   // Import CSV state
   const [showImport, setShowImport] = useState(false);
   const [importStep, setImportStep] = useState<'upload' | 'preview' | 'result'>('upload');
@@ -104,7 +114,28 @@ export function CustomersPage() {
     return () => clearTimeout(timer);
   }, [fetchCustomers]);
 
-  const openCreate = () => { setFormData(emptyForm); setSelectedCustomer(null); setModalMode('create'); };
+  const openCreate = () => { setFormData(emptyForm); setSelectedCustomer(null); setRespSelected(null); setRespSearch(''); setRespResults([]); setModalMode('create'); };
+
+  const searchResponsavel = async (q: string) => {
+    setRespSearch(q);
+    if (q.length < 2) { setRespResults([]); return; }
+    try {
+      const { data } = await api.get('/customers', { params: { search: q } });
+      setRespResults((data.data || []).slice(0, 8).map((c: any) => ({ id: c.id, name: c.name, phone: c.phone })));
+    } catch { setRespResults([]); }
+  };
+
+  const selectResponsavel = (r: { id: string; name: string; phone: string | null }) => {
+    setRespSelected(r);
+    setFormData(prev => ({ ...prev, responsavelId: r.id, usarTelResponsavel: true }));
+    setRespSearch('');
+    setRespResults([]);
+  };
+
+  const clearResponsavel = () => {
+    setRespSelected(null);
+    setFormData(prev => ({ ...prev, responsavelId: '', parentesco: '', usarTelResponsavel: false }));
+  };
 
   const openDetail = (c: Customer, tab: DetailTab = 'info') => {
     setSelectedCustomer(c);
@@ -116,14 +147,17 @@ export function CustomersPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         ...formData,
         birthDate: formData.birthDate || undefined, cpfCnpj: formData.cpfCnpj || undefined,
         notes: formData.notes || undefined, origin: formData.origin || undefined,
         address: formData.address.cep || formData.address.street ? formData.address : undefined,
+        responsavelId: formData.responsavelId || undefined,
+        parentesco: formData.parentesco || undefined,
+        usarTelResponsavel: formData.usarTelResponsavel || undefined,
       };
       await api.post('/customers', payload);
-      setModalMode('closed'); setFormData(emptyForm); fetchCustomers();
+      setModalMode('closed'); setFormData(emptyForm); setRespSelected(null); fetchCustomers();
       showToast('Paciente criado com sucesso!');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message || 'Erro ao criar paciente. Tente novamente.';
@@ -405,6 +439,66 @@ export function CustomersPage() {
                   </label>
                 </div>
               </div>
+
+              {/* Responsavel / Dependente */}
+              <div className="border-t border-slate-200 pt-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Responsavel (opcional)</label>
+                {respSelected ? (
+                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                    <span className="text-sm font-medium text-blue-800">{respSelected.name}</span>
+                    {respSelected.phone && <span className="text-xs text-blue-600">({respSelected.phone})</span>}
+                    <button type="button" onClick={clearResponsavel} className="ml-auto text-blue-400 hover:text-blue-600"><X size={16} /></button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={respSearch}
+                      onChange={(e) => searchResponsavel(e.target.value)}
+                      placeholder="Buscar paciente responsavel..."
+                      className={inputCls}
+                    />
+                    {respResults.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {respResults.map(r => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => selectResponsavel(r)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 border-b last:border-0"
+                          >
+                            <span className="font-medium">{r.name}</span>
+                            {r.phone && <span className="text-slate-500 ml-2">({r.phone})</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {formData.responsavelId && (
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="block text-xs text-slate-600 mb-1">Parentesco</label>
+                      <select value={formData.parentesco} onChange={(e) => setFormData({ ...formData, parentesco: e.target.value })} className={inputCls}>
+                        <option value="">Selecione</option>
+                        <option value="pai">Pai</option>
+                        <option value="mae">Mae</option>
+                        <option value="conjuge">Conjuge</option>
+                        <option value="avo">Avo/Avo</option>
+                        <option value="responsavel_legal">Responsavel Legal</option>
+                        <option value="outro">Outro</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" checked={formData.usarTelResponsavel} onChange={(e) => setFormData({ ...formData, usarTelResponsavel: e.target.checked })} className="rounded" />
+                        Usar telefone do responsavel
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Endereco</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

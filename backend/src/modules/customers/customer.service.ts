@@ -27,6 +27,9 @@ interface CreateCustomerData {
   origin?: string;
   optInWhatsApp?: boolean;
   tagIds?: string[];
+  responsavelId?: string | null;
+  parentesco?: string | null;
+  usarTelResponsavel?: boolean;
 }
 
 interface MedicalRecordData {
@@ -68,6 +71,8 @@ export const customerService = {
         orderBy: { createdAt: 'desc' },
         include: {
           tags: { include: { tag: true } },
+          responsavel: { select: { id: true, name: true, phone: true } },
+          dependentes: { select: { id: true, name: true, birthDate: true, parentesco: true }, where: { isActive: true } },
           scheduledCalls: {
             select: { id: true, date: true, status: true },
             orderBy: { date: 'desc' },
@@ -105,6 +110,8 @@ export const customerService = {
       where: { id, tenantId },
       include: {
         tags: { include: { tag: true } },
+        responsavel: { select: { id: true, name: true, phone: true } },
+        dependentes: { select: { id: true, name: true, phone: true, birthDate: true, parentesco: true, usarTelResponsavel: true }, where: { isActive: true } },
         messagesSent: {
           orderBy: { createdAt: 'desc' },
           take: 50,
@@ -175,7 +182,7 @@ export const customerService = {
   },
 
   async create(tenantId: string, data: CreateCustomerData) {
-    const { tagIds, birthDate, ...rest } = data;
+    const { tagIds, birthDate, responsavelId, parentesco, usarTelResponsavel, ...rest } = data;
 
     const customer = await prisma.customer.create({
       data: {
@@ -183,11 +190,17 @@ export const customerService = {
         tenantId,
         birthDate: birthDate ? new Date(birthDate) : undefined,
         address: data.address ? JSON.parse(JSON.stringify(data.address)) : undefined,
+        responsavelId: responsavelId || undefined,
+        parentesco: parentesco || undefined,
+        usarTelResponsavel: usarTelResponsavel ?? false,
         tags: tagIds?.length
           ? { create: tagIds.map((tagId) => ({ tagId })) }
           : undefined,
       },
-      include: { tags: { include: { tag: true } } },
+      include: {
+        tags: { include: { tag: true } },
+        responsavel: { select: { id: true, name: true, phone: true } },
+      },
     });
 
     return customer;
@@ -199,16 +212,26 @@ export const customerService = {
       throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado');
     }
 
-    const { tagIds, birthDate, ...rest } = data;
+    const { tagIds, birthDate, responsavelId, parentesco, usarTelResponsavel, ...rest } = data;
+
+    const updateData: any = {
+      ...rest,
+      birthDate: birthDate ? new Date(birthDate) : undefined,
+      address: data.address ? JSON.parse(JSON.stringify(data.address)) : undefined,
+    };
+
+    if (responsavelId !== undefined) updateData.responsavelId = responsavelId || null;
+    if (parentesco !== undefined) updateData.parentesco = parentesco || null;
+    if (usarTelResponsavel !== undefined) updateData.usarTelResponsavel = usarTelResponsavel;
 
     const customer = await prisma.customer.update({
       where: { id },
-      data: {
-        ...rest,
-        birthDate: birthDate ? new Date(birthDate) : undefined,
-        address: data.address ? JSON.parse(JSON.stringify(data.address)) : undefined,
+      data: updateData,
+      include: {
+        tags: { include: { tag: true } },
+        responsavel: { select: { id: true, name: true, phone: true } },
+        dependentes: { select: { id: true, name: true, birthDate: true, parentesco: true }, where: { isActive: true } },
       },
-      include: { tags: { include: { tag: true } } },
     });
 
     return customer;
@@ -305,5 +328,31 @@ export const customerService = {
       throw new AppError(404, 'ENTRY_NOT_FOUND', 'Anotação não encontrada');
     }
     await prisma.medicalEntry.delete({ where: { id: entryId } });
+  },
+
+  async getContactPhone(customerId: string): Promise<{ phone: string | null; responsavelName: string | null }> {
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { phone: true, usarTelResponsavel: true, responsavel: { select: { name: true, phone: true } } },
+    });
+    if (!customer) return { phone: null, responsavelName: null };
+    if (customer.usarTelResponsavel && customer.responsavel?.phone) {
+      return { phone: customer.responsavel.phone, responsavelName: customer.responsavel.name };
+    }
+    return { phone: customer.phone, responsavelName: null };
+  },
+
+  async promoteToTitular(tenantId: string, customerId: string, phone?: string) {
+    const customer = await prisma.customer.findFirst({ where: { id: customerId, tenantId } });
+    if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado');
+
+    const updateData: any = { responsavelId: null, parentesco: null, usarTelResponsavel: false };
+    if (phone) updateData.phone = phone;
+
+    return prisma.customer.update({
+      where: { id: customerId },
+      data: updateData,
+      select: { id: true, name: true, phone: true, responsavelId: true },
+    });
   },
 };

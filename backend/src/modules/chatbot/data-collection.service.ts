@@ -378,8 +378,9 @@ async function finishCollection(
       });
     } else {
       // Check if customer already exists with this phone (exact match by tenantId + phone)
+      // Only match titulares (no responsavelId) to avoid overwriting dependents' data
       const existing = await prisma.customer.findFirst({
-        where: { tenantId, phone, isActive: true },
+        where: { tenantId, phone, isActive: true, responsavelId: null },
       });
 
       if (existing) {

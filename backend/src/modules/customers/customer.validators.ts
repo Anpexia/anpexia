@@ -19,6 +19,9 @@ export const createCustomerSchema = z.object({
   origin: z.string().optional(),
   optInWhatsApp: z.boolean().optional(),
   tagIds: z.array(z.string()).optional(),
+  responsavelId: z.string().nullable().optional(),
+  parentesco: z.string().nullable().optional(),
+  usarTelResponsavel: z.boolean().optional(),
 });
 
 export const updateCustomerSchema = createCustomerSchema.partial();

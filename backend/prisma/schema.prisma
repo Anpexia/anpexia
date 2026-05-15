@@ -242,7 +242,14 @@ model Customer {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
+  // Dependente / Responsável
+  responsavelId      String?  @map("responsavel_id")
+  parentesco         String?  // "pai", "mae", "conjuge", "avo", "responsavel_legal", "outro"
+  usarTelResponsavel Boolean  @default(false) @map("usar_tel_responsavel")
+
   tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  responsavel           Customer?               @relation("Dependentes", fields: [responsavelId], references: [id], onDelete: SetNull)
+  dependentes           Customer[]              @relation("Dependentes")
   tags                  CustomerTagAssignment[]
   messagesSent          MessageSent[]
   scheduledCalls        ScheduledCall[]
@@ -256,6 +263,7 @@ model Customer {
   documents             PatientDocument[]
 
   @@index([tenantId])
+  @@index([responsavelId])
   @@map("customers")
 }
 

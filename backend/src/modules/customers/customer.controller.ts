@@ -319,3 +319,14 @@ customerRouter.post('/import-batch', async (req: Request, res: Response, next: N
     next(err);
   }
 });
+
+// Promote dependent to titular (remove responsavel link)
+customerRouter.post('/:id/promote-titular', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await customerService.promoteToTitular(req.auth!.tenantId!, req.params.id as string, req.body.phone);
+    await logAction({ ...auditCtx(req), action: 'UPDATE', entity: 'PATIENT', entityId: req.params.id as string, metadata: { action: 'promote_titular' } });
+    return success(res, result);
+  } catch (err) {
+    next(err);
+  }
+});

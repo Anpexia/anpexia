@@ -52,6 +52,11 @@ interface Customer {
   address: { cep?: string; street?: string; number?: string; neighborhood?: string; city?: string; state?: string } | null;
   optInWhatsApp: boolean;
   isActive: boolean;
+  responsavelId?: string | null;
+  parentesco?: string | null;
+  usarTelResponsavel?: boolean;
+  responsavel?: { id: string; name: string; phone: string | null } | null;
+  dependentes?: Array<{ id: string; name: string; phone: string | null; birthDate: string | null; parentesco: string | null; usarTelResponsavel: boolean }>;
   tags: Array<{ tag: { id: string; name: string; color: string } }>;
   messagesSent?: Array<{ id: string; body: string; status: string; sentAt: string | null; createdAt: string }>;
   scheduledCalls?: ScheduledCall[];
@@ -923,6 +928,55 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
               <label className="block text-sm font-medium text-slate-700 mb-1">Observacoes</label>
               <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className={inputCls + ' h-20 resize-none'} />
             </div>
+
+            {/* Responsavel / Dependentes Section */}
+            {customer && (
+              <div className="border border-slate-200 rounded-lg p-4 space-y-3">
+                <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                  <User size={16} className="text-indigo-500" /> Familia / Vinculos
+                </h4>
+
+                {/* If patient has a responsavel */}
+                {(customer as any).responsavel && (
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                    <p className="text-xs text-indigo-600 font-medium mb-1">Responsavel:</p>
+                    <p className="text-sm font-medium text-indigo-800">{(customer as any).responsavel.name}
+                      {(customer as any).parentesco && <span className="text-xs text-indigo-500 ml-2">({(customer as any).parentesco})</span>}
+                    </p>
+                    {(customer as any).responsavel.phone && <p className="text-xs text-indigo-600">{(customer as any).responsavel.phone}</p>}
+                    {(customer as any).usarTelResponsavel && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded mt-1 inline-block">Usa telefone do responsavel</span>}
+                  </div>
+                )}
+
+                {/* If patient has dependentes */}
+                {(customer as any).dependentes && (customer as any).dependentes.length > 0 && (
+                  <div>
+                    <p className="text-xs text-slate-600 font-medium mb-2">Dependentes:</p>
+                    <div className="space-y-1.5">
+                      {(customer as any).dependentes.map((dep: any) => {
+                        let age = '';
+                        if (dep.birthDate) {
+                          const b = new Date(dep.birthDate);
+                          const y = new Date().getFullYear() - b.getFullYear();
+                          age = `${y} anos`;
+                        }
+                        return (
+                          <div key={dep.id} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded px-3 py-1.5">
+                            <span className="text-sm font-medium text-slate-800">{dep.name}</span>
+                            {dep.parentesco && <span className="text-xs text-slate-500">({dep.parentesco})</span>}
+                            {age && <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{age}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {!(customer as any).responsavel && (!(customer as any).dependentes || (customer as any).dependentes.length === 0) && (
+                  <p className="text-xs text-slate-400 italic">Nenhum vinculo familiar cadastrado.</p>
+                )}
+              </div>
+            )}
           </form>
         )}
 

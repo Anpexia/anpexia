@@ -756,12 +756,18 @@ async function handleSchedConfirm(tenantId: string, phone: string, text: string)
 
 async function findCustomer(tenantId: string, phone: string) {
   const suffix = phone.replace(/\D/g, '').slice(-8);
-  return prisma.customer.findFirst({
+  const matches = await prisma.customer.findMany({
     where: {
       tenantId,
       phone: { contains: suffix },
       isActive: true,
     },
-    orderBy: { createdAt: 'desc' },
+    select: { id: true, name: true, responsavelId: true, createdAt: true },
+    orderBy: { createdAt: 'asc' },
   });
+  if (matches.length === 0) return null;
+  // Prefer the customer who is a responsavel (has no responsavelId) — i.e. the titular
+  const titular = matches.find(c => !c.responsavelId);
+  const chosen = titular || matches[0];
+  return prisma.customer.findUnique({ where: { id: chosen.id } });
 }

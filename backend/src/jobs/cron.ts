@@ -108,13 +108,23 @@ async function sendAppointmentReminders() {
         status: { in: ['scheduled', 'confirmed'] },
         confirmationSentAt: null, // Only send once
       },
+      include: {
+        customer: { select: { name: true, phone: true, usarTelResponsavel: true, responsavel: { select: { name: true, phone: true } } } },
+      },
     });
 
     for (const call of upcomingIn48h) {
+      const cust = call.customer;
+      const usesResponsavel = cust?.usarTelResponsavel && cust?.responsavel?.phone;
+      const targetPhone = usesResponsavel ? cust!.responsavel!.phone! : call.phone;
+      const targetName = usesResponsavel ? cust!.responsavel!.name : call.name;
+      const patientName = usesResponsavel ? call.name : undefined;
+
       await sendReminder48h({
         id: call.id,
-        name: call.name,
-        phone: call.phone,
+        name: targetName,
+        patientName,
+        phone: targetPhone,
         date: call.date,
         leadId: call.leadId,
         tenantId: call.tenantId,
@@ -150,13 +160,23 @@ async function sendAppointmentReminders() {
         status: { in: ['scheduled', 'confirmed'] },
         reminderSentAt: null, // Only send once
       },
+      include: {
+        customer: { select: { name: true, phone: true, usarTelResponsavel: true, responsavel: { select: { name: true, phone: true } } } },
+      },
     });
 
     for (const call of upcomingIn2h) {
+      const cust2 = call.customer;
+      const usesResp2 = cust2?.usarTelResponsavel && cust2?.responsavel?.phone;
+      const targetPhone2 = usesResp2 ? cust2!.responsavel!.phone! : call.phone;
+      const targetName2 = usesResp2 ? cust2!.responsavel!.name : call.name;
+      const patientName2 = usesResp2 ? call.name : undefined;
+
       await sendReminder2h({
         id: call.id,
-        name: call.name,
-        phone: call.phone,
+        name: targetName2,
+        patientName: patientName2,
+        phone: targetPhone2,
         date: call.date,
         leadId: call.leadId,
         tenantId: call.tenantId,

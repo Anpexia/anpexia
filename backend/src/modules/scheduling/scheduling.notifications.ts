@@ -129,6 +129,7 @@ export async function sendCancellationNotice(call: {
 export async function sendReminder48h(call: {
   id: string;
   name: string;
+  patientName?: string;
   phone: string;
   date: Date;
   leadId: string | null;
@@ -141,11 +142,15 @@ export async function sendReminder48h(call: {
   const doctorName = await getDoctorName(call.doctorId);
   const doctorLine = doctorName ? `\n👨‍⚕️ ${doctorName}` : '';
 
+  const greeting = call.patientName
+    ? `Ola ${call.name}! Lembrete da consulta de ${call.patientName}:`
+    : `Ola ${call.name}! Lembrete da sua consulta:`;
+
   const body =
-    `Ola ${call.name}! Lembrete da sua consulta:\n\n` +
+    `${greeting}\n\n` +
     `📅 ${dayOfWeek}, ${dateStr} as ${timeStr}` +
     doctorLine +
-    `\n\nPodemos contar com sua presenca?\n\n` +
+    `\n\nPodemos contar com ${call.patientName ? 'a presenca' : 'sua presenca'}?\n\n` +
     `1 - Confirmar presenca\n` +
     `2 - Cancelar\n` +
     `3 - Reagendar`;
@@ -180,6 +185,7 @@ export async function sendReminder48h(call: {
 export async function sendReminder2h(call: {
   id: string;
   name: string;
+  patientName?: string;
   phone: string;
   date: Date;
   leadId: string | null;
@@ -192,8 +198,12 @@ export async function sendReminder2h(call: {
   const address = await getTenantAddress(call.tenantId);
   const addressLine = address ? `\n\nEndereco: ${address}` : '';
 
+  const consultaRef = call.patientName
+    ? `A consulta de ${call.patientName} e em 2 horas!`
+    : `Sua consulta e em 2 horas!`;
+
   const body =
-    `Sua consulta e em 2 horas! ⏰\n\n` +
+    `${consultaRef} ⏰\n\n` +
     `📅 Hoje as ${timeStr}` +
     doctorLine +
     addressLine +
