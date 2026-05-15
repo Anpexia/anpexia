@@ -16,6 +16,8 @@ import { AssinaturaPage } from './pages/AssinaturaPage';
 import { LoginPage } from './pages/LoginPage';
 import { Verify2FAPage } from './pages/Verify2FAPage';
 import { CriarSenhaPage } from './pages/CriarSenhaPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { DemoPage } from './pages/DemoPage';
 import { DemoJFPage } from './pages/DemoJFPage';
 import { EloyDemo } from './pages/demo/EloyDemo';
@@ -43,6 +45,8 @@ export default function App() {
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/verificar-2fa" element={<Verify2FAPage />} />
       <Route path="/criar-senha" element={<CriarSenhaPage />} />
+      <Route path="/recuperar-senha" element={<ForgotPasswordPage />} />
+      <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />

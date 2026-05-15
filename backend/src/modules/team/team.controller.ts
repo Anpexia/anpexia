@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { teamService } from './team.service';
 import { availabilityService } from './availability.service';
+import { authService } from '../auth/auth.service';
 import { success, created, noContent } from '../../shared/utils/response';
 import { authenticate, requireTenant, requireRole } from '../../shared/middleware/auth';
 import { logAction, getClientIp } from '../../services/auditLog.service';
@@ -138,6 +139,16 @@ teamRouter.delete('/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, 
     const result = await teamService.remove(req.auth!.tenantId!, req.params.id as string, req.auth!.userId);
     await logAction({ ...auditCtx(req), action: 'DELETE', entity: 'USER', entityId: req.params.id as string });
     return success(res, result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Resend invite email — OWNER and MANAGER
+teamRouter.post('/:id/resend-invite', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await authService.resendInvite(req.params.id as string);
+    return success(res, { message: 'Convite reenviado com sucesso' });
   } catch (err) {
     next(err);
   }

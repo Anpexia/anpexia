@@ -139,6 +139,8 @@ model User {
   passwordDefined      Boolean   @default(true) @map("password_defined")
   inviteToken          String?   @unique @map("invite_token")
   inviteTokenExpiresAt DateTime? @map("invite_token_expires_at")
+  resetToken           String?   @unique @map("reset_token")
+  resetTokenExpiresAt  DateTime? @map("reset_token_expires_at")
   twoFactorSecret      String?   @map("two_factor_secret")
   twoFactorEnabled     Boolean   @default(false) @map("two_factor_enabled")
   failedLoginAttempts  Int       @default(0) @map("failed_login_attempts")

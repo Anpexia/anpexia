@@ -34,6 +34,7 @@ export const teamService = {
         scheduleMode: true,
         duracaoConsulta: true,
         isActive: true,
+        passwordDefined: true,
         lastLoginAt: true,
         createdAt: true,
       },

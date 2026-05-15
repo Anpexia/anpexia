@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, X, CheckCircle, XCircle, UserCheck, UserX, Shield, Edit2, Trash2, Clock, DoorOpen } from 'lucide-react';
+import { Users, Plus, X, CheckCircle, XCircle, UserCheck, UserX, Shield, Edit2, Trash2, Clock, DoorOpen, Mail } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import SpecialtyCombobox from '../components/SpecialtyCombobox';
@@ -72,6 +72,7 @@ interface TeamMember {
   scheduleMode?: string;
   duracaoConsulta?: number | null;
   isActive: boolean;
+  passwordDefined?: boolean;
   lastLoginAt: string | null;
   createdAt: string;
 }
@@ -286,6 +287,15 @@ export function TeamPage() {
     finally { setSavingRepasse(false); }
   };
 
+  const handleResendInvite = async (id: string) => {
+    try {
+      await api.post(`/team/${id}/resend-invite`);
+      showToast('Convite reenviado com sucesso!');
+    } catch (err: any) {
+      showToast(err.response?.data?.error?.message || 'Erro ao reenviar convite', 'error');
+    }
+  };
+
   const handleToggle = async (id: string) => {
     try {
       await api.patch(`/team/${id}/toggle`);
@@ -452,6 +462,11 @@ export function TeamPage() {
                           {(m.role !== 'OWNER' || isOwner) && canManage && (
                             <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-slate-100 text-slate-500" title="Editar">
                               <Edit2 size={15} />
+                            </button>
+                          )}
+                          {m.passwordDefined === false && canManage && (
+                            <button onClick={() => handleResendInvite(m.id)} className="p-1.5 rounded hover:bg-blue-50 text-blue-500" title="Reenviar convite">
+                              <Mail size={15} />
                             </button>
                           )}
                           {m.role !== 'OWNER' && isOwner && (

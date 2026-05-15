@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Routes, Route, Navigate, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, NavLink, Outlet, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Building2, BarChart3, LogOut, CreditCard, Plus, X, Eye, ToggleLeft, ToggleRight, UserPlus, Users, Zap, FileSearch, UserCog, Settings as SettingsIcon, Calendar, Trash2, Target } from 'lucide-react';
 import clsx from 'clsx';
 import api from './services/api';
@@ -125,7 +125,164 @@ function AdminLoginPage() {
           <button type="submit" disabled={loading} className="w-full btn-pill justify-center" style={{ backgroundColor: '#2563EB', color: '#fff', borderRadius: 999 }}>
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
+          <button type="button" onClick={() => navigate('/recuperar-senha')} className="w-full text-sm text-white/50 hover:text-white/80">
+            Esqueci minha senha
+          </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ============ FORGOT PASSWORD ============
+
+function AdminForgotPasswordPage() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      await api.post('/auth/forgot-password', { email });
+      setSent(true);
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Erro ao enviar. Tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#152C49] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <img src="/anpexia-logo-white.svg" alt="Anpexia" className="h-10 mx-auto mb-3" />
+          <span className="text-xs bg-[#2563EB] text-white px-2 py-0.5 rounded mt-2 inline-block">Admin</span>
+        </div>
+        <div className="bg-[#1E3A5F] rounded-xl border border-white/10 p-6 space-y-4">
+          <h1 className="text-lg font-bold text-white">Esqueceu sua senha?</h1>
+          <p className="text-sm text-white/60">Informe seu e-mail cadastrado e enviaremos um link para redefinir sua senha.</p>
+
+          {sent ? (
+            <div className="space-y-4">
+              <div className="bg-emerald-900/50 border border-emerald-700 text-emerald-300 text-sm px-4 py-3 rounded-lg">
+                Se este e-mail estiver cadastrado, voce recebera um link para redefinir a senha. Verifique sua caixa de entrada e spam.
+              </div>
+              <button onClick={() => navigate('/login')} className="w-full btn-pill justify-center" style={{ backgroundColor: '#2563EB', color: '#fff', borderRadius: 999 }}>
+                Voltar ao login
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && <div className="bg-red-900/50 border border-red-800 text-red-300 text-sm px-4 py-3 rounded-lg">{error}</div>}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">E-mail</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB] placeholder-white/40" placeholder="admin@anpexia.com.br" required />
+              </div>
+              <button type="submit" disabled={submitting} className="w-full btn-pill justify-center" style={{ backgroundColor: '#2563EB', color: '#fff', borderRadius: 999 }}>
+                {submitting ? 'Enviando...' : 'Enviar link de recuperacao'}
+              </button>
+              <button type="button" onClick={() => navigate('/login')} className="w-full text-sm text-white/50 hover:text-white/80">
+                Voltar ao login
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============ RESET PASSWORD ============
+
+function AdminResetPasswordPage() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const token = params.get('token') || '';
+  const [loadingValidate, setLoadingValidate] = useState(true);
+  const [userInfo, setUserInfo] = useState<{ name: string; email: string } | null>(null);
+  const [validationError, setValidationError] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!token) { setValidationError('Token ausente'); setLoadingValidate(false); return; }
+    api.post('/auth/validate-reset', { token })
+      .then(({ data }) => setUserInfo(data.data))
+      .catch((err) => setValidationError(err.response?.data?.error?.message || 'Link invalido ou expirado'))
+      .finally(() => setLoadingValidate(false));
+  }, [token]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (password !== confirm) { setError('As senhas nao coincidem'); return; }
+    setSubmitting(true);
+    try {
+      await api.post('/auth/reset-password', { token, password, confirmPassword: confirm });
+      setSuccess(true);
+      setTimeout(() => navigate('/login'), 3000);
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Erro ao redefinir senha');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loadingValidate) return <div className="min-h-screen bg-[#152C49] flex items-center justify-center text-white/50">Validando link...</div>;
+
+  if (validationError) {
+    return (
+      <div className="min-h-screen bg-[#152C49] flex items-center justify-center px-4">
+        <div className="bg-[#1E3A5F] rounded-xl border border-red-800 p-8 max-w-sm text-center">
+          <h1 className="text-xl font-bold text-red-400 mb-2">Link invalido</h1>
+          <p className="text-white/60 text-sm">{validationError}</p>
+          <button onClick={() => navigate('/recuperar-senha')} className="mt-4 btn-pill justify-center" style={{ backgroundColor: '#2563EB', color: '#fff', borderRadius: 999 }}>Solicitar novo link</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#152C49] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <img src="/anpexia-logo-white.svg" alt="Anpexia" className="h-10 mx-auto mb-3" />
+          <span className="text-xs bg-[#2563EB] text-white px-2 py-0.5 rounded mt-2 inline-block">Admin</span>
+        </div>
+        <div className="bg-[#1E3A5F] rounded-xl border border-white/10 p-6 space-y-4">
+          <h1 className="text-lg font-bold text-white">Redefinir senha</h1>
+          <p className="text-sm text-white/60">Crie uma nova senha para {userInfo?.email}.</p>
+
+          {success ? (
+            <div className="bg-emerald-900/50 border border-emerald-700 text-emerald-300 text-sm px-4 py-3 rounded-lg">
+              Senha redefinida com sucesso! Redirecionando para o login...
+            </div>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              {error && <div className="bg-red-900/50 border border-red-800 text-red-300 text-sm px-4 py-3 rounded-lg">{error}</div>}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Nova senha</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB] placeholder-white/40" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Confirmar senha</label>
+                <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB] placeholder-white/40" required />
+              </div>
+              <button type="submit" disabled={submitting} className="w-full btn-pill justify-center" style={{ backgroundColor: '#2563EB', color: '#fff', borderRadius: 999 }}>
+                {submitting ? 'Redefinindo...' : 'Redefinir senha'}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -805,6 +962,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<AdminLoginPage />} />
+      <Route path="/recuperar-senha" element={<AdminForgotPasswordPage />} />
+      <Route path="/redefinir-senha" element={<AdminResetPasswordPage />} />
       <Route path="/criar-senha" element={<CriarSenhaPage />} />
       <Route path="/verificar-2fa" element={<Verify2FAPage />} />
       <Route path="/" element={<ProtectedAdmin><AdminLayout /></ProtectedAdmin>}>

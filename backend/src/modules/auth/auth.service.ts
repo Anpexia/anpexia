@@ -568,4 +568,128 @@ export const authService = {
       },
     });
   },
+
+  // ===== Esqueci minha senha / Reset =====
+
+  async requestPasswordReset(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findFirst({
+      where: { email: normalizedEmail, isActive: true },
+    });
+    // Always return success to not reveal if email exists
+    if (!user) return;
+
+    const resetToken = crypto.randomUUID();
+    const resetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { resetToken, resetTokenExpiresAt },
+    });
+
+    const base = env.frontendUrl.replace(/\/$/, '');
+    const link = `${base}/redefinir-senha?token=${resetToken}`;
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+        <h2 style="color:#111">Redefinição de senha</h2>
+        <p>Olá ${user.name},</p>
+        <p>Recebemos uma solicitação para redefinir sua senha. Clique no botão abaixo para criar uma nova senha.</p>
+        <p style="text-align:center;margin:32px 0">
+          <a href="${link}" style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Redefinir minha senha</a>
+        </p>
+        <p style="color:#666;font-size:13px">Este link é válido por 1 hora.</p>
+        <p style="color:#666;font-size:13px">Se você não solicitou esta alteração, ignore este e-mail.</p>
+        <p style="color:#666;font-size:13px">Se o botão não funcionar, copie e cole este endereço no navegador:<br/>${link}</p>
+      </div>
+    `;
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Redefinição de senha — Anpexia',
+        html,
+        text: `Olá ${user.name}, redefina sua senha em: ${link}`,
+      });
+    } catch (err) {
+      console.error('[AUTH] Falha ao enviar e-mail de reset:', err);
+    }
+  },
+
+  async validateResetToken(token: string) {
+    const user = await prisma.user.findUnique({
+      where: { resetToken: token },
+      select: { id: true, name: true, email: true, resetTokenExpiresAt: true },
+    });
+    if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+      throw new AppError(404, 'RESET_INVALID', 'Link inválido ou expirado');
+    }
+    return { name: user.name, email: user.email };
+  },
+
+  async resetPassword(token: string, password: string, confirmPassword: string) {
+    if (password !== confirmPassword) {
+      throw new AppError(400, 'PASSWORD_MISMATCH', 'As senhas não coincidem');
+    }
+    const check = isPasswordValid(password);
+    if (!check.valid) throw new AppError(400, 'WEAK_PASSWORD', check.message);
+
+    const user = await prisma.user.findUnique({ where: { resetToken: token } });
+    if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+      throw new AppError(404, 'RESET_INVALID', 'Link inválido ou expirado');
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordDefined: true,
+        resetToken: null,
+        resetTokenExpiresAt: null,
+      },
+    });
+  },
+
+  // ===== Reenviar convite =====
+
+  async resendInvite(userId: string, linkBase?: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, passwordDefined: true },
+    });
+    if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuário não encontrado');
+    if (user.passwordDefined) throw new AppError(400, 'ALREADY_DEFINED', 'Usuário já definiu a senha');
+
+    const inviteToken = crypto.randomUUID();
+    const inviteTokenExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { inviteToken, inviteTokenExpiresAt },
+    });
+
+    const base = (linkBase || env.frontendUrl).replace(/\/$/, '');
+    const link = `${base}/criar-senha?token=${inviteToken}`;
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+        <h2 style="color:#111">Reenvio de convite</h2>
+        <p>Olá ${user.name},</p>
+        <p>Estamos reenviando o convite para definir sua senha de acesso ao sistema Anpexia.</p>
+        <p style="text-align:center;margin:32px 0">
+          <a href="${link}" style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Definir minha senha</a>
+        </p>
+        <p style="color:#666;font-size:13px">Este link é válido por 48 horas.</p>
+        <p style="color:#666;font-size:13px">Se o botão não funcionar, copie e cole este endereço no navegador:<br/>${link}</p>
+      </div>
+    `;
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Reenvio de convite — Anpexia',
+        html,
+        text: `Olá ${user.name}, defina sua senha em: ${link}`,
+      });
+    } catch (err) {
+      console.error('[AUTH] Falha ao reenviar convite:', err);
+    }
+  },
 };

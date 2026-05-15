@@ -211,3 +211,35 @@ authRouter.post('/define-password', publicRateLimit, async (req: Request, res: R
     next(err);
   }
 });
+
+// ========== Forgot / Reset Password ==========
+
+authRouter.post('/forgot-password', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const email = String(req.body.email || '').trim();
+    await authService.requestPasswordReset(email);
+    return success(res, { message: 'Se este e-mail estiver cadastrado, você receberá um link para redefinir a senha.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/validate-reset', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = String(req.body.token || '');
+    const result = await authService.validateResetToken(token);
+    return success(res, result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/reset-password', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token, password, confirmPassword } = req.body;
+    await authService.resetPassword(String(token || ''), String(password || ''), String(confirmPassword || ''));
+    return success(res, { message: 'Senha redefinida com sucesso' });
+  } catch (err) {
+    next(err);
+  }
+});

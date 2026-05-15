@@ -151,6 +151,10 @@ export function LoginPage() {
             >
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
+
+            <button type="button" onClick={() => navigate('/recuperar-senha')} className="w-full text-sm text-slate-500 hover:text-slate-700">
+              Esqueci minha senha
+            </button>
           </form>
         )}
       </div>
