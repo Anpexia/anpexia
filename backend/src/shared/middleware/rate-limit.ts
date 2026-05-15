@@ -20,7 +20,7 @@ export const publicRateLimit = rateLimit({
 
 export const apiRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 3000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
