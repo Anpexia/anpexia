@@ -164,6 +164,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const [anamneseError, setAnamneseError] = useState<string>('');
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anamneseDataRef = useRef<any>({});
+  const [anamneseTab, setAnamneseTab] = useState<'campos' | 'texto_livre'>('campos');
 
   // Evolucao state
   const [evolucoes, setEvolucoes] = useState<any[]>([]);
@@ -1093,16 +1094,50 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                       {anamneseSaveStatus === 'saving' && <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
                     </div>
 
-                    {getSegmentConfig(user?.tenant?.segment).anamnese.map(field => (
-                      <div key={field.key}>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
-                        {field.type === 'textarea' ? (
-                          <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => handleAnamneseFieldChange(field.key, v)} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
-                        ) : (
-                          <input type={field.type === 'number' ? 'number' : 'text'} value={anamneseData[field.key] || ''} onChange={(e) => handleAnamneseFieldChange(field.key, e.target.value)} className={inputCls} placeholder={field.placeholder} />
-                        )}
+                    {/* Tabs: Campos | Texto Livre */}
+                    <div className="flex gap-1 border-b border-slate-200">
+                      <button
+                        onClick={() => setAnamneseTab('campos')}
+                        className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${anamneseTab === 'campos' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Campos
+                      </button>
+                      <button
+                        onClick={() => setAnamneseTab('texto_livre')}
+                        className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${anamneseTab === 'texto_livre' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Texto Livre
+                      </button>
+                    </div>
+
+                    {/* Tab: Campos (modo tradicional) */}
+                    {anamneseTab === 'campos' && (
+                      <div className="space-y-3">
+                        {getSegmentConfig(user?.tenant?.segment).anamnese.map(field => (
+                          <div key={field.key}>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
+                            {field.type === 'textarea' ? (
+                              <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => handleAnamneseFieldChange(field.key, v)} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
+                            ) : (
+                              <input type={field.type === 'number' ? 'number' : 'text'} value={anamneseData[field.key] || ''} onChange={(e) => handleAnamneseFieldChange(field.key, e.target.value)} className={inputCls} placeholder={field.placeholder} />
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+
+                    {/* Tab: Texto Livre (quadro branco) */}
+                    {anamneseTab === 'texto_livre' && (
+                      <div>
+                        <DictationTextarea
+                          value={anamneseData._freeText || ''}
+                          onChange={(v) => handleAnamneseFieldChange('_freeText', v)}
+                          className={inputCls + ' resize-y'}
+                          style={{ minHeight: '50vh', maxHeight: '80vh' }}
+                          placeholder="Cole aqui seus modelos prontos ou digite livremente. Todas as informacoes da anamnese podem ficar neste campo unico."
+                        />
+                      </div>
+                    )}
 
                   </>
                 )}
