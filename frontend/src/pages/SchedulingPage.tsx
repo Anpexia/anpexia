@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw, DoorOpen } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw, DoorOpen, Plus } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -19,6 +19,7 @@ interface Doctor {
   name: string;
   especialidade?: string | null;
   horarios?: Record<string, DoctorHorario> | null;
+  duracaoConsulta?: number | null;
 }
 
 interface CallProcedure {
@@ -162,6 +163,101 @@ function StatusTimeline({ status }: { status: string }) {
       })}
     </div>
   );
+}
+
+interface TimeGridRow {
+  time: string;
+  minutes: number;
+  type: 'free' | 'appointment';
+  appointment?: Appointment;
+}
+
+function buildTimeGrid(
+  dayAppts: Appointment[],
+  doctorsForDay: Doctor[],
+  dayKey: string,
+  filterDoctorId: string,
+): TimeGridRow[] {
+  const slotDuration = (() => {
+    if (filterDoctorId) {
+      const doc = doctorsForDay.find(d => d.id === filterDoctorId);
+      if (doc?.duracaoConsulta) return doc.duracaoConsulta;
+    }
+    if (doctorsForDay.length === 1 && doctorsForDay[0].duracaoConsulta) {
+      return doctorsForDay[0].duracaoConsulta;
+    }
+    return 30;
+  })();
+
+  let startMin = 480; // 08:00
+  let endMin = 1080; // 18:00
+
+  const targetDoc = filterDoctorId ? doctorsForDay.find(d => d.id === filterDoctorId) : null;
+  if (targetDoc?.horarios?.[dayKey]?.ativo) {
+    const h = targetDoc.horarios[dayKey];
+    const parseTime = (t: string) => { const [hh, mm] = t.split(':').map(Number); return hh * 60 + mm; };
+    if (h.manha && h.tarde) {
+      startMin = parseTime(h.manha.inicio);
+      endMin = parseTime(h.tarde.fim);
+    } else if (h.inicio && h.fim) {
+      startMin = parseTime(h.inicio);
+      endMin = parseTime(h.fim);
+    }
+  } else if (doctorsForDay.length > 0) {
+    const parseTime = (t: string) => { const [hh, mm] = t.split(':').map(Number); return hh * 60 + mm; };
+    let earliest = 1440, latest = 0;
+    for (const doc of doctorsForDay) {
+      if (!doc.horarios?.[dayKey]?.ativo) continue;
+      const h = doc.horarios[dayKey];
+      if (h.manha && h.tarde) {
+        earliest = Math.min(earliest, parseTime(h.manha.inicio));
+        latest = Math.max(latest, parseTime(h.tarde.fim));
+      } else if (h.inicio && h.fim) {
+        earliest = Math.min(earliest, parseTime(h.inicio));
+        latest = Math.max(latest, parseTime(h.fim));
+      }
+    }
+    if (earliest < latest) { startMin = earliest; endMin = latest; }
+  }
+
+  const standardSlots: number[] = [];
+  for (let m = startMin; m < endMin; m += slotDuration) {
+    standardSlots.push(m);
+  }
+
+  const apptMinutes = dayAppts.map(a => {
+    const d = new Date(a.date);
+    const sp = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+    return sp.getUTCHours() * 60 + sp.getUTCMinutes();
+  });
+
+  const allTimes = new Set<number>(standardSlots);
+  apptMinutes.forEach(m => allTimes.add(m));
+  const sortedTimes = Array.from(allTimes).sort((a, b) => a - b);
+
+  const apptsByMinute = new Map<number, Appointment[]>();
+  dayAppts.forEach((a, i) => {
+    const m = apptMinutes[i];
+    if (!apptsByMinute.has(m)) apptsByMinute.set(m, []);
+    apptsByMinute.get(m)!.push(a);
+  });
+
+  const rows: TimeGridRow[] = [];
+  for (const m of sortedTimes) {
+    const hh = String(Math.floor(m / 60)).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    const time = `${hh}:${mm}`;
+    const appts = apptsByMinute.get(m);
+    if (appts && appts.length > 0) {
+      for (const appt of appts) {
+        rows.push({ time, minutes: m, type: 'appointment', appointment: appt });
+      }
+    } else {
+      rows.push({ time, minutes: m, type: 'free' });
+    }
+  }
+
+  return rows;
 }
 
 export function SchedulingPage() {
@@ -1668,18 +1764,49 @@ export function SchedulingPage() {
                     const doctorsToday = agendaDoctorsForDay(dateStr);
                     const dayKeyMap: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
                     const dayKey = dayKeyMap[agendaDate.getDay()];
+                    const timeGrid = buildTimeGrid(dayAppts, doctorsToday, dayKey, filterDoctorId);
 
                     return (
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div className="lg:col-span-2 space-y-3">
-                          <h3 className="font-semibold text-slate-800">Agendamentos do dia ({dayAppts.length})</h3>
-                          {dayAppts.length === 0 ? (
+                          <h3 className="font-semibold text-slate-800">Grade de horarios ({dayAppts.length} agendamento{dayAppts.length !== 1 ? 's' : ''})</h3>
+                          {timeGrid.length === 0 ? (
                             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
-                              <p className="text-sm text-slate-500">Nenhum agendamento para este dia.</p>
+                              <p className="text-sm text-slate-500">Nenhum horario configurado para este dia.</p>
                             </div>
                           ) : (
-                            <div className="space-y-3">
-                              {dayAppts.map(a => renderAppointmentCard(a))}
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                              <div className="divide-y divide-slate-100">
+                                {timeGrid.map((row, idx) => (
+                                  <div key={row.appointment?.id || `free-${row.time}-${idx}`} className={`flex ${row.type === 'appointment' ? '' : 'hover:bg-blue-50/50'}`}>
+                                    <div className={`w-16 shrink-0 flex items-center justify-center py-3 border-r border-slate-100 ${row.type === 'appointment' ? 'bg-slate-50' : 'bg-white'}`}>
+                                      <span className={`text-xs font-mono font-semibold ${row.type === 'appointment' ? 'text-[#1E3A5F]' : 'text-slate-400'}`}>{row.time}</span>
+                                    </div>
+                                    {row.type === 'appointment' && row.appointment ? (
+                                      <div className="flex-1 min-w-0 p-2">
+                                        {renderAppointmentCard(row.appointment)}
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          const bf = { name: '', phone: '', email: '', date: dateStr, time: row.time, notes: '', customerId: '', doctorId: filterDoctorId || '' };
+                                          setBookForm(bf);
+                                          setSelectedBookCustomer(null);
+                                          setCustomerSearch('');
+                                          resetPaymentState();
+                                          setBookEncaixe(false);
+                                          setBookCalMonth(startOfMonth(agendaDate));
+                                          setShowBookModal(true);
+                                        }}
+                                        className="flex-1 min-w-0 flex items-center gap-2 px-4 py-3 text-sm text-slate-400 hover:text-[#2563EB] transition-colors group"
+                                      >
+                                        <Plus size={14} className="text-slate-300 group-hover:text-[#2563EB]" />
+                                        <span className="group-hover:text-[#2563EB]">Horario livre — clique para agendar</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1728,48 +1855,63 @@ export function SchedulingPage() {
                   {/* SEMANAL */}
                   {agendaMode === 'semanal' && (() => {
                     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(agendaWeekStart, i));
+                    const dayKeyMapW: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-3">
                         {weekDays.map(day => {
                           const dayStr = format(day, 'yyyy-MM-dd');
                           const dayAppts = agendaByDay.get(dayStr) || [];
                           const today = isToday(day);
+                          const dayKey = dayKeyMapW[day.getDay()];
+                          const doctorsThisDay = agendaDoctorsForDay(dayStr);
+                          const grid = buildTimeGrid(dayAppts, doctorsThisDay, dayKey, filterDoctorId);
+                          const occupiedCount = grid.filter(r => r.type === 'appointment').length;
                           return (
                             <div key={dayStr} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${today ? 'border-[#2563EB] ring-1 ring-[#2563EB]' : 'border-slate-200'}`}>
                               <div className={`px-3 py-2 text-center ${today ? 'bg-[#1E3A5F] text-white' : 'bg-slate-50'}`}>
                                 <p className={`text-xs font-medium capitalize ${today ? 'text-white/80' : 'text-slate-500'}`}>{format(day, 'EEE', { locale: ptBR })}</p>
                                 <p className={`text-lg font-bold ${today ? 'text-white' : 'text-slate-800'}`}>{format(day, 'dd')}</p>
-                              </div>
-                              <div className="p-2 space-y-1.5 min-h-[120px] max-h-[400px] overflow-y-auto">
-                                {dayAppts.length === 0 && (
-                                  <p className="text-xs text-slate-400 text-center py-4">Sem agendamentos</p>
+                                {grid.length > 0 && (
+                                  <p className={`text-[10px] mt-0.5 ${today ? 'text-white/70' : 'text-slate-400'}`}>{occupiedCount}/{grid.length} ocupados</p>
                                 )}
-                                {dayAppts.map(a => {
-                                  const st = statusMap[a.status];
-                                  const pt = a.paymentType || 'PARTICULAR';
-                                  return (
-                                    <button
-                                      key={a.id}
-                                      onClick={() => { setAgendaMode('diario'); setAgendaDate(day); }}
-                                      className="w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-[#EFF6FF] transition-colors border border-slate-100 hover:border-[#BFDBFE]"
-                                    >
-                                      <div className="flex items-center justify-between mb-0.5">
-                                        <span className="text-xs font-semibold text-[#1E3A5F]">{format(new Date(a.date), 'HH:mm')}</span>
-                                        <span className={`text-[9px] px-1 py-0.5 rounded ${st?.cls || ''}`}>{st?.icon}</span>
-                                      </div>
-                                      <p className="text-xs font-medium text-slate-800 truncate">{a.customer?.name || a.name}</p>
-                                      {a.doctor && (
-                                        <p className="text-[10px] text-indigo-600 truncate flex items-center gap-0.5 mt-0.5">
-                                          <Stethoscope size={9} /> {a.doctor.name}
-                                        </p>
-                                      )}
-                                      {(() => { const rn = getRoomName(a); return rn ? <p className="text-[10px] text-sky-600 truncate flex items-center gap-0.5"><DoorOpen size={9} />{rn}</p> : null; })()}
-                                      <span className={`text-[9px] mt-0.5 inline-block px-1 py-0.5 rounded ${pt === 'CONVENIO' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
-                                        {pt === 'CONVENIO' ? (a.convenio?.nome || conveniosLookup[a.convenioId || '']?.nome || 'Convenio') : 'Particular'}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
+                              </div>
+                              <div className="divide-y divide-slate-50 max-h-[400px] overflow-y-auto">
+                                {grid.length === 0 && (
+                                  <p className="text-xs text-slate-400 text-center py-4">Sem horarios</p>
+                                )}
+                                {grid.map((row, rIdx) => (
+                                  <div key={row.appointment?.id || `free-${row.time}-${rIdx}`} className={`flex items-center gap-1.5 px-2 py-1.5 ${row.type === 'free' ? 'hover:bg-blue-50/50' : ''}`}>
+                                    <span className={`text-[10px] font-mono w-10 shrink-0 ${row.type === 'appointment' ? 'font-semibold text-[#1E3A5F]' : 'text-slate-400'}`}>{row.time}</span>
+                                    {row.type === 'appointment' && row.appointment ? (
+                                      <button
+                                        onClick={() => { setAgendaMode('diario'); setAgendaDate(day); }}
+                                        className="flex-1 min-w-0 text-left"
+                                      >
+                                        <p className="text-xs font-medium text-slate-800 truncate">{row.appointment.customer?.name || row.appointment.name}</p>
+                                        <div className="flex items-center gap-1">
+                                          <span className={`text-[9px] px-1 py-0.5 rounded ${statusMap[row.appointment.status]?.cls || ''}`}>{statusMap[row.appointment.status]?.icon}</span>
+                                          {row.appointment.doctor && <span className="text-[9px] text-indigo-600 truncate">{row.appointment.doctor.name}</span>}
+                                        </div>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          const bf = { name: '', phone: '', email: '', date: dayStr, time: row.time, notes: '', customerId: '', doctorId: filterDoctorId || '' };
+                                          setBookForm(bf);
+                                          setSelectedBookCustomer(null);
+                                          setCustomerSearch('');
+                                          resetPaymentState();
+                                          setBookEncaixe(false);
+                                          setBookCalMonth(startOfMonth(day));
+                                          setShowBookModal(true);
+                                        }}
+                                        className="flex-1 min-w-0 text-[10px] text-slate-300 hover:text-[#2563EB] transition-colors"
+                                      >
+                                        + Livre
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           );
@@ -1779,7 +1921,9 @@ export function SchedulingPage() {
                   })()}
 
                   {/* MENSAL */}
-                  {agendaMode === 'mensal' && (
+                  {agendaMode === 'mensal' && (() => {
+                    const dayKeyMapM: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+                    return (
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                       <div className="grid grid-cols-7 mb-1">
                         {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'].map(d => (
@@ -1793,6 +1937,9 @@ export function SchedulingPage() {
                           const today = isToday(day);
                           const dayAppts = agendaByDay.get(dayStr) || [];
                           const count = dayAppts.length;
+                          const dayKey = dayKeyMapM[day.getDay()];
+                          const doctorsThisDay = inMonth ? agendaDoctorsForDay(dayStr) : [];
+                          const totalSlots = inMonth && doctorsThisDay.length > 0 ? buildTimeGrid([], doctorsThisDay, dayKey, filterDoctorId).length : 0;
 
                           return (
                             <button
@@ -1805,14 +1952,18 @@ export function SchedulingPage() {
                               `}
                             >
                               <span className={`text-sm ${inMonth ? 'text-slate-700' : 'text-slate-300'}`}>{format(day, 'd')}</span>
-                              {inMonth && count > 0 && (
+                              {inMonth && (count > 0 || totalSlots > 0) && (
                                 <div className="mt-1 flex flex-col items-center gap-0.5">
-                                  <div className="flex gap-0.5">
-                                    {Array.from({ length: Math.min(count, 4) }).map((_, i) => (
-                                      <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />
-                                    ))}
-                                  </div>
-                                  <span className="text-[10px] font-medium text-[#1E3A5F]">{count} consulta{count !== 1 ? 's' : ''}</span>
+                                  {count > 0 && (
+                                    <div className="flex gap-0.5">
+                                      {Array.from({ length: Math.min(count, 4) }).map((_, i) => (
+                                        <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />
+                                      ))}
+                                    </div>
+                                  )}
+                                  <span className="text-[10px] font-medium text-[#1E3A5F]">
+                                    {totalSlots > 0 ? `${count}/${totalSlots}` : `${count} consulta${count !== 1 ? 's' : ''}`}
+                                  </span>
                                 </div>
                               )}
                             </button>
@@ -1820,7 +1971,8 @@ export function SchedulingPage() {
                         })}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </>
               )}
             </div>
