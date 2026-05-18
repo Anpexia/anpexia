@@ -119,7 +119,7 @@ const statusMap: Record<string, { label: string; cls: string; icon: string; step
   attended: { label: 'Atendido', cls: 'bg-emerald-100 text-emerald-700', icon: '🩺', step: 5 },
   completed: { label: 'Realizado', cls: 'bg-slate-100 text-slate-600', icon: '✅', step: 6 },
   cancelled: { label: 'Cancelado', cls: 'bg-red-100 text-red-700', icon: '❌', step: -1 },
-  no_show: { label: 'Faltou', cls: 'bg-amber-100 text-amber-700', icon: '👻', step: -1 },
+  no_show: { label: 'Faltou', cls: 'bg-red-100 text-red-700', icon: '❌', step: -1 },
 };
 
 const timelineSteps = [
@@ -1481,7 +1481,7 @@ export function SchedulingPage() {
     }
   };
 
-  const activeStatuses = new Set(['scheduled', 'confirmed', 'awaiting_payment', 'present', 'in_attendance', 'attended', 'completed']);
+  const activeStatuses = new Set(['scheduled', 'confirmed', 'awaiting_payment', 'present', 'in_attendance', 'attended', 'completed', 'no_show']);
 
   const agendaActive = useMemo(() => agendaAppointments.filter(a => activeStatuses.has(a.status)), [agendaAppointments]);
 
@@ -1587,7 +1587,7 @@ export function SchedulingPage() {
   const renderAppointmentCard = (a: Appointment) => {
     const isCompleted = a.status === 'completed';
     return (
-    <div key={a.id} className={`rounded-xl border shadow-sm p-4 space-y-3 ${isCompleted ? 'bg-slate-50 border-slate-200 opacity-60' : a.isEncaixe ? 'bg-orange-50/30 border-orange-300' : 'bg-white border-slate-200'}`}>
+    <div key={a.id} className={`rounded-xl border shadow-sm p-4 space-y-3 ${a.status === 'no_show' ? 'bg-red-50/50 border-red-300 opacity-75' : isCompleted ? 'bg-slate-50 border-slate-200 opacity-60' : a.isEncaixe ? 'bg-orange-50/30 border-orange-300' : 'bg-white border-slate-200'}`}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-start gap-4">
           <div className="bg-[#EFF6FF] rounded-lg p-3 text-center min-w-[60px]">
@@ -1676,6 +1676,9 @@ export function SchedulingPage() {
           {!isCompleted && ['scheduled', 'confirmed', 'awaiting_payment'].includes(a.status) && (
             <button onClick={() => openEditModal(a)} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 flex items-center gap-1"><Pencil size={14} />Editar</button>
           )}
+          {a.status === 'no_show' && (
+            <span className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium flex items-center gap-1">❌ Faltou</span>
+          )}
           {isCompleted && isReturnEligible(a) && (
             <button onClick={() => openReturnModal(a)} className="px-3 py-1.5 bg-sky-50 text-sky-700 rounded-lg text-xs font-medium hover:bg-sky-100 flex items-center gap-1"><RotateCcw size={14} />Agendar Retorno</button>
           )}
@@ -1715,13 +1718,13 @@ export function SchedulingPage() {
               )}
             </>
           )}
-          {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && a.status !== 'awaiting_payment' && (
+          {a.status !== 'attended' && a.status !== 'in_attendance' && a.status !== 'completed' && a.status !== 'awaiting_payment' && a.status !== 'no_show' && (
             <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100">Realizado</button>
           )}
-          {!isCompleted && a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && (
+          {!isCompleted && a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && a.status !== 'no_show' && (
             <button onClick={() => handleStatusChange(a.id, 'no_show')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1"><AlertTriangle size={14} />Faltou</button>
           )}
-          {!isCompleted && a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && (
+          {!isCompleted && a.status !== 'in_attendance' && a.status !== 'attended' && a.status !== 'awaiting_payment' && a.status !== 'no_show' && (
             <button onClick={() => handleCancel(a.id)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 flex items-center gap-1"><XCircle size={14} />Cancelar</button>
           )}
           {!isCompleted && canRevert && (
@@ -1842,8 +1845,8 @@ export function SchedulingPage() {
                             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                               <div className="divide-y divide-slate-100">
                                 {timeGrid.map((row, idx) => (
-                                  <div key={row.appointment?.id || `free-${row.time}-${idx}`} className={`flex ${row.type === 'appointment' ? '' : 'hover:bg-blue-50/50'}`}>
-                                    <div className={`w-16 shrink-0 flex items-center justify-center py-3 border-r border-slate-100 ${row.type === 'appointment' ? 'bg-slate-50' : 'bg-white'}`}>
+                                  <div key={row.appointment?.id || `free-${row.time}-${idx}`} className={`flex ${row.type === 'appointment' ? (row.appointment?.status === 'no_show' ? 'bg-red-50/40' : '') : 'hover:bg-blue-50/50'}`}>
+                                    <div className={`w-16 shrink-0 flex items-center justify-center py-3 border-r border-slate-100 ${row.type === 'appointment' ? (row.appointment?.status === 'no_show' ? 'bg-red-50' : 'bg-slate-50') : 'bg-white'}`}>
                                       <span className={`text-xs font-mono font-semibold ${row.type === 'appointment' ? 'text-[#1E3A5F]' : 'text-slate-400'}`}>{row.time}</span>
                                     </div>
                                     {row.type === 'appointment' && row.appointment ? (
