@@ -350,6 +350,7 @@ export function SchedulingPage() {
   const [tussEditMode, setTussEditMode] = useState(false);
   // When true, the call is already completed (legacy "Registrar TUSS") — skip status change.
   const [tussAlreadyCompleted, setTussAlreadyCompleted] = useState(false);
+  const [tussCompleteOnSave, setTussCompleteOnSave] = useState(false);
 
   // ---- Stock withdrawal extension (procedure templates + materials) ----
   interface TplMaterial { productId: string; productName: string; unit: string; quantity: number }
@@ -880,7 +881,8 @@ export function SchedulingPage() {
     if (a.paymentType === 'PARTICULAR') {
       await openStockOnlyModal(a);
     } else {
-      await openTussModalForCall(a, false);
+      const hasExistingProcs = (a.procedures?.length || 0) > 0;
+      await openTussModalForCall(a, hasExistingProcs, false, true);
     }
   };
 
@@ -1076,11 +1078,12 @@ export function SchedulingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tussItems.map(i => i.procedureId).join(','), tussModalCall, tussModalProcedures, procedureTemplates, inventoryProducts]);
 
-  const openTussModalForCall = async (a: Appointment, editMode: boolean, retroMode = false) => {
+  const openTussModalForCall = async (a: Appointment, editMode: boolean, retroMode = false, completeOnSave = false) => {
     setTussModalCall(a);
     setTussEditMode(editMode);
     setTussAlreadyCompleted(a.status === 'completed');
     setTussRetroMode(retroMode);
+    setTussCompleteOnSave(completeOnSave);
     const defaultDocId = a.doctorId || '';
     setTussItems([{ procedureId: '', authNumber: '', doctorId: defaultDocId }]);
     setTussLoadingList(true);
@@ -1170,6 +1173,8 @@ export function SchedulingPage() {
         await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
       } else {
         await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
+      }
+      if (tussCompleteOnSave && !tussAlreadyCompleted) {
         await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
       }
 
@@ -1193,13 +1198,15 @@ export function SchedulingPage() {
       }
 
       showToast(
-        tussEditMode
-          ? 'Procedimentos atualizados!'
-          : tussAlreadyCompleted
-            ? 'Procedimentos registrados!'
-            : 'Realizacao confirmada!',
+        tussCompleteOnSave && !tussAlreadyCompleted
+          ? 'Realizacao confirmada!'
+          : tussEditMode
+            ? 'Procedimentos atualizados!'
+            : tussAlreadyCompleted
+              ? 'Procedimentos registrados!'
+              : 'Realizacao confirmada!',
       );
-      if (!tussEditMode && !tussAlreadyCompleted && tussModalCall && !tussModalCall.isReturn) {
+      if (tussCompleteOnSave && !tussAlreadyCompleted && tussModalCall && !tussModalCall.isReturn) {
         setReturnPromptCall(tussModalCall);
       }
       setTussModalCall(null);
@@ -1713,8 +1720,10 @@ export function SchedulingPage() {
           {!isCompleted && a.status === 'attended' && (
             <>
               <button onClick={() => handleRealized(a)} disabled={updatingId === a.id} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1 animate-pulse"><Check size={14} />Realizado</button>
-              {a.paymentType === 'PARTICULAR' && (
+              {a.paymentType === 'PARTICULAR' ? (
                 <button onClick={() => { setAddProcCallId(a.id); setAddProcRows([{ procedureId: '', doctorId: '' }]); }} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 flex items-center gap-1"><Calendar size={14} />Novo procedimento</button>
+              ) : (
+                <button onClick={() => openTussModalForCall(a, true)} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 flex items-center gap-1"><Calendar size={14} />Novo procedimento</button>
               )}
             </>
           )}
