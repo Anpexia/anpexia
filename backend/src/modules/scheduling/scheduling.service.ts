@@ -939,8 +939,10 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
   // Private (particular) procedures
   for (const pp of call.privateProcedureCalls) {
     const proc = pp.privateProcedure;
-    const valor = pp.finalAmount != null ? Number(pp.finalAmount) : (Number(proc.value) || 0);
-    if (valor <= 0) continue;
+    const originalValue = Number(proc.value) || 0;
+    const valor = pp.finalAmount != null ? Number(pp.finalAmount) : originalValue;
+    const isCourtesy = valor <= 0 && originalValue > 0 && Number(pp.discountPercent) >= 100;
+    if (valor <= 0 && !isCourtesy) continue;
     const effectiveDoctorId = pp.doctorId || call.doctorId;
     const effectiveDoctorName = effectiveDoctorId ? doctorNames.get(effectiveDoctorId) : null;
 
@@ -949,7 +951,7 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
         tenantId,
         type: 'INCOME',
         category: 'Procedimentos',
-        description: `${proc.name} - ${patientName} - ${dateIso}${Number(pp.discountPercent) > 0 ? ` (desconto ${pp.discountPercent}%)` : ''}`,
+        description: `${proc.name} - ${patientName} - ${dateIso}${isCourtesy ? ' (cortesia)' : Number(pp.discountPercent) > 0 ? ` (desconto ${pp.discountPercent}%)` : ''}`,
         amount: new Prisma.Decimal(valor),
         date: call.date,
         paymentMethod: 'DINHEIRO',
@@ -959,7 +961,7 @@ async function applyFinancialsForCompletedCall(tx: Prisma.TransactionClient, cal
       },
     });
 
-    if (effectiveDoctorId && effectiveDoctorName) {
+    if (!isCourtesy && effectiveDoctorId && effectiveDoctorName) {
       const pct = repasseByPrivate.get(effectiveDoctorId)?.get(pp.privateProcedureId)
         ?? repasseByType.get(effectiveDoctorId)?.get(proc.type)
         ?? 0;
