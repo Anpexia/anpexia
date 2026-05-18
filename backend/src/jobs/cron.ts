@@ -752,6 +752,32 @@ async function sendMeetingReminders() {
 }
 
 // ============================================================
+// JOB 11: Auto-mark no-show for past appointments (daily 00:01 AM)
+// ============================================================
+async function markNoShowAppointments() {
+  try {
+    const now = new Date();
+    const spNow = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+    const todaySP = spNow.toISOString().slice(0, 10);
+    const startOfTodaySP = new Date(`${todaySP}T00:00:00-03:00`);
+
+    const result = await prisma.scheduledCall.updateMany({
+      where: {
+        date: { lt: startOfTodaySP },
+        status: { in: ['scheduled', 'confirmed'] },
+      },
+      data: { status: 'no_show' },
+    });
+
+    if (result.count > 0) {
+      console.log(`${TAG} Auto-marked ${result.count} past appointment(s) as no_show`);
+    }
+  } catch (err) {
+    console.error(`${TAG} markNoShowAppointments error:`, err);
+  }
+}
+
+// ============================================================
 // INIT: Register all cron jobs
 // ============================================================
 export function initCronJobs() {
@@ -804,8 +830,17 @@ export function initCronJobs() {
     await checkWhatsAppConnections();
   }, { timezone: 'America/Sao_Paulo' });
 
+  // Daily at 00:01 AM: auto-mark no-show for past appointments
+  cron.schedule('1 0 * * *', async () => {
+    console.log(`${TAG} Running auto no-show marking...`);
+    await markNoShowAppointments();
+  }, { timezone: 'America/Sao_Paulo' });
+
   // On startup: check WhatsApp connections after 30s delay
   setTimeout(() => checkWhatsAppConnections(), 30_000);
+
+  // On startup: mark past no-shows immediately (catches backlog)
+  setTimeout(() => markNoShowAppointments(), 5_000);
 
   console.log(`${TAG} Cron jobs registered:`);
   console.log(`${TAG}   - Message queues: every 1 min`);
@@ -816,6 +851,7 @@ export function initCronJobs() {
   console.log(`${TAG}   - Birthday greetings: daily 9:00 AM`);
   console.log(`${TAG}   - 30-day return reminders: daily 10:00 AM`);
   console.log(`${TAG}   - 90-day reactivation: Monday 10:00 AM`);
+  console.log(`${TAG}   - Auto no-show marking: daily 00:01 AM`);
 }
 
 // ============================================================
