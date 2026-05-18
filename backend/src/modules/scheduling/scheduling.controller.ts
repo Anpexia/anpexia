@@ -3,6 +3,7 @@ import prisma from '../../config/database';
 import { schedulingService } from './scheduling.service';
 import {
   bookCallSchema,
+  editCallSchema,
   updateConfigSchema,
   updateCallStatusSchema,
   linkProceduresSchema,
@@ -53,7 +54,8 @@ router.get('/available-slots/:date', async (req: Request, res: Response, next) =
     const doctorId = (req.query.doctorId as string) || null;
     const tenantId = req.query.tenantId as string;
     if (!tenantId) throw new AppError(400, 'MISSING_TENANT', 'tenantId e obrigatorio');
-    const slots = await schedulingService.getAvailableSlots(date, doctorId, tenantId);
+    const excludeCallId = (req.query.excludeCallId as string) || null;
+    const slots = await schedulingService.getAvailableSlots(date, doctorId, tenantId, excludeCallId);
     return success(res, slots);
   } catch (err) { next(err); }
 });
@@ -157,6 +159,17 @@ router.patch('/calls/:id', authenticate, requireTenant, async (req: Request, res
   const call = await schedulingService.updateCallStatus(id, data, req.auth!.tenantId!);
   await logAction({ ...auditCtx(req), action: 'UPDATE', entity: 'APPOINTMENT', entityId: id, metadata: { status: data.status } });
   return success(res, call);
+});
+
+// PATCH /calls/:id/edit — edit appointment details (date, time, doctor, procedure, notes, etc.)
+router.patch('/calls/:id/edit', authenticate, requireTenant, async (req: Request, res: Response, next) => {
+  try {
+    const id = req.params.id as string;
+    const data = editCallSchema.parse(req.body);
+    const call = await schedulingService.editCall(id, req.auth!.tenantId!, data);
+    await logAction({ ...auditCtx(req), action: 'UPDATE', entity: 'APPOINTMENT', entityId: id, metadata: { editFields: Object.keys(data) } });
+    return success(res, call);
+  } catch (err) { next(err); }
 });
 
 // GET /calls/:id/return-eligibility — check if a completed call can have a return scheduled

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AppError } from '../../shared/middleware/error-handler';
 import {
   BookCallInput,
+  EditCallInput,
   UpdateConfigInput,
   UpdateCallStatusInput,
   LinkProceduresInput,
@@ -251,7 +252,7 @@ async function updateConfig(data: UpdateConfigInput) {
 // Generate time slots for a given date.
 // doctorId: when provided, only conflicts with calls for that doctor count as "booked".
 // This allows multiple doctors to have consults in the same slot without interfering.
-async function getAvailableSlots(date: string, doctorId?: string | null, tenantId?: string | null) {
+async function getAvailableSlots(date: string, doctorId?: string | null, tenantId?: string | null, excludeCallId?: string | null) {
   const config = await getConfig();
   const dayOfWeek = new Date(`${date}T12:00:00${SP_OFFSET}`).getDay();
   const dayKey = DAY_KEYS[dayOfWeek];
@@ -329,6 +330,7 @@ async function getAvailableSlots(date: string, doctorId?: string | null, tenantI
   };
   if (tenantId) where.tenantId = tenantId;
   if (doctorId) where.doctorId = doctorId;
+  if (excludeCallId) where.NOT = { id: excludeCallId };
 
   const bookedCalls = await prisma.scheduledCall.findMany({
     where,
@@ -1208,6 +1210,154 @@ async function withdrawInventoryForCall(
   return { alreadyProcessed: false as const, movements };
 }
 
+async function editCall(id: string, tenantId: string, data: EditCallInput) {
+  const call = await prisma.scheduledCall.findFirst({
+    where: { id, tenantId },
+    include: { privateProcedureCalls: true },
+  });
+  if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento nao encontrado');
+
+  const editableStatuses = ['scheduled', 'confirmed', 'awaiting_payment'];
+  if (!editableStatuses.includes(call.status)) {
+    throw new AppError(400, 'NOT_EDITABLE', 'Este agendamento nao pode ser editado no status atual. Reverta o status antes de editar.');
+  }
+
+  const hasPaidProcedures = call.privateProcedureCalls.some(p => p.paymentStatus === 'paid');
+
+  if (hasPaidProcedures && data.paymentType && data.paymentType !== call.paymentType) {
+    throw new AppError(400, 'HAS_PAID', 'Nao e possivel alterar tipo de pagamento com procedimentos ja pagos');
+  }
+  if (hasPaidProcedures && data.privateProcedureId !== undefined) {
+    throw new AppError(400, 'HAS_PAID', 'Nao e possivel alterar procedimento com pagamentos ja registrados');
+  }
+
+  const spNow = toSP(call.date);
+  const currentDate = spNow.dateStr;
+  const currentTime = `${String(spNow.hours).padStart(2, '0')}:${String(spNow.minutes).padStart(2, '0')}`;
+
+  const newDate = data.date || currentDate;
+  const newTime = data.time || currentTime;
+  const newDoctorId = data.doctorId !== undefined ? data.doctorId : call.doctorId;
+  const isEncaixe = data.isEncaixe !== undefined ? data.isEncaixe : call.isEncaixe;
+
+  let durationMin = call.duration;
+  const dateChanged = data.date !== undefined && data.date !== currentDate;
+  const timeChanged = data.time !== undefined && data.time !== currentTime;
+  const doctorChanged = data.doctorId !== undefined && data.doctorId !== call.doctorId;
+
+  if ((dateChanged || timeChanged || doctorChanged) && !isEncaixe) {
+    const result = await validateBookingWithinHours({
+      tenantId,
+      date: newDate,
+      time: newTime,
+      doctorId: newDoctorId,
+      excludeCallId: id,
+    });
+    durationMin = result.durationMin;
+  }
+
+  if (isEncaixe && doctorChanged && newDoctorId) {
+    const doc = await prisma.user.findUnique({ where: { id: newDoctorId }, select: { duracaoConsulta: true } });
+    if (doc?.duracaoConsulta) durationMin = doc.duracaoConsulta;
+  }
+
+  const callDate = (dateChanged || timeChanged) ? new Date(`${newDate}T${newTime}:00${SP_OFFSET}`) : undefined;
+
+  const newPaymentType = data.paymentType || call.paymentType;
+  const newConvenioId = newPaymentType === 'CONVENIO'
+    ? (data.convenioId !== undefined ? data.convenioId : call.convenioId)
+    : null;
+
+  if (newConvenioId) {
+    const conv = await prisma.convenio.findFirst({ where: { id: newConvenioId, tenantId } });
+    if (!conv) throw new AppError(400, 'INVALID_CONVENIO', 'Convenio nao pertence a este tenant');
+  }
+
+  if (data.privateProcedureId) {
+    const proc = await prisma.privateProcedure.findFirst({ where: { id: data.privateProcedureId, tenantId } });
+    if (!proc) throw new AppError(400, 'INVALID_PROCEDURE', 'Procedimento nao pertence a este tenant');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (callDate) {
+      updateData.date = callDate;
+      updateData.duration = durationMin;
+    }
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.doctorId !== undefined) updateData.doctorId = data.doctorId || null;
+    if (data.paymentType !== undefined) updateData.paymentType = data.paymentType;
+    updateData.convenioId = newConvenioId;
+    if (data.isEncaixe !== undefined) updateData.isEncaixe = data.isEncaixe;
+
+    const updated = await tx.scheduledCall.update({ where: { id }, data: updateData });
+
+    // Handle procedure changes when switching payment types or changing procedure
+    if (!hasPaidProcedures) {
+      const switchingToConvenio = data.paymentType === 'CONVENIO' && call.paymentType !== 'CONVENIO';
+      const switchingToParticular = data.paymentType === 'PARTICULAR' && call.paymentType !== 'PARTICULAR';
+      const changingProcedure = data.privateProcedureId !== undefined;
+
+      if (switchingToConvenio) {
+        await tx.privateProcedureCall.deleteMany({
+          where: { scheduledCallId: id, paymentStatus: { not: 'paid' } },
+        });
+      }
+
+      if (switchingToParticular && data.privateProcedureId) {
+        await tx.privateProcedureCall.deleteMany({
+          where: { scheduledCallId: id, paymentStatus: { not: 'paid' } },
+        });
+        await tx.privateProcedureCall.create({
+          data: {
+            scheduledCallId: id,
+            privateProcedureId: data.privateProcedureId,
+            doctorId: (data.doctorId !== undefined ? data.doctorId : call.doctorId) || undefined,
+            paymentStatus: 'pending',
+          },
+        });
+      }
+
+      if (!switchingToConvenio && !switchingToParticular && changingProcedure && (newPaymentType === 'PARTICULAR')) {
+        await tx.privateProcedureCall.deleteMany({
+          where: { scheduledCallId: id, paymentStatus: { not: 'paid' } },
+        });
+        if (data.privateProcedureId) {
+          await tx.privateProcedureCall.create({
+            data: {
+              scheduledCallId: id,
+              privateProcedureId: data.privateProcedureId,
+              doctorId: (data.doctorId !== undefined ? data.doctorId : call.doctorId) || undefined,
+              paymentStatus: 'pending',
+            },
+          });
+        }
+      }
+    }
+
+    if (doctorChanged && !hasPaidProcedures) {
+      await tx.privateProcedureCall.updateMany({
+        where: { scheduledCallId: id, paymentStatus: { not: 'paid' } },
+        data: { doctorId: data.doctorId || undefined },
+      });
+    }
+
+    if (newPaymentType === 'CONVENIO' && newConvenioId && updated.customerId) {
+      const existing = await tx.patientConvenio.findUnique({
+        where: { patientId_convenioId: { patientId: updated.customerId, convenioId: newConvenioId } },
+      });
+      if (!existing) {
+        await tx.patientConvenio.create({ data: { patientId: updated.customerId, convenioId: newConvenioId } });
+      }
+    }
+
+    return updated;
+  });
+}
+
 export { applyFinancialsForCompletedCall, revertFinancialsForCall };
 
 export const schedulingService = {
@@ -1216,6 +1366,7 @@ export const schedulingService = {
   getAvailableSlots,
   getAvailableDates,
   bookCall,
+  editCall,
   listCalls,
   getTodayAppointments,
   updateCallStatus,

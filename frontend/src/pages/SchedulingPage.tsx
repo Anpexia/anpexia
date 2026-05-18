@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw, DoorOpen, Plus } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw, DoorOpen, Plus, Pencil } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -277,8 +277,9 @@ export function SchedulingPage() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'agendamentos' | 'medicos'>('agendamentos');
 
-  // New appointment
+  // New / Edit appointment
   const [showBookModal, setShowBookModal] = useState(false);
+  const [editingCallId, setEditingCallId] = useState<string | null>(null);
   const [bookForm, setBookForm] = useState({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
   const [saving, setSaving] = useState(false);
   // Payment type for new appointment
@@ -662,6 +663,7 @@ export function SchedulingPage() {
   };
 
   const openBookWithSlot = (date: string, time: string) => {
+    setEditingCallId(null);
     setBookForm({ name: '', phone: '', email: '', date, time, notes: '', customerId: '', doctorId: '' });
     setSelectedBookCustomer(null);
     setCustomerSearch('');
@@ -671,11 +673,44 @@ export function SchedulingPage() {
   };
 
   const openBook = () => {
+    setEditingCallId(null);
     setBookForm({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
     setSelectedBookCustomer(null);
     setCustomerSearch('');
     resetPaymentState();
     setBookEncaixe(false);
+    setShowBookModal(true);
+  };
+
+  const openEditModal = (a: Appointment) => {
+    const dt = new Date(a.date);
+    const spDate = new Date(dt.getTime() - 3 * 60 * 60 * 1000);
+    const dateStr = spDate.toISOString().slice(0, 10);
+    const timeStr = spDate.toISOString().slice(11, 16);
+    setEditingCallId(a.id);
+    setBookForm({
+      name: a.name,
+      phone: a.phone,
+      email: a.email || '',
+      date: dateStr,
+      time: timeStr,
+      notes: a.notes || '',
+      customerId: a.customerId || '',
+      doctorId: a.doctorId || '',
+    });
+    if (a.customer) {
+      setSelectedBookCustomer(a.customer);
+    } else {
+      setSelectedBookCustomer(null);
+    }
+    setCustomerSearch('');
+    setBookPaymentType((a.paymentType === 'CONVENIO' ? 'CONVENIO' : 'PARTICULAR') as 'PARTICULAR' | 'CONVENIO');
+    setBookConvenioId(a.convenioId || '');
+    const existingProc = a.privateProcedureCalls?.[0];
+    setBookProcedureId(existingProc?.privateProcedure?.id || '');
+    setBookEncaixe(!!a.isEncaixe);
+    setBookCalMonth(startOfMonth(new Date(dateStr + 'T12:00:00')));
+    bookDoctorRef.current = a.doctorId || '';
     setShowBookModal(true);
   };
 
@@ -687,14 +722,14 @@ export function SchedulingPage() {
     }
     let cancelled = false;
     setLoadingBookSlots(true);
-    api.get(`/scheduling/available-slots/${bookForm.date}`, {
-      params: { doctorId: bookForm.doctorId, tenantId: user?.tenant?.id },
-    })
+    const params: any = { doctorId: bookForm.doctorId, tenantId: user?.tenant?.id };
+    if (editingCallId) params.excludeCallId = editingCallId;
+    api.get(`/scheduling/available-slots/${bookForm.date}`, { params })
       .then(({ data }) => { if (!cancelled) setBookSlots(data.data || []); })
       .catch(() => { if (!cancelled) setBookSlots([]); })
       .finally(() => { if (!cancelled) setLoadingBookSlots(false); });
     return () => { cancelled = true; };
-  }, [showBookModal, bookForm.doctorId, bookForm.date, user?.tenant?.id]);
+  }, [showBookModal, bookForm.doctorId, bookForm.date, user?.tenant?.id, editingCallId]);
 
   // Reset date + time when doctor changes in booking modal
   const bookDoctorRef = useRef(bookForm.doctorId);
@@ -774,31 +809,57 @@ export function SchedulingPage() {
     }
     setSaving(true);
     try {
-      const payload: any = {
-        name: bookForm.name,
-        phone: bookForm.phone,
-        email: bookForm.email || undefined,
-        date: bookForm.date,
-        time: bookForm.time || undefined,
-        notes: bookForm.notes || undefined,
-        customerId: bookForm.customerId || undefined,
-        doctorId: bookForm.doctorId,
-        paymentType: bookPaymentType,
-        isEncaixe: bookEncaixe || undefined,
-      };
-      if (bookPaymentType === 'CONVENIO') {
-        payload.convenioId = bookConvenioId;
+      if (editingCallId) {
+        const payload: any = {
+          name: bookForm.name,
+          phone: bookForm.phone,
+          email: bookForm.email || null,
+          date: bookForm.date,
+          time: bookForm.time || undefined,
+          notes: bookForm.notes || null,
+          doctorId: bookForm.doctorId || null,
+          paymentType: bookPaymentType,
+          isEncaixe: bookEncaixe || false,
+        };
+        if (bookPaymentType === 'CONVENIO') {
+          payload.convenioId = bookConvenioId || null;
+        }
+        if (bookPaymentType === 'PARTICULAR') {
+          payload.privateProcedureId = bookProcedureId || null;
+        }
+        await api.patch(`/scheduling/calls/${editingCallId}/edit`, payload);
+        setShowBookModal(false);
+        setEditingCallId(null);
+        fetchAppointments(); setAgendaRefresh(r => r + 1);
+        fetchDates();
+        showToast('Agendamento atualizado com sucesso!');
+      } else {
+        const payload: any = {
+          name: bookForm.name,
+          phone: bookForm.phone,
+          email: bookForm.email || undefined,
+          date: bookForm.date,
+          time: bookForm.time || undefined,
+          notes: bookForm.notes || undefined,
+          customerId: bookForm.customerId || undefined,
+          doctorId: bookForm.doctorId,
+          paymentType: bookPaymentType,
+          isEncaixe: bookEncaixe || undefined,
+        };
+        if (bookPaymentType === 'CONVENIO') {
+          payload.convenioId = bookConvenioId;
+        }
+        if (bookPaymentType === 'PARTICULAR' && bookProcedureId) {
+          payload.privateProcedureId = bookProcedureId;
+        }
+        await api.post('/scheduling/book', payload);
+        setShowBookModal(false);
+        fetchAppointments(); setAgendaRefresh(r => r + 1);
+        fetchDates();
+        showToast('Agendamento criado com sucesso!');
       }
-      if (bookPaymentType === 'PARTICULAR' && bookProcedureId) {
-        payload.privateProcedureId = bookProcedureId;
-      }
-      await api.post('/scheduling/book', payload);
-      setShowBookModal(false);
-      fetchAppointments(); setAgendaRefresh(r => r + 1);
-      fetchDates();
-      showToast('Agendamento criado com sucesso!');
     } catch (err: any) {
-      const msg = err?.response?.data?.error?.message || 'Erro ao criar agendamento. Tente novamente.';
+      const msg = err?.response?.data?.error?.message || (editingCallId ? 'Erro ao atualizar agendamento.' : 'Erro ao criar agendamento. Tente novamente.');
       showToast(msg);
     } finally { setSaving(false); }
   };
@@ -1612,6 +1673,9 @@ export function SchedulingPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {!isCompleted && ['scheduled', 'confirmed', 'awaiting_payment'].includes(a.status) && (
+            <button onClick={() => openEditModal(a)} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 flex items-center gap-1"><Pencil size={14} />Editar</button>
+          )}
           {isCompleted && isReturnEligible(a) && (
             <button onClick={() => openReturnModal(a)} className="px-3 py-1.5 bg-sky-50 text-sky-700 rounded-lg text-xs font-medium hover:bg-sky-100 flex items-center gap-1"><RotateCcw size={14} />Agendar Retorno</button>
           )}
@@ -2485,15 +2549,20 @@ export function SchedulingPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-md flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-6 pb-4 shrink-0">
-              <h3 className="font-semibold text-slate-800">Novo agendamento</h3>
-              <button onClick={() => setShowBookModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+              <h3 className="font-semibold text-slate-800">{editingCallId ? 'Editar agendamento' : 'Novo agendamento'}</h3>
+              <button onClick={() => { setShowBookModal(false); setEditingCallId(null); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
             <form onSubmit={handleBook} className="flex flex-col flex-1 min-h-0">
               <div className="px-6 pb-4 space-y-4 overflow-y-auto flex-1">
               {/* Customer Search */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Buscar paciente</label>
-                {selectedBookCustomer ? (
+                <label className="block text-sm font-medium text-slate-700 mb-1">{editingCallId ? 'Paciente' : 'Buscar paciente'}</label>
+                {editingCallId && selectedBookCustomer ? (
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-sm font-medium text-slate-800">{selectedBookCustomer.name}</p>
+                    <p className="text-xs text-slate-500">{selectedBookCustomer.phone || selectedBookCustomer.email || ''}</p>
+                  </div>
+                ) : selectedBookCustomer ? (
                   <div className="flex items-center justify-between p-2.5 bg-[#EFF6FF]/50 border border-[#BFDBFE] rounded-lg">
                     <div>
                       <p className="text-sm font-medium text-slate-800">{selectedBookCustomer.name}</p>
@@ -2768,8 +2837,8 @@ export function SchedulingPage() {
               </div>
               </div>
               <div className="shrink-0 flex gap-3 p-6 pt-4 border-t border-slate-200 shadow-[0_-2px_4px_rgba(0,0,0,0.08)]">
-                <button type="button" onClick={() => setShowBookModal(false)} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? 'Agendando...' : 'Agendar'}</button>
+                <button type="button" onClick={() => { setShowBookModal(false); setEditingCallId(null); }} className="flex-1 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">{saving ? (editingCallId ? 'Salvando...' : 'Agendando...') : (editingCallId ? 'Salvar alteracoes' : 'Agendar')}</button>
               </div>
             </form>
           </div>

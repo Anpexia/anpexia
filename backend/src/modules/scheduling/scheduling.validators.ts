@@ -57,7 +57,22 @@ export const replaceProceduresSchema = z.object({
   })),
 });
 
+export const editCallSchema = z.object({
+  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').optional(),
+  phone: z.string().min(10, 'Telefone deve ter pelo menos 10 dígitos').optional(),
+  email: z.string().email('Email inválido').optional().nullable(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').optional(),
+  time: z.string().regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:MM').optional(),
+  notes: z.string().max(500).optional().nullable(),
+  doctorId: z.string().optional().nullable(),
+  paymentType: z.enum(['PARTICULAR', 'CONVENIO']).optional(),
+  convenioId: z.string().optional().nullable(),
+  privateProcedureId: z.string().optional().nullable(),
+  isEncaixe: z.boolean().optional(),
+});
+
 export type BookCallInput = z.infer<typeof bookCallSchema>;
+export type EditCallInput = z.infer<typeof editCallSchema>;
 export type UpdateConfigInput = z.infer<typeof updateConfigSchema>;
 export type UpdateCallStatusInput = z.infer<typeof updateCallStatusSchema>;
 export type LinkProceduresInput = z.infer<typeof linkProceduresSchema>;
