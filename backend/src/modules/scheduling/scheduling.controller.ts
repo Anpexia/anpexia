@@ -264,18 +264,20 @@ router.patch('/calls/:id/revert-status', authenticate, requireTenant, requireRol
     const call = await prisma.scheduledCall.findFirst({ where: { id, tenantId } });
     if (!call) throw new AppError(404, 'NOT_FOUND', 'Agendamento não encontrado');
 
-    const revertMap: Record<string, string> = { confirmed: 'scheduled', awaiting_payment: 'confirmed', present: 'confirmed', attended: 'present', completed: 'attended' };
+    const revertMap: Record<string, string> = { confirmed: 'scheduled', awaiting_payment: 'confirmed', present: 'awaiting_payment', attended: 'present', completed: 'attended' };
     const newStatus = revertMap[call.status];
     if (!newStatus) throw new AppError(400, 'INVALID_REVERT', 'Status não pode ser revertido');
 
     const updated = await prisma.$transaction(async (tx) => {
       const updateData: any = { status: newStatus };
-      if (call.status === 'present') {
-        updateData.checkinAt = null;
+      if (call.status === 'awaiting_payment') {
         await tx.privateProcedureCall.updateMany({
           where: { scheduledCallId: id },
           data: { paymentStatus: 'pending', paymentMethod: null, paidAt: null, discountPercent: 0, finalAmount: null },
         });
+      }
+      if (call.status === 'present') {
+        updateData.checkinAt = null;
       }
       if (['confirmed', 'scheduled', 'present'].includes(newStatus)) {
         updateData.calledAt = null;
@@ -434,18 +436,7 @@ router.post('/calls/:id/pay', authenticate, requireTenant, async (req: Request, 
       });
     }
 
-    // If all procedures are now paid and status is awaiting_payment, transition to present
-    if (call.status === 'awaiting_payment') {
-      const unpaid = await prisma.privateProcedureCall.count({
-        where: { scheduledCallId: callId, paymentStatus: { not: 'paid' } },
-      });
-      if (unpaid === 0) {
-        await prisma.scheduledCall.update({
-          where: { id: callId },
-          data: { status: 'present' },
-        });
-      }
-    }
+    // Payment done — status stays awaiting_payment until receptionist clicks "Presente"
 
     return success(res, { updated: procedureCallIds.length });
   } catch (err) { next(err); }

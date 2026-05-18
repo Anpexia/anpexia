@@ -115,12 +115,22 @@ const statusMap: Record<string, { label: string; cls: string; icon: string; step
   scheduled: { label: 'Agendado', cls: 'bg-blue-100 text-blue-700', icon: '🔵', step: 1 },
   confirmed: { label: 'Confirmado', cls: 'bg-green-100 text-green-700', icon: '✅', step: 2 },
   awaiting_payment: { label: 'Aguardando pgto', cls: 'bg-yellow-100 text-yellow-700', icon: '💰', step: 3 },
+  paid: { label: 'Pago', cls: 'bg-emerald-100 text-emerald-700', icon: '✅', step: 3 },
   present: { label: 'Na fila', cls: 'bg-purple-100 text-purple-700', icon: '🏥', step: 4 },
   attended: { label: 'Atendido', cls: 'bg-emerald-100 text-emerald-700', icon: '🩺', step: 5 },
   completed: { label: 'Realizado', cls: 'bg-slate-100 text-slate-600', icon: '✅', step: 6 },
   cancelled: { label: 'Cancelado', cls: 'bg-red-100 text-red-700', icon: '❌', step: -1 },
   no_show: { label: 'Faltou', cls: 'bg-red-100 text-red-700', icon: '❌', step: -1 },
 };
+
+function getDisplayStatus(a: { status: string; paymentType: string | null; privateProcedureCalls?: { paymentStatus?: string | null }[] }): string {
+  if (a.status === 'awaiting_payment' && a.paymentType === 'PARTICULAR' &&
+    (a.privateProcedureCalls?.length || 0) > 0 &&
+    a.privateProcedureCalls!.every(p => p.paymentStatus === 'paid')) {
+    return 'paid';
+  }
+  return a.status;
+}
 
 const timelineSteps = [
   { key: 'scheduled', label: 'Agendado', icon: '🔵' },
@@ -1593,6 +1603,8 @@ export function SchedulingPage() {
 
   const renderAppointmentCard = (a: Appointment) => {
     const isCompleted = a.status === 'completed';
+    const dStatus = getDisplayStatus(a);
+    const allProcsPaid = dStatus === 'paid';
     return (
     <div key={a.id} className={`rounded-xl border shadow-sm p-4 space-y-3 ${a.status === 'no_show' ? 'bg-red-50/50 border-red-300 opacity-75' : isCompleted ? 'bg-slate-50 border-slate-200 opacity-60' : a.isEncaixe ? 'bg-orange-50/30 border-orange-300' : 'bg-white border-slate-200'}`}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -1706,12 +1718,15 @@ export function SchedulingPage() {
           {!isCompleted && a.status === 'confirmed' && a.paymentType !== 'PARTICULAR' && (
             <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1"><UserCheck size={14} />Presente</button>
           )}
-          {!isCompleted && a.status === 'awaiting_payment' && (
+          {!isCompleted && a.status === 'awaiting_payment' && !allProcsPaid && (
             <button onClick={() => openPaymentModal(a.id)} className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1 animate-pulse">Efetuar pagamento</button>
+          )}
+          {!isCompleted && a.status === 'awaiting_payment' && allProcsPaid && (
+            <button onClick={() => handleStatusChange(a.id, 'present')} disabled={updatingId === a.id} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1"><UserCheck size={14} />Presente</button>
           )}
           {!isCompleted && canRevert && (a.status === 'confirmed' || a.status === 'awaiting_payment' || a.status === 'present' || a.status === 'attended') && (
             <button onClick={() => setRevertTarget(a)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 flex items-center gap-1">
-              <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : a.status === 'attended' ? 'Desfazer atendido' : a.status === 'awaiting_payment' ? 'Desfazer presenca' : 'Desconfirmar'}
+              <Undo2 size={14} />{a.status === 'present' ? 'Desfazer presente' : a.status === 'attended' ? 'Desfazer atendido' : a.status === 'awaiting_payment' ? (allProcsPaid ? 'Desfazer pago' : 'Cancelar pagamento') : 'Desconfirmar'}
             </button>
           )}
           {!isCompleted && a.status === 'in_attendance' && (
@@ -1742,7 +1757,7 @@ export function SchedulingPage() {
         </div>
       </div>
       <div className="pt-2 border-t border-slate-100">
-        <StatusTimeline status={a.status} />
+        <StatusTimeline status={dStatus} />
       </div>
     </div>
     );
@@ -1965,7 +1980,7 @@ export function SchedulingPage() {
                                       >
                                         <p className="text-xs font-medium text-slate-800 truncate">{row.appointment.customer?.name || row.appointment.name}</p>
                                         <div className="flex items-center gap-1">
-                                          <span className={`text-[9px] px-1 py-0.5 rounded ${statusMap[row.appointment.status]?.cls || ''}`}>{statusMap[row.appointment.status]?.icon}</span>
+                                          {(() => { const ds = getDisplayStatus(row.appointment!); return <span className={`text-[9px] px-1 py-0.5 rounded ${statusMap[ds]?.cls || ''}`}>{statusMap[ds]?.icon}</span>; })()}
                                           {row.appointment.doctor && <span className="text-[9px] text-indigo-600 truncate">{row.appointment.doctor.name}</span>}
                                         </div>
                                       </button>
@@ -2085,7 +2100,7 @@ export function SchedulingPage() {
               ) : (
                 <div className="space-y-2">
                   {historyData.map((a) => {
-                    const st = statusMap[a.status] || { label: a.status, cls: 'bg-gray-100 text-gray-600', icon: '⬜', step: 0 };
+                    const st = statusMap[getDisplayStatus(a)] || { label: a.status, cls: 'bg-gray-100 text-gray-600', icon: '⬜', step: 0 };
                     const isRealized = a.status === 'completed';
                     const hasProcs = (a.procedures?.length || 0) > 0;
                     const hasPrivProcs = (a.privateProcedureCalls?.length || 0) > 0;
@@ -2444,7 +2459,7 @@ export function SchedulingPage() {
                               <p className="text-xs text-slate-500 mb-2">Agendados ({dayAppts.length})</p>
                               <div className="space-y-1.5">
                                 {dayAppts.map(a => {
-                                  const st = statusMap[a.status];
+                                  const st = statusMap[getDisplayStatus(a)];
                                   return (
                                     <div key={a.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
                                       <div className="flex items-center gap-2">
@@ -3392,13 +3407,16 @@ export function SchedulingPage() {
                 : revertTarget.status === 'attended'
                 ? 'Deseja reverter este agendamento para Em atendimento?'
                 : revertTarget.status === 'present'
-                ? 'Deseja reverter este agendamento para Confirmado?'
+                ? 'Deseja remover este paciente da fila do medico?'
                 : revertTarget.status === 'awaiting_payment'
-                ? 'Deseja reverter este agendamento para Confirmado?'
+                ? 'Deseja desfazer o pagamento? O paciente voltara para Confirmado.'
                 : 'Deseja reverter este agendamento para Aguardando confirmação?'}
             </p>
             {revertTarget.status === 'completed' && (
               <p className="text-xs text-amber-600 mb-4">O estoque baixado não será estornado automaticamente.</p>
+            )}
+            {revertTarget.status === 'awaiting_payment' && (
+              <p className="text-xs text-amber-600 mb-4">O pagamento registrado sera estornado.</p>
             )}
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setRevertTarget(null)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
