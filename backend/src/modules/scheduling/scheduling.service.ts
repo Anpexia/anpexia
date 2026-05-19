@@ -160,6 +160,7 @@ async function validateBookingWithinHours(params: {
   let durationMin = hours.durationMin;
   let shifts: Shift[] = [];
   let isDayActive = false;
+  let shiftsFromDoctor = false;
 
   if (params.doctorId) {
     const doctor = await prisma.user.findUnique({
@@ -179,6 +180,7 @@ async function validateBookingWithinHours(params: {
       const parsed = parseDayShifts((doctor.horarios as any)[key]);
       isDayActive = parsed.ativo;
       shifts = parsed.shifts;
+      if (shifts.length > 0) shiftsFromDoctor = true;
     }
     if (doctor?.duracaoConsulta) durationMin = doctor.duracaoConsulta;
   }
@@ -205,6 +207,17 @@ async function validateBookingWithinHours(params: {
 
   if (!fitsInShift) {
     throw new AppError(400, 'INVALID_TIME', 'Horário fora do expediente configurado');
+  }
+
+  if (!shiftsFromDoctor) {
+    const config = await getConfig();
+    if (config.breakStart != null && config.breakEnd != null) {
+      const bStart = config.breakStart * 60;
+      const bEnd = config.breakEnd * 60;
+      if (reqMin >= bStart && reqMin < bEnd) {
+        throw new AppError(400, 'INVALID_TIME', 'Horário dentro do intervalo de almoço');
+      }
+    }
   }
 
   // Per-doctor conflict check: another call at the exact same datetime for same doctor
@@ -261,6 +274,7 @@ async function getAvailableSlots(date: string, doctorId?: string | null, tenantI
   let slotDuration = config.slotDuration;
   let shifts: Shift[] = [];
   let isDayActive = false;
+  let shiftsFromDoctor = false;
 
   if (doctorId) {
     const doctor = await prisma.user.findUnique({
@@ -278,6 +292,7 @@ async function getAvailableSlots(date: string, doctorId?: string | null, tenantI
       const parsed = parseDayShifts((doctor.horarios as any)[dayKey]);
       isDayActive = parsed.ativo;
       shifts = parsed.shifts;
+      if (shifts.length > 0) shiftsFromDoctor = true;
     }
     if (doctor?.duracaoConsulta) slotDuration = doctor.duracaoConsulta;
   }
@@ -307,12 +322,19 @@ async function getAvailableSlots(date: string, doctorId?: string | null, tenantI
   }
 
   // Generate slots from all shifts
+  // Apply break filter only when shifts come from tenant/global fallback (single continuous shift).
+  // Doctor-specific manha/tarde shifts already have natural gaps for lunch.
+  const applyBreak = !shiftsFromDoctor && config.breakStart != null && config.breakEnd != null;
+  const breakStartMin = applyBreak ? config.breakStart! * 60 : -1;
+  const breakEndMin = applyBreak ? config.breakEnd! * 60 : -1;
+
   const slots: { time: string; available: boolean }[] = [];
   for (const shift of shifts) {
     const startMinutes = timeToMinutes(shift.inicio);
     const endMinutes = timeToMinutes(shift.fim);
 
     for (let m = startMinutes; m < endMinutes; m += slotDuration) {
+      if (applyBreak && m >= breakStartMin && m < breakEndMin) continue;
       const hour = Math.floor(m / 60);
       const minute = m % 60;
       const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;

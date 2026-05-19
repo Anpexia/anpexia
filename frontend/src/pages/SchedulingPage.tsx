@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw, DoorOpen, Plus, Pencil } from 'lucide-react';
+import { Calendar, Clock, X, Check, XCircle, Phone, Search, AlertTriangle, ChevronLeft, ChevronRight, FileCheck2, AlertCircle, UserCog, Stethoscope, ShieldCheck, ShieldAlert, Undo2, Trash2, UserCheck, Eye, ChevronDown, ChevronUp, RotateCcw, DoorOpen, Plus, Pencil, Coffee } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isBefore, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -180,7 +180,7 @@ function StatusTimeline({ status }: { status: string }) {
 interface TimeGridRow {
   time: string;
   minutes: number;
-  type: 'free' | 'appointment';
+  type: 'free' | 'appointment' | 'break';
   appointment?: Appointment;
 }
 
@@ -190,6 +190,8 @@ function buildTimeGrid(
   dayKey: string,
   filterDoctorId: string,
 ): TimeGridRow[] {
+  const parseTime = (t: string) => { const [hh, mm] = t.split(':').map(Number); return hh * 60 + mm; };
+
   const slotDuration = (() => {
     if (filterDoctorId) {
       const doc = doctorsForDay.find(d => d.id === filterDoctorId);
@@ -201,39 +203,65 @@ function buildTimeGrid(
     return 30;
   })();
 
-  let startMin = 480; // 08:00
-  let endMin = 1080; // 18:00
+  // Collect working ranges and break ranges
+  interface Range { start: number; end: number }
+  const workRanges: Range[] = [];
+  const breakRanges: Range[] = [];
 
   const targetDoc = filterDoctorId ? doctorsForDay.find(d => d.id === filterDoctorId) : null;
   if (targetDoc?.horarios?.[dayKey]?.ativo) {
     const h = targetDoc.horarios[dayKey];
-    const parseTime = (t: string) => { const [hh, mm] = t.split(':').map(Number); return hh * 60 + mm; };
     if (h.manha && h.tarde) {
-      startMin = parseTime(h.manha.inicio);
-      endMin = parseTime(h.tarde.fim);
+      const manhaEnd = parseTime(h.manha.fim);
+      const tardeStart = parseTime(h.tarde.inicio);
+      workRanges.push({ start: parseTime(h.manha.inicio), end: manhaEnd });
+      workRanges.push({ start: tardeStart, end: parseTime(h.tarde.fim) });
+      if (tardeStart > manhaEnd) breakRanges.push({ start: manhaEnd, end: tardeStart });
     } else if (h.inicio && h.fim) {
-      startMin = parseTime(h.inicio);
-      endMin = parseTime(h.fim);
+      workRanges.push({ start: parseTime(h.inicio), end: parseTime(h.fim) });
+      breakRanges.push({ start: 720, end: 780 }); // 12:00-13:00 default break
     }
   } else if (doctorsForDay.length > 0) {
-    const parseTime = (t: string) => { const [hh, mm] = t.split(':').map(Number); return hh * 60 + mm; };
     let earliest = 1440, latest = 0;
+    const gaps: Range[] = [];
     for (const doc of doctorsForDay) {
       if (!doc.horarios?.[dayKey]?.ativo) continue;
       const h = doc.horarios[dayKey];
       if (h.manha && h.tarde) {
         earliest = Math.min(earliest, parseTime(h.manha.inicio));
         latest = Math.max(latest, parseTime(h.tarde.fim));
+        const gapStart = parseTime(h.manha.fim);
+        const gapEnd = parseTime(h.tarde.inicio);
+        if (gapEnd > gapStart) gaps.push({ start: gapStart, end: gapEnd });
       } else if (h.inicio && h.fim) {
         earliest = Math.min(earliest, parseTime(h.inicio));
         latest = Math.max(latest, parseTime(h.fim));
       }
     }
-    if (earliest < latest) { startMin = earliest; endMin = latest; }
+    if (earliest < latest) {
+      workRanges.push({ start: earliest, end: latest });
+      if (gaps.length > 0) {
+        const commonGapStart = Math.max(...gaps.map(g => g.start));
+        const commonGapEnd = Math.min(...gaps.map(g => g.end));
+        if (commonGapEnd > commonGapStart) breakRanges.push({ start: commonGapStart, end: commonGapEnd });
+      } else {
+        breakRanges.push({ start: 720, end: 780 });
+      }
+    }
   }
 
+  if (workRanges.length === 0) {
+    workRanges.push({ start: 480, end: 1080 }); // 08:00-18:00 default
+    breakRanges.push({ start: 720, end: 780 }); // 12:00-13:00 default break
+  }
+
+  const overallStart = Math.min(...workRanges.map(r => r.start));
+  const overallEnd = Math.max(...workRanges.map(r => r.end));
+
+  const isInBreak = (m: number) => breakRanges.some(b => m >= b.start && m < b.end);
+
   const standardSlots: number[] = [];
-  for (let m = startMin; m < endMin; m += slotDuration) {
+  for (let m = overallStart; m < overallEnd; m += slotDuration) {
     standardSlots.push(m);
   }
 
@@ -264,6 +292,8 @@ function buildTimeGrid(
       for (const appt of appts) {
         rows.push({ time, minutes: m, type: 'appointment', appointment: appt });
       }
+    } else if (isInBreak(m)) {
+      rows.push({ time, minutes: m, type: 'break' });
     } else {
       rows.push({ time, minutes: m, type: 'free' });
     }
@@ -1877,13 +1907,18 @@ export function SchedulingPage() {
                             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                               <div className="divide-y divide-slate-100">
                                 {timeGrid.map((row, idx) => (
-                                  <div key={row.appointment?.id || `free-${row.time}-${idx}`} className={`flex ${row.type === 'appointment' ? (row.appointment?.status === 'no_show' ? 'bg-red-50/40' : '') : 'hover:bg-blue-50/50'}`}>
-                                    <div className={`w-16 shrink-0 flex items-center justify-center py-3 border-r border-slate-100 ${row.type === 'appointment' ? (row.appointment?.status === 'no_show' ? 'bg-red-50' : 'bg-slate-50') : 'bg-white'}`}>
-                                      <span className={`text-xs font-mono font-semibold ${row.type === 'appointment' ? 'text-[#1E3A5F]' : 'text-slate-400'}`}>{row.time}</span>
+                                  <div key={row.appointment?.id || `${row.type}-${row.time}-${idx}`} className={`flex ${row.type === 'appointment' ? (row.appointment?.status === 'no_show' ? 'bg-red-50/40' : '') : row.type === 'break' ? 'bg-slate-50/60' : 'hover:bg-blue-50/50'}`}>
+                                    <div className={`w-16 shrink-0 flex items-center justify-center py-3 border-r border-slate-100 ${row.type === 'appointment' ? (row.appointment?.status === 'no_show' ? 'bg-red-50' : 'bg-slate-50') : row.type === 'break' ? 'bg-slate-100' : 'bg-white'}`}>
+                                      <span className={`text-xs font-mono font-semibold ${row.type === 'appointment' ? 'text-[#1E3A5F]' : row.type === 'break' ? 'text-slate-300' : 'text-slate-400'}`}>{row.time}</span>
                                     </div>
                                     {row.type === 'appointment' && row.appointment ? (
                                       <div className="flex-1 min-w-0 p-2">
                                         {renderAppointmentCard(row.appointment)}
+                                      </div>
+                                    ) : row.type === 'break' ? (
+                                      <div className="flex-1 min-w-0 flex items-center gap-2 px-4 py-3">
+                                        <Coffee size={14} className="text-slate-300" />
+                                        <span className="text-xs text-slate-300 italic">Intervalo</span>
                                       </div>
                                     ) : (
                                       <button
@@ -1965,13 +2000,14 @@ export function SchedulingPage() {
                           const doctorsThisDay = agendaDoctorsForDay(dayStr);
                           const grid = buildTimeGrid(dayAppts, doctorsThisDay, dayKey, filterDoctorId);
                           const occupiedCount = grid.filter(r => r.type === 'appointment').length;
+                          const usableSlots = grid.filter(r => r.type !== 'break').length;
                           return (
                             <div key={dayStr} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${today ? 'border-[#2563EB] ring-1 ring-[#2563EB]' : 'border-slate-200'}`}>
                               <div className={`px-3 py-2 text-center ${today ? 'bg-[#1E3A5F] text-white' : 'bg-slate-50'}`}>
                                 <p className={`text-xs font-medium capitalize ${today ? 'text-white/80' : 'text-slate-500'}`}>{format(day, 'EEE', { locale: ptBR })}</p>
                                 <p className={`text-lg font-bold ${today ? 'text-white' : 'text-slate-800'}`}>{format(day, 'dd')}</p>
                                 {grid.length > 0 && (
-                                  <p className={`text-[10px] mt-0.5 ${today ? 'text-white/70' : 'text-slate-400'}`}>{occupiedCount}/{grid.length} ocupados</p>
+                                  <p className={`text-[10px] mt-0.5 ${today ? 'text-white/70' : 'text-slate-400'}`}>{occupiedCount}/{usableSlots} ocupados</p>
                                 )}
                               </div>
                               <div className="divide-y divide-slate-50 max-h-[400px] overflow-y-auto">
@@ -1979,8 +2015,8 @@ export function SchedulingPage() {
                                   <p className="text-xs text-slate-400 text-center py-4">Sem horarios</p>
                                 )}
                                 {grid.map((row, rIdx) => (
-                                  <div key={row.appointment?.id || `free-${row.time}-${rIdx}`} className={`flex items-center gap-1.5 px-2 py-1.5 ${row.type === 'free' ? 'hover:bg-blue-50/50' : ''}`}>
-                                    <span className={`text-[10px] font-mono w-10 shrink-0 ${row.type === 'appointment' ? 'font-semibold text-[#1E3A5F]' : 'text-slate-400'}`}>{row.time}</span>
+                                  <div key={row.appointment?.id || `${row.type}-${row.time}-${rIdx}`} className={`flex items-center gap-1.5 px-2 py-1.5 ${row.type === 'free' ? 'hover:bg-blue-50/50' : row.type === 'break' ? 'bg-slate-50/40' : ''}`}>
+                                    <span className={`text-[10px] font-mono w-10 shrink-0 ${row.type === 'appointment' ? 'font-semibold text-[#1E3A5F]' : row.type === 'break' ? 'text-slate-300' : 'text-slate-400'}`}>{row.time}</span>
                                     {row.type === 'appointment' && row.appointment ? (
                                       <button
                                         onClick={() => { setAgendaMode('diario'); setAgendaDate(day); }}
@@ -1992,6 +2028,8 @@ export function SchedulingPage() {
                                           {row.appointment.doctor && <span className="text-[9px] text-indigo-600 truncate">{row.appointment.doctor.name}</span>}
                                         </div>
                                       </button>
+                                    ) : row.type === 'break' ? (
+                                      <span className="flex-1 text-[10px] text-slate-300 italic">Intervalo</span>
                                     ) : (
                                       <button
                                         onClick={() => {
@@ -2038,7 +2076,7 @@ export function SchedulingPage() {
                           const count = dayAppts.length;
                           const dayKey = dayKeyMapM[day.getDay()];
                           const doctorsThisDay = inMonth ? agendaDoctorsForDay(dayStr) : [];
-                          const totalSlots = inMonth && doctorsThisDay.length > 0 ? buildTimeGrid([], doctorsThisDay, dayKey, filterDoctorId).length : 0;
+                          const totalSlots = inMonth && doctorsThisDay.length > 0 ? buildTimeGrid([], doctorsThisDay, dayKey, filterDoctorId).filter(r => r.type !== 'break').length : 0;
 
                           return (
                             <button
