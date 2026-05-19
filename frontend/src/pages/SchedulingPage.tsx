@@ -44,6 +44,8 @@ interface CallPrivateProcedure {
   paymentStatus?: string | null;
   paymentMethod?: string | null;
   paidAt?: string | null;
+  discountPercent?: number | null;
+  finalAmount?: number | null;
   privateProcedure: {
     id: string;
     name: string;
@@ -1681,12 +1683,18 @@ export function SchedulingPage() {
             {/* Private procedure info */}
             {a.paymentType === 'PARTICULAR' && a.privateProcedureCalls && a.privateProcedureCalls.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {a.privateProcedureCalls.map(pc => (
+                {a.privateProcedureCalls.map(pc => {
+                  const isPaid = pc.paymentStatus === 'paid';
+                  const hasDiscount = isPaid && pc.finalAmount != null && pc.privateProcedure.value != null && Number(pc.finalAmount) !== Number(pc.privateProcedure.value);
+                  const displayValue = isPaid && pc.finalAmount != null ? Number(pc.finalAmount) : (pc.privateProcedure.value != null ? Number(pc.privateProcedure.value) : null);
+                  return (
                   <span key={pc.id} className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
                     {pc.privateProcedure.name}
-                    {pc.privateProcedure.value != null && <span className="font-medium">R$ {Number(pc.privateProcedure.value).toFixed(2)}</span>}
+                    {hasDiscount && <span className="font-medium line-through text-slate-400">R$ {Number(pc.privateProcedure.value).toFixed(2)}</span>}
+                    {displayValue != null && <span className="font-medium">R$ {displayValue.toFixed(2)}</span>}
                   </span>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2307,15 +2315,23 @@ export function SchedulingPage() {
                                       <th className="pb-1 pr-3">Nome</th><th className="pb-1 pr-3">Tipo</th><th className="pb-1 pr-3">Valor</th><th className="pb-1 pr-3">Medico</th><th className="pb-1">Notas</th>
                                     </tr></thead>
                                     <tbody>
-                                      {a.privateProcedureCalls?.map((p) => (
+                                      {a.privateProcedureCalls?.map((p) => {
+                                        const isPd = p.paymentStatus === 'paid';
+                                        const hasDsc = isPd && p.finalAmount != null && p.privateProcedure.value != null && Number(p.finalAmount) !== Number(p.privateProcedure.value);
+                                        const dVal = isPd && p.finalAmount != null ? Number(p.finalAmount) : (p.privateProcedure.value != null ? Number(p.privateProcedure.value) : null);
+                                        return (
                                         <tr key={p.id} className="border-b border-slate-100">
                                           <td className="py-1.5 pr-3 text-slate-700">{p.privateProcedure.name}</td>
                                           <td className="py-1.5 pr-3"><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{p.privateProcedure.type}</span></td>
-                                          <td className="py-1.5 pr-3 text-slate-700">{p.privateProcedure.value != null ? `R$ ${p.privateProcedure.value.toFixed(2)}` : '-'}</td>
+                                          <td className="py-1.5 pr-3 text-slate-700">
+                                            {hasDsc && <span className="line-through text-slate-400 mr-1">R$ {Number(p.privateProcedure.value).toFixed(2)}</span>}
+                                            {dVal != null ? `R$ ${dVal.toFixed(2)}` : '-'}
+                                          </td>
                                           <td className="py-1.5 pr-3 text-slate-700">{p.doctor?.name || a.doctor?.name || '-'}</td>
                                           <td className="py-1.5 text-slate-700">{p.notes || '-'}</td>
                                         </tr>
-                                      ))}
+                                        );
+                                      })}
                                     </tbody>
                                   </table>
                                 </div>
@@ -3580,6 +3596,7 @@ export function SchedulingPage() {
 
       {/* Payment Modal */}
       {paymentCallId && (() => {
+        const currentPaymentCallId = paymentCallId;
         const computedItems = paymentSummary?.items.map(item => {
           const discPct = item.paymentStatus === 'paid' ? item.discountPercent : (paymentDiscounts[item.id] ?? 0);
           const finalVal = item.paymentStatus === 'paid' ? item.finalAmount : item.value * (1 - discPct / 100);
@@ -3681,9 +3698,25 @@ export function SchedulingPage() {
                     </select>
                   </div>
                 )}
-                {!hasUnpaid && (
+                {!hasUnpaid && computedItems.length > 0 && (
                   <div className="text-center py-2">
                     <p className="text-sm text-emerald-600 font-medium">Todos os procedimentos pagos!</p>
+                  </div>
+                )}
+                {computedItems.length === 0 && (
+                  <div className="text-center py-4 space-y-3">
+                    <p className="text-sm text-slate-500">Nenhum procedimento vinculado a este agendamento.</p>
+                    <button
+                      onClick={() => {
+                        setPaymentCallId(null);
+                        setPaymentSummary(null);
+                        setAddProcCallId(currentPaymentCallId);
+                        setAddProcRows([{ procedureId: '', doctorId: '' }]);
+                      }}
+                      className="px-4 py-2 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A]"
+                    >
+                      Adicionar procedimento
+                    </button>
                   </div>
                 )}
               </div>
