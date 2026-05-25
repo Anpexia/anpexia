@@ -1,6 +1,31 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
 
+export async function checkDuplicatePhone(tenantId: string, phone: string | undefined | null, excludeId?: string) {
+  if (!phone) return;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 8) return;
+
+  const suffix = digits.slice(-9);
+
+  const where: any = {
+    tenantId,
+    isActive: true,
+    phone: { endsWith: suffix },
+    responsavelId: null,
+  };
+  if (excludeId) where.id = { not: excludeId };
+
+  const existing = await prisma.customer.findFirst({
+    where,
+    select: { id: true, name: true },
+  });
+
+  if (existing) {
+    throw new AppError(409, 'DUPLICATE_PHONE', `Ja existe um paciente cadastrado com este telefone: ${existing.name}. Se for dependente, vincule pelo campo Responsavel.`);
+  }
+}
+
 interface ListParams {
   skip: number;
   take: number;
@@ -184,6 +209,10 @@ export const customerService = {
   async create(tenantId: string, data: CreateCustomerData) {
     const { tagIds, birthDate, responsavelId, parentesco, usarTelResponsavel, ...rest } = data;
 
+    if (!responsavelId) {
+      await checkDuplicatePhone(tenantId, data.phone);
+    }
+
     const customer = await prisma.customer.create({
       data: {
         ...rest,
@@ -213,6 +242,11 @@ export const customerService = {
     }
 
     const { tagIds, birthDate, responsavelId, parentesco, usarTelResponsavel, ...rest } = data;
+
+    const effectiveResponsavelId = responsavelId !== undefined ? responsavelId : existing.responsavelId;
+    if (data.phone && data.phone !== existing.phone && !effectiveResponsavelId) {
+      await checkDuplicatePhone(tenantId, data.phone, id);
+    }
 
     const updateData: any = {
       ...rest,

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { customerService } from './customer.service';
+import { customerService, checkDuplicatePhone } from './customer.service';
 import { createCustomerSchema, updateCustomerSchema } from './customer.validators';
 import { success, created, noContent } from '../../shared/utils/response';
 import { authenticate, requireTenant } from '../../shared/middleware/auth';
@@ -290,6 +290,8 @@ customerRouter.post('/import-batch', async (req: Request, res: Response, next: N
         const address = (r.cep || r.street || r.number || r.neighborhood || r.city || r.state)
           ? { cep: r.cep || '', street: r.street || '', number: r.number || '', neighborhood: r.neighborhood || '', city: r.city || '', state: r.state || '' }
           : undefined;
+
+        await checkDuplicatePhone(tenantId, r.phone || null);
 
         await prisma.customer.create({
           data: {
