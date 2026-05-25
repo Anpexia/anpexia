@@ -14,10 +14,24 @@ interface QueueItem {
   calledAt: string | null;
   doctorId: string | null;
   customerId: string | null;
-  customer: { id: string; name: string; phone: string } | null;
+  paymentType?: string | null;
+  convenioNome?: string | null;
+  customer: { id: string; name: string; phone: string; birthDate?: string | null } | null;
   doctor: { id: string; name: string; salas?: Record<string, { manha: string | null; tarde: string | null }> | null } | null;
   isEncaixe?: boolean;
   isReturn?: boolean;
+}
+
+function calcAge(birthDate: string | null | undefined): string | null {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  if (isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  if (age < 0) return null;
+  return `${age} ano${age !== 1 ? 's' : ''}`;
 }
 
 interface Doctor {
@@ -294,7 +308,7 @@ export function FilaPage() {
                             {index + 1}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
+                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.paymentType === 'PARTICULAR' ? <span className="ml-1.5 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">Particular</span> : item.convenioNome ? <span className="ml-1.5 text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">{item.convenioNome}</span> : null}{calcAge(item.customer?.birthDate) && <span className="ml-1.5 text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">{calcAge(item.customer?.birthDate)}</span>}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               <span className="flex items-center gap-1"><Clock size={11} /> Agendado: {formatTime(item.date)}</span>
                               {item.checkinAt && <span className="flex items-center gap-1"><UserCheck size={11} /> Chegou: {formatTime(item.checkinAt)}</span>}
@@ -341,7 +355,7 @@ export function FilaPage() {
                             <UserCheck size={16} className="text-blue-600" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
+                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.paymentType === 'PARTICULAR' ? <span className="ml-1.5 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">Particular</span> : item.convenioNome ? <span className="ml-1.5 text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">{item.convenioNome}</span> : null}{calcAge(item.customer?.birthDate) && <span className="ml-1.5 text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">{calcAge(item.customer?.birthDate)}</span>}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               <span>Agendado: {formatTime(item.date)}</span>
                               {item.checkinAt && <span>Chegou: {formatTime(item.checkinAt)}</span>}
@@ -391,7 +405,7 @@ export function FilaPage() {
                             <Stethoscope size={16} className="text-emerald-600" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
+                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.paymentType === 'PARTICULAR' ? <span className="ml-1.5 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">Particular</span> : item.convenioNome ? <span className="ml-1.5 text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">{item.convenioNome}</span> : null}{calcAge(item.customer?.birthDate) && <span className="ml-1.5 text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">{calcAge(item.customer?.birthDate)}</span>}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               <span>Agendado: {formatTime(item.date)}</span>
                               {item.calledAt && <span className="text-emerald-600 font-medium">Iniciado: {formatTime(item.calledAt)}</span>}
@@ -430,7 +444,7 @@ export function FilaPage() {
                             <CheckCircle2 size={16} className="text-emerald-600" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
+                            <p className="font-semibold text-slate-800 text-sm truncate">{item.customer?.name || item.name}{item.paymentType === 'PARTICULAR' ? <span className="ml-1.5 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">Particular</span> : item.convenioNome ? <span className="ml-1.5 text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">{item.convenioNome}</span> : null}{calcAge(item.customer?.birthDate) && <span className="ml-1.5 text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">{calcAge(item.customer?.birthDate)}</span>}{item.isEncaixe && <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Encaixe</span>}{item.isReturn && <span className="ml-1.5 text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Retorno</span>}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               <span>Agendado: {formatTime(item.date)}</span>
                               {item.checkinAt && <span>Chegou: {formatTime(item.checkinAt)}</span>}

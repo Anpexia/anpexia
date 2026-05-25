@@ -493,13 +493,28 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
     const queue = await prisma.scheduledCall.findMany({
       where,
       include: {
-        customer: { select: { id: true, name: true, phone: true } },
+        customer: { select: { id: true, name: true, phone: true, birthDate: true } },
         doctor: { select: { id: true, name: true, salas: true } },
       },
       orderBy: { date: 'asc' },
     });
 
-    return success(res, queue);
+    const convenioIds = [...new Set(queue.filter(q => q.convenioId).map(q => q.convenioId!))];
+    let convenioMap: Record<string, string> = {};
+    if (convenioIds.length > 0) {
+      const convenios = await prisma.convenio.findMany({
+        where: { id: { in: convenioIds } },
+        select: { id: true, nome: true },
+      });
+      for (const c of convenios) convenioMap[c.id] = c.nome;
+    }
+
+    const result = queue.map(q => ({
+      ...q,
+      convenioNome: q.convenioId ? convenioMap[q.convenioId] || null : null,
+    }));
+
+    return success(res, result);
   } catch (err) { next(err); }
 });
 
@@ -583,14 +598,29 @@ router.get('/queue/history', authenticate, requireTenant, async (req: Request, r
     const history = await prisma.scheduledCall.findMany({
       where,
       include: {
-        customer: { select: { id: true, name: true, phone: true } },
+        customer: { select: { id: true, name: true, phone: true, birthDate: true } },
         doctor: { select: { id: true, name: true, salas: true } },
       },
       orderBy: { checkinAt: 'desc' },
       take: 200,
     });
 
-    return success(res, history);
+    const hConvenioIds = [...new Set(history.filter(q => q.convenioId).map(q => q.convenioId!))];
+    let hConvenioMap: Record<string, string> = {};
+    if (hConvenioIds.length > 0) {
+      const convenios = await prisma.convenio.findMany({
+        where: { id: { in: hConvenioIds } },
+        select: { id: true, nome: true },
+      });
+      for (const c of convenios) hConvenioMap[c.id] = c.nome;
+    }
+
+    const historyResult = history.map(q => ({
+      ...q,
+      convenioNome: q.convenioId ? hConvenioMap[q.convenioId] || null : null,
+    }));
+
+    return success(res, historyResult);
   } catch (err) { next(err); }
 });
 
