@@ -1226,6 +1226,8 @@ export function SchedulingPage() {
       }
       if (tussCompleteOnSave && !tussAlreadyCompleted) {
         await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
+      } else if (tussEditMode && !tussAlreadyCompleted && tussModalCall.status === 'attended' && tussModalCall.paymentType !== 'PARTICULAR') {
+        await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'present' });
       }
 
       if (materials.length > 0) {
@@ -1250,11 +1252,13 @@ export function SchedulingPage() {
       showToast(
         tussCompleteOnSave && !tussAlreadyCompleted
           ? 'Realizacao confirmada!'
-          : tussEditMode
-            ? 'Procedimentos atualizados!'
-            : tussAlreadyCompleted
-              ? 'Procedimentos registrados!'
-              : 'Realizacao confirmada!',
+          : tussEditMode && !tussAlreadyCompleted && tussModalCall.status === 'attended' && tussModalCall.paymentType !== 'PARTICULAR'
+            ? 'Procedimento adicionado! Paciente voltou para a fila.'
+            : tussEditMode
+              ? 'Procedimentos atualizados!'
+              : tussAlreadyCompleted
+                ? 'Procedimentos registrados!'
+                : 'Realizacao confirmada!',
       );
       if (tussCompleteOnSave && !tussAlreadyCompleted && tussModalCall && !tussModalCall.isReturn) {
         setReturnPromptCall(tussModalCall);
