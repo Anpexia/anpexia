@@ -61,6 +61,10 @@ export const teamService = {
         horarios: true,
         salas: true,
         scheduleMode: true,
+        availabilityPeriods: {
+          select: { id: true, startDate: true, endDate: true },
+          orderBy: { startDate: 'asc' },
+        },
       },
       orderBy: { name: 'asc' },
     });

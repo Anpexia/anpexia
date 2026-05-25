@@ -14,12 +14,20 @@ interface DoctorHorario {
   fim?: string;
 }
 
+interface AvailabilityPeriod {
+  id: string;
+  startDate: string;
+  endDate: string;
+}
+
 interface Doctor {
   id: string;
   name: string;
   especialidade?: string | null;
   horarios?: Record<string, DoctorHorario> | null;
   duracaoConsulta?: number | null;
+  scheduleMode?: string | null;
+  availabilityPeriods?: AvailabilityPeriod[];
 }
 
 interface CallProcedure {
@@ -1564,7 +1572,17 @@ export function SchedulingPage() {
     return doctors.filter(d => {
       if (!d.horarios) return false;
       const h = d.horarios[dayKey];
-      return h && h.ativo;
+      if (!h || !h.ativo) return false;
+      if (d.scheduleMode === 'period') {
+        if (!d.availabilityPeriods || d.availabilityPeriods.length === 0) return false;
+        const checkDate = dateStr;
+        return d.availabilityPeriods.some(p => {
+          const start = p.startDate.slice(0, 10);
+          const end = p.endDate.slice(0, 10);
+          return checkDate >= start && checkDate <= end;
+        });
+      }
+      return true;
     });
   }, [doctors]);
 
@@ -2561,7 +2579,17 @@ export function SchedulingPage() {
                       const doctorsToday = doctors.filter(d => {
                         if (!d.horarios) return false;
                         const h = d.horarios[dayKey];
-                        return h && h.ativo;
+                        if (!h || !h.ativo) return false;
+                        if (d.scheduleMode === 'period') {
+                          if (!d.availabilityPeriods || d.availabilityPeriods.length === 0) return false;
+                          const checkDate = selectedDate;
+                          return d.availabilityPeriods.some(p => {
+                            const start = p.startDate.slice(0, 10);
+                            const end = p.endDate.slice(0, 10);
+                            return checkDate >= start && checkDate <= end;
+                          });
+                        }
+                        return true;
                       });
 
                       if (doctorsToday.length === 0) {
