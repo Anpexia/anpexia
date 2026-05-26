@@ -1199,12 +1199,14 @@ export function SchedulingPage() {
     if (!tussModalCall) return;
 
     const validItems = tussItems.filter(it => it.procedureId);
-    if (validItems.length === 0) {
+    const isReturnAppointment = !!tussModalCall.isReturn;
+
+    if (validItems.length === 0 && !isReturnAppointment) {
       showToast('Selecione ao menos um procedimento TUSS');
       return;
     }
 
-    if (tussTab === 'tuss' && tussHasMaterials) {
+    if (validItems.length > 0 && tussTab === 'tuss' && tussHasMaterials) {
       setTussTab('estoque');
       return;
     }
@@ -1219,10 +1221,12 @@ export function SchedulingPage() {
     setTussSaving(true);
     setTussModalError('');
     try {
-      if (tussEditMode || tussAlreadyCompleted) {
-        await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
-      } else {
-        await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
+      if (validItems.length > 0) {
+        if (tussEditMode || tussAlreadyCompleted) {
+          await api.put(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
+        } else {
+          await api.post(`/scheduling/calls/${tussModalCall.id}/procedures`, { procedures: selected });
+        }
       }
       if (tussCompleteOnSave && !tussAlreadyCompleted) {
         await api.patch(`/scheduling/calls/${tussModalCall.id}`, { status: 'completed' });
@@ -2962,6 +2966,7 @@ export function SchedulingPage() {
       {tussModalCall && (() => {
         const totalMaterialCount = Object.values(tussAllMaterials).reduce((sum, { tpl, extra }) => sum + tpl.length + extra.length, 0);
         const validItems = tussItems.filter(it => it.procedureId);
+        const isReturnModal = !!tussModalCall.isReturn;
         return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
@@ -2976,6 +2981,12 @@ export function SchedulingPage() {
                 Paciente: <strong>{tussModalCall.customer?.name || tussModalCall.name}</strong> — {format(new Date(tussModalCall.date), 'dd/MM/yyyy HH:mm')}
                 {tussModalCall.doctor && <> · Medico: <strong>{tussModalCall.doctor.name}</strong></>}
               </p>
+
+              {isReturnModal && (
+                <div className="mx-6 mb-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                  Consulta de retorno — procedimentos são opcionais. Você pode finalizar sem selecionar nenhum.
+                </div>
+              )}
 
               {tussModalError && (
                 <div className="mx-6 mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -3182,13 +3193,15 @@ export function SchedulingPage() {
                 </button>
               )}
               <button onClick={submitTussModal}
-                disabled={tussSaving || tussLoadingList || validItems.length === 0}
+                disabled={tussSaving || tussLoadingList || (validItems.length === 0 && !isReturnModal)}
                 className="flex-1 py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:bg-[#2A4D7A] disabled:opacity-50">
                 {tussSaving
                   ? 'Salvando...'
-                  : tussTab === 'tuss' && tussHasMaterials
+                  : tussTab === 'tuss' && tussHasMaterials && validItems.length > 0
                     ? 'Proximo: Estoque'
-                    : tussEditMode ? 'Salvar' : 'Registrar procedimentos'}
+                    : tussEditMode ? 'Salvar'
+                    : isReturnModal && validItems.length === 0 ? 'Finalizar retorno'
+                    : 'Registrar procedimentos'}
               </button>
             </div>
           </div>
