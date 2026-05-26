@@ -716,6 +716,7 @@ export function SchedulingPage() {
   const openBookWithSlot = (date: string, time: string) => {
     setEditingCallId(null);
     setBookForm({ name: '', phone: '', email: '', date, time, notes: '', customerId: '', doctorId: '' });
+    bookDoctorRef.current = '';
     setSelectedBookCustomer(null);
     setCustomerSearch('');
     resetPaymentState();
@@ -726,6 +727,7 @@ export function SchedulingPage() {
   const openBook = () => {
     setEditingCallId(null);
     setBookForm({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
+    bookDoctorRef.current = '';
     setSelectedBookCustomer(null);
     setCustomerSearch('');
     resetPaymentState();
@@ -1951,6 +1953,7 @@ export function SchedulingPage() {
                                         onClick={() => {
                                           const bf = { name: '', phone: '', email: '', date: dateStr, time: row.time, notes: '', customerId: '', doctorId: filterDoctorId || '' };
                                           setBookForm(bf);
+                                          bookDoctorRef.current = filterDoctorId || '';
                                           setSelectedBookCustomer(null);
                                           setCustomerSearch('');
                                           resetPaymentState();
@@ -2061,6 +2064,7 @@ export function SchedulingPage() {
                                         onClick={() => {
                                           const bf = { name: '', phone: '', email: '', date: dayStr, time: row.time, notes: '', customerId: '', doctorId: filterDoctorId || '' };
                                           setBookForm(bf);
+                                          bookDoctorRef.current = filterDoctorId || '';
                                           setSelectedBookCustomer(null);
                                           setCustomerSearch('');
                                           resetPaymentState();
