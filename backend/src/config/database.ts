@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { tenantStore } from '../shared/middleware/tenantContext';
 import { ENCRYPTED_MODELS, encryptModelFields, decryptDeep } from '../shared/utils/encryption';
+import { isConnectionError } from '../shared/utils/dbErrors';
 
 // Only models that have a direct tenant_id column
 const TENANT_SCOPED_MODELS = new Set([
@@ -133,29 +134,9 @@ const prisma = basePrisma.$extends({
 
 const RETRY_DELAYS = [1500, 3000, 6000];
 
-export function isConnectionError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  // Prisma: pool timeout (P2024), init/reach errors, rust panic
-  const code = (error as any).code;
-  const name = error.name || '';
-  if (code === 'P2024' || code === 'P1001' || code === 'P1002' || code === 'P1008' || code === 'P1017') return true;
-  if (name === 'PrismaClientInitializationError' || name === 'PrismaClientRustPanicError') return true;
-  const msg = error.message.toLowerCase();
-  return (
-    msg.includes('connection') ||
-    msg.includes('econnrefused') ||
-    msg.includes('econnreset') ||
-    msg.includes('etimedout') ||
-    msg.includes('socket') ||
-    msg.includes('can\'t reach database') ||
-    msg.includes('prepared statement') ||
-    msg.includes('server closed the connection') ||
-    msg.includes('connection terminated') ||
-    msg.includes('timed out fetching') ||
-    msg.includes('connection pool') ||
-    msg.includes('too many connections')
-  );
-}
+// isConnectionError vive em shared/utils/dbErrors (puro/testável) e é reexportado
+// aqui por conveniência dos imports existentes.
+export { isConnectionError };
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));

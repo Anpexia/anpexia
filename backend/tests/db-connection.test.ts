@@ -1,10 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import dotenv from 'dotenv';
-dotenv.config({ path: path.join(process.cwd(), '.env') });
-
-import { isConnectionError } from '../src/config/database';
+import { isConnectionError } from '../src/shared/utils/dbErrors';
 
 function errWith(props: { message?: string; name?: string; code?: string }): Error {
   const e = new Error(props.message || 'x');

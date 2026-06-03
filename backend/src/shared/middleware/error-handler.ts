@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
+import crypto from 'crypto';
+import { isConnectionError } from '../utils/dbErrors';
+import { log, describeError } from '../utils/logger';
 
 export class AppError extends Error {
   public details?: Record<string, unknown>;
@@ -18,7 +21,7 @@ export class AppError extends Error {
 
 export function errorHandler(
   err: any,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ) {
@@ -83,13 +86,40 @@ export function errorHandler(
     });
   }
 
-  console.error('Unexpected error:', err);
+  // Correlaciona log <-> resposta para diagnóstico.
+  const errorId = crypto.randomUUID();
+  const detail = describeError(err);
+  const ctx = {
+    errorId,
+    method: req.method,
+    path: req.originalUrl,
+    ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip,
+    userEmail: (req.body && typeof req.body === 'object' ? (req.body as any).email : undefined) || undefined,
+    ...detail,
+  };
+
+  // Erro de CONEXÃO/disponibilidade do banco → 503 (retryável), não 500 genérico.
+  if (isConnectionError(err)) {
+    log.error('db_connection_error', { ...ctx, httpStatus: 503 });
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Servidor temporariamente indisponível. Tente novamente em instantes.',
+        errorId,
+      },
+    });
+  }
+
+  // Demais erros inesperados → 500, mas com LOG completo (mensagem + stack) no backend.
+  log.error('unhandled_error', { ...ctx, httpStatus: 500 });
 
   return res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_ERROR',
       message: 'Erro interno do servidor',
+      errorId,
     },
   });
 }
