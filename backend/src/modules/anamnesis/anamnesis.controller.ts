@@ -39,12 +39,13 @@ anamnesisRouter.post('/anamnesis/:patientId', async (req: Request, res: Response
 
 anamnesisRouter.put('/anamnesis/:patientId/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { data } = req.body;
+    const { data, version } = req.body;
 
     const anamnesis = await anamnesisService.update(
       req.auth!.tenantId!,
       req.params.id as string,
       data,
+      typeof version === 'number' ? version : undefined,
     );
     return success(res, anamnesis);
   } catch (err) {

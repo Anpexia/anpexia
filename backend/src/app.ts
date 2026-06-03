@@ -134,6 +134,7 @@ async function loadRoutes() {
     const { prescriptionsRouter } = await import('./modules/prescriptions/prescriptions.controller');
     const { anamnesisRouter } = await import('./modules/anamnesis/anamnesis.controller');
     const { evolutionsRouter } = await import('./modules/evolutions/evolutions.controller');
+    const { clinicalNotesRouter } = await import('./modules/clinicalNotes/clinicalNotes.controller');
     const { teamRouter } = await import('./modules/team/team.controller');
     const { conveniosRouter } = await import('./modules/convenios/convenios.controller');
     const { settingsRouter } = await import('./modules/settings/settings.controller');
@@ -197,6 +198,8 @@ async function loadRoutes() {
     app.use('/api/v1', prescriptionsRouter);
     app.use('/api/v1', autoAudit('Anamnesis'), anamnesisRouter);
     app.use('/api/v1', autoAudit('PatientEvolution'), evolutionsRouter);
+    // ClinicalNote faz auditoria explícita (com conteúdo) no service, então não usa autoAudit aqui.
+    app.use('/api/v1', clinicalNotesRouter);
     app.use('/api/v1/team', teamRouter);
     app.use('/api/v1/convenios', conveniosRouter);
     app.use('/api/v1/settings', settingsRouter);
