@@ -232,7 +232,9 @@ model Customer {
   id            String    @id @default(cuid())
   tenantId      String    @map("tenant_id")
   name          String
-  phone         String?
+  phone         String? // LEGADO — mantido p/ compatibilidade; espelha cellPhone
+  cellPhone     String?   @map("cell_phone") // Celular (WhatsApp/chatbot) — 11 dígitos
+  landlinePhone String?   @map("landline_phone") // Fixo (somente contato) — 10 dígitos
   email         String?
   cpfCnpj       String?   @map("cpf_cnpj") // Criptografado
   birthDate     DateTime? @map("birth_date")
