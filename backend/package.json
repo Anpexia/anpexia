@@ -11,7 +11,12 @@
     "db:generate": "node prisma/load-env.js generate",
     "db:migrate": "node prisma/load-env.js migrate dev",
     "db:push": "node prisma/load-env.js db push",
-    "db:studio": "node prisma/load-env.js studio"
+    "db:studio": "node prisma/load-env.js studio",
+    "test:schema": "node --import tsx --test tests/schema.test.ts",
+    "test:clinical-notes": "node --import tsx --test tests/clinicalNotes.service.test.ts",
+    "test:anamnesis": "node --import tsx --test tests/anamnesis.service.test.ts",
+    "test:all": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

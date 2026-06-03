@@ -12,7 +12,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'Supplier', 'SupplierProduct', 'PurchaseOrder',
   'FinancialTransaction', 'FinancialCategory',
   'DoctorSignature', 'MedicalCertificate', 'Prescription',
-  'Anamnesis', 'PatientEvolution', 'ScheduledCall',
+  'Anamnesis', 'PatientEvolution', 'ClinicalNote', 'ScheduledCall',
   'Convenio', 'Autorizacao', 'TussProcedure', 'DoctorRepasse',
   'ProcedureTemplate', 'RepasseType', 'PrivateProcedure',
   'TenantSettings', 'TenantModule', 'PatientDocument',
