@@ -102,7 +102,23 @@ const prisma = basePrisma.$extends({
         }
       }
 
-      const result = await query(args);
+      // Retry transparente em erros de conexão (cold-start/queda do Neon).
+      // Corrige a intermitência: 1ª tentativa pode falhar com conexão fria,
+      // a seguinte (após backoff) já pega a conexão quente.
+      let result: any;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          result = await query(args);
+          break;
+        } catch (err) {
+          if (attempt < RETRY_DELAYS.length && isConnectionError(err)) {
+            console.warn(`[DB] Erro de conexão em ${model ?? '?'}.${operation} — retry ${attempt + 1}/${RETRY_DELAYS.length} em ${RETRY_DELAYS[attempt]}ms: ${(err as Error).message?.slice(0, 120)}`);
+            await sleep(RETRY_DELAYS[attempt]);
+            continue;
+          }
+          throw err;
+        }
+      }
 
       if (result) {
         decryptDeep(result);
@@ -117,8 +133,13 @@ const prisma = basePrisma.$extends({
 
 const RETRY_DELAYS = [1500, 3000, 6000];
 
-function isConnectionError(error: unknown): boolean {
+export function isConnectionError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
+  // Prisma: pool timeout (P2024), init/reach errors, rust panic
+  const code = (error as any).code;
+  const name = error.name || '';
+  if (code === 'P2024' || code === 'P1001' || code === 'P1002' || code === 'P1008' || code === 'P1017') return true;
+  if (name === 'PrismaClientInitializationError' || name === 'PrismaClientRustPanicError') return true;
   const msg = error.message.toLowerCase();
   return (
     msg.includes('connection') ||
@@ -128,7 +149,11 @@ function isConnectionError(error: unknown): boolean {
     msg.includes('socket') ||
     msg.includes('can\'t reach database') ||
     msg.includes('prepared statement') ||
-    msg.includes('server closed the connection')
+    msg.includes('server closed the connection') ||
+    msg.includes('connection terminated') ||
+    msg.includes('timed out fetching') ||
+    msg.includes('connection pool') ||
+    msg.includes('too many connections')
   );
 }
 
@@ -170,12 +195,15 @@ export async function warmupDatabase(): Promise<void> {
   }
 }
 
-setInterval(async () => {
+// Keepalive para evitar autosuspend do Neon (reduz cold-starts).
+// .unref() para não impedir o encerramento de processos curtos (testes/scripts).
+const keepaliveTimer = setInterval(async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
   } catch (err) {
     console.warn('[DB] Keepalive ping falhou:', (err as Error).message);
   }
 }, 4 * 60 * 1000);
+keepaliveTimer.unref();
 
 export default prisma;
