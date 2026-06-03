@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { customerService, checkDuplicatePhone } from './customer.service';
+import { customerService, findSharedPhonePatients, checkDuplicateCpf } from './customer.service';
 import { createCustomerSchema, updateCustomerSchema } from './customer.validators';
 import { resolvePhones } from '../../shared/utils/phone';
+import { cpfHash as computeCpfHash } from '../../shared/utils/cpf';
 import { success, created, noContent } from '../../shared/utils/response';
 import { authenticate, requireTenant } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
@@ -36,6 +37,18 @@ customerRouter.get('/', async (req: Request, res: Response, next: NextFunction) 
     );
 
     return success(res, customers, paginationMeta(total, page, limit));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Pré-checagem de telefone compartilhado (NÃO bloqueia — só informa para alerta).
+customerRouter.get('/check-phone', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const phone = (req.query.phone as string) || '';
+    const excludeId = (req.query.excludeId as string) || undefined;
+    const matches = await findSharedPhonePatients(req.auth!.tenantId!, phone, excludeId);
+    return success(res, { shared: matches.length > 0, patients: matches });
   } catch (err) {
     next(err);
   }
@@ -312,7 +325,9 @@ customerRouter.post('/import-batch', async (req: Request, res: Response, next: N
           : undefined;
 
         const phones = resolvePhones({ phone: r.phone, cellPhone: r.cellPhone, landlinePhone: r.landlinePhone });
-        await checkDuplicatePhone(tenantId, phones.cellPhone);
+        // Telefone não bloqueia import (pode repetir). CPF continua único.
+        const importCpfHash = computeCpfHash(r.cpfCnpj);
+        await checkDuplicateCpf(tenantId, importCpfHash);
 
         await prisma.customer.create({
           data: {
@@ -321,6 +336,7 @@ customerRouter.post('/import-batch', async (req: Request, res: Response, next: N
             phone: phones.phone,
             cellPhone: phones.cellPhone,
             landlinePhone: phones.landlinePhone,
+            cpfHash: importCpfHash,
             email: r.email || null,
             cpfCnpj: r.cpfCnpj || null,
             birthDate,

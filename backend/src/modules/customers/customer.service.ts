@@ -1,34 +1,35 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
 import { resolvePhones } from '../../shared/utils/phone';
+import { cpfHash as computeCpfHash } from '../../shared/utils/cpf';
 
-// Deduplicação pelo CELULAR (identidade de WhatsApp). Fixos podem repetir
-// (famílias compartilham linha fixa), então não bloqueiam.
-export async function checkDuplicatePhone(tenantId: string, phone: string | undefined | null, excludeId?: string) {
-  if (!phone) return;
+// Telefone NÃO é mais identificador único — famílias compartilham número.
+// Retorna (sem bloquear) os pacientes que já usam o telefone, para alerta no front.
+export async function findSharedPhonePatients(tenantId: string, phone: string | undefined | null, excludeId?: string) {
+  if (!phone) return [];
   const digits = phone.replace(/\D/g, '');
-  if (digits.length < 8) return;
-
+  if (digits.length < 8) return [];
   const suffix = digits.slice(-9);
-
   const where: any = {
     tenantId,
     isActive: true,
-    responsavelId: null,
-    OR: [
-      { cellPhone: { endsWith: suffix } },
-      { phone: { endsWith: suffix } },
-    ],
+    OR: [{ cellPhone: { endsWith: suffix } }, { phone: { endsWith: suffix } }],
   };
   if (excludeId) where.id = { not: excludeId };
+  return prisma.customer.findMany({ where, select: { id: true, name: true } });
+}
 
-  const existing = await prisma.customer.findFirst({
-    where,
-    select: { id: true, name: true },
-  });
-
+// CPF é o identificador secundário: único por tenant (via blind index cpfHash).
+export async function checkDuplicateCpf(tenantId: string, cpfHashValue: string | null, excludeId?: string) {
+  if (!cpfHashValue) return;
+  const where: any = { tenantId, cpfHash: cpfHashValue, isActive: true };
+  if (excludeId) where.id = { not: excludeId };
+  const existing = await prisma.customer.findFirst({ where, select: { id: true, name: true } });
   if (existing) {
-    throw new AppError(409, 'DUPLICATE_PHONE', `Ja existe um paciente cadastrado com este telefone: ${existing.name}. Se for dependente, vincule pelo campo Responsavel.`);
+    throw new AppError(409, 'CPF_DUPLICATE', 'Já existe um paciente cadastrado com este CPF.', {
+      existingId: existing.id,
+      existingName: existing.name,
+    });
   }
 }
 
@@ -46,6 +47,8 @@ interface CreateCustomerData {
   landlinePhone?: string | null;
   email?: string;
   cpfCnpj?: string;
+  documentType?: string | null;
+  documentNumber?: string | null;
   birthDate?: string;
   address?: {
     cep?: string;
@@ -220,9 +223,9 @@ export const customerService = {
     // Normaliza/valida celular e fixo; phone passa a espelhar cellPhone.
     const phones = resolvePhones({ phone, cellPhone, landlinePhone });
 
-    if (!responsavelId) {
-      await checkDuplicatePhone(tenantId, phones.cellPhone);
-    }
+    // CPF (quando preenchido) é único por tenant. Telefone NÃO bloqueia mais.
+    const cpfHashValue = computeCpfHash(data.cpfCnpj);
+    await checkDuplicateCpf(tenantId, cpfHashValue);
 
     const customer = await prisma.customer.create({
       data: {
@@ -231,6 +234,7 @@ export const customerService = {
         phone: phones.phone,
         cellPhone: phones.cellPhone,
         landlinePhone: phones.landlinePhone,
+        cpfHash: cpfHashValue,
         birthDate: birthDate ? new Date(birthDate) : undefined,
         address: data.address ? JSON.parse(JSON.stringify(data.address)) : undefined,
         responsavelId: responsavelId || undefined,
@@ -264,9 +268,12 @@ export const customerService = {
       { cellPhone: existing.cellPhone, landlinePhone: existing.landlinePhone },
     );
 
-    const effectiveResponsavelId = responsavelId !== undefined ? responsavelId : existing.responsavelId;
-    if (phonesProvided && phones.cellPhone && phones.cellPhone !== existing.cellPhone && !effectiveResponsavelId) {
-      await checkDuplicatePhone(tenantId, phones.cellPhone, id);
+    // Telefone NÃO bloqueia mais (famílias compartilham). CPF continua único.
+    if (data.cpfCnpj !== undefined) {
+      const newCpfHash = computeCpfHash(data.cpfCnpj);
+      if (newCpfHash && newCpfHash !== existing.cpfHash) {
+        await checkDuplicateCpf(tenantId, newCpfHash, id);
+      }
     }
 
     const updateData: any = {
@@ -274,6 +281,10 @@ export const customerService = {
       birthDate: birthDate ? new Date(birthDate) : undefined,
       address: data.address ? JSON.parse(JSON.stringify(data.address)) : undefined,
     };
+
+    if (data.cpfCnpj !== undefined) {
+      updateData.cpfHash = computeCpfHash(data.cpfCnpj);
+    }
 
     if (phonesProvided) {
       updateData.phone = phones.phone;

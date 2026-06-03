@@ -7,7 +7,11 @@ export const createCustomerSchema = z.object({
   landlinePhone: z.string().optional().or(z.literal('')),
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   cpfCnpj: z.string().optional(),
-  birthDate: z.string().optional().or(z.literal('')),
+  documentType: z.enum(['RG', 'CNH', 'PASSPORT', 'RNM', 'OTHER']).optional().or(z.literal('')),
+  documentNumber: z.string().optional().or(z.literal('')),
+  // Nascimento obrigatório APENAS no cadastro manual (createCustomerSchema).
+  // No update vira opcional via .partial() — registros antigos sem data continuam editáveis.
+  birthDate: z.string({ required_error: 'Data de nascimento é obrigatória' }).min(1, 'Data de nascimento é obrigatória'),
   insurance: z.string().optional(),
   address: z.object({
     cep: z.string().optional(),
