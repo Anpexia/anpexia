@@ -9,6 +9,7 @@ import { DictationTextarea } from './DictationTextarea';
 import { CidAutocomplete } from './CidAutocomplete';
 import { useCepLookup, formatarCep } from '../hooks/useCepLookup';
 import { getSegmentConfig } from '../config/segmentConfig';
+import { maskPhone, whatsappIndicator } from '../utils/phone';
 
 // ==================== Interfaces ====================
 
@@ -43,6 +44,8 @@ interface Customer {
   id: string;
   name: string;
   phone: string | null;
+  cellPhone?: string | null;
+  landlinePhone?: string | null;
   email: string | null;
   cpfCnpj: string | null;
   birthDate: string | null;
@@ -153,7 +156,7 @@ function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel,
 
 function populateForm(c: Customer) {
   return {
-    name: c.name, phone: c.phone || '', email: c.email || '',
+    name: c.name, phone: c.phone || '', cellPhone: c.cellPhone || '', landlinePhone: c.landlinePhone || '', email: c.email || '',
     cpfCnpj: c.cpfCnpj || '', birthDate: c.birthDate ? c.birthDate.split('T')[0] : '',
     insurance: c.insurance || '', notes: c.notes || '', origin: c.origin || '', optInWhatsApp: c.optInWhatsApp,
     address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '', ...(c.address as any || {}) },
@@ -196,7 +199,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loadingCustomer, setLoadingCustomer] = useState(true);
-  const [formData, setFormData] = useState({ name: '', phone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } });
+  const [formData, setFormData] = useState({ name: '', phone: '', cellPhone: '', landlinePhone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } });
   const [saving, setSaving] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>(initialTab);
 
@@ -959,8 +962,13 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                 <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={inputCls} required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className={inputCls} placeholder="(00) 00000-0000" />
+                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone Celular <span className="text-[11px] text-slate-400">(WhatsApp)</span></label>
+                <input type="tel" value={formData.cellPhone} onChange={(e) => setFormData({ ...formData, cellPhone: maskPhone(e.target.value) })} className={inputCls} placeholder="(00) 00000-0000" maxLength={16} />
+                {(() => { const ind = whatsappIndicator(formData.cellPhone, formData.landlinePhone); return <p className={`mt-1 text-xs ${ind.cls}`}>{ind.icon} {ind.label}</p>; })()}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone Fixo</label>
+                <input type="tel" value={formData.landlinePhone} onChange={(e) => setFormData({ ...formData, landlinePhone: maskPhone(e.target.value) })} className={inputCls} placeholder="(00) 0000-0000" maxLength={15} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>

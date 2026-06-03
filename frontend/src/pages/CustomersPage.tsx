@@ -5,6 +5,7 @@ import Papa from 'papaparse';
 import api from '../services/api';
 import { PatientPanel, type DetailTab } from '../components/PatientPanel';
 import { useCepLookup, formatarCep } from '../hooks/useCepLookup';
+import { maskPhone, whatsappIndicator } from '../utils/phone';
 
 interface ScheduledCall {
   id: string;
@@ -19,6 +20,8 @@ interface Customer {
   id: string;
   name: string;
   phone: string | null;
+  cellPhone: string | null;
+  landlinePhone: string | null;
   email: string | null;
   cpfCnpj: string | null;
   birthDate: string | null;
@@ -47,7 +50,7 @@ interface Customer {
 
 type ModalMode = 'closed' | 'create' | 'detail';
 
-const emptyForm = { name: '', phone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' }, responsavelId: '', parentesco: '', usarTelResponsavel: false };
+const emptyForm = { name: '', phone: '', cellPhone: '', landlinePhone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' }, responsavelId: '', parentesco: '', usarTelResponsavel: false };
 
 export function CustomersPage() {
   const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
@@ -177,7 +180,9 @@ export function CustomersPage() {
   const IMPORT_FIELDS = [
     { key: '_skip', label: '— Ignorar —' },
     { key: 'name', label: 'Nome' },
-    { key: 'phone', label: 'Telefone' },
+    { key: 'cellPhone', label: 'Telefone Celular' },
+    { key: 'landlinePhone', label: 'Telefone Fixo' },
+    { key: 'phone', label: 'Telefone (classifica automático)' },
     { key: 'email', label: 'Email' },
     { key: 'cpfCnpj', label: 'CPF/CNPJ' },
     { key: 'birthDate', label: 'Data de Nascimento' },
@@ -194,7 +199,9 @@ export function CustomersPage() {
 
   const AUTO_MAP: Record<string, string> = {
     nome: 'name', name: 'name', 'nome completo': 'name', paciente: 'name',
-    telefone: 'phone', phone: 'phone', celular: 'phone', whatsapp: 'phone', fone: 'phone', tel: 'phone',
+    telefone: 'phone', phone: 'phone', fone: 'phone', tel: 'phone',
+    celular: 'cellPhone', whatsapp: 'cellPhone', cel: 'cellPhone', movel: 'cellPhone', 'telefone celular': 'cellPhone',
+    fixo: 'landlinePhone', 'telefone fixo': 'landlinePhone', residencial: 'landlinePhone',
     email: 'email', 'e-mail': 'email',
     cpf: 'cpfCnpj', cnpj: 'cpfCnpj', cpfcnpj: 'cpfCnpj', 'cpf/cnpj': 'cpfCnpj', documento: 'cpfCnpj',
     nascimento: 'birthDate', 'data de nascimento': 'birthDate', 'data nascimento': 'birthDate', birthdate: 'birthDate', 'dt nascimento': 'birthDate', 'dt nasc': 'birthDate',
@@ -354,7 +361,21 @@ export function CustomersPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500 hidden md:table-cell">{c.phone || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 hidden md:table-cell">
+                    {(() => {
+                      const cell = c.cellPhone ? maskPhone(c.cellPhone) : '';
+                      const land = c.landlinePhone ? maskPhone(c.landlinePhone) : '';
+                      const ind = whatsappIndicator(c.cellPhone, c.landlinePhone);
+                      if (!cell && !land) return <span className="text-slate-400">{c.phone ? maskPhone(c.phone) : '-'}</span>;
+                      return (
+                        <span title={ind.label}>
+                          {cell && <span>{ind.icon} {cell}</span>}
+                          {cell && land && <br />}
+                          {land && <span className="text-slate-400">☎ {land}</span>}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="px-6 py-4 text-sm text-slate-500 hidden lg:table-cell">
                     {c.lastAppointment ? format(new Date(c.lastAppointment), 'dd/MM/yy') : <span className="text-slate-400">-</span>}
                   </td>
@@ -405,8 +426,13 @@ export function CustomersPage() {
                   <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={inputCls} required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className={inputCls} placeholder="(00) 00000-0000" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Telefone Celular <span className="text-[11px] text-slate-400">(WhatsApp)</span></label>
+                  <input type="tel" value={formData.cellPhone} onChange={(e) => setFormData({ ...formData, cellPhone: maskPhone(e.target.value) })} className={inputCls} placeholder="(00) 00000-0000" maxLength={16} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Telefone Fixo</label>
+                  <input type="tel" value={formData.landlinePhone} onChange={(e) => setFormData({ ...formData, landlinePhone: maskPhone(e.target.value) })} className={inputCls} placeholder="(00) 0000-0000" maxLength={15} />
+                  {(() => { const ind = whatsappIndicator(formData.cellPhone, formData.landlinePhone); return <p className={`mt-1 text-xs ${ind.cls}`}>{ind.icon} {ind.label}</p>; })()}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
