@@ -1,7 +1,31 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
 import { resolvePhones } from '../../shared/utils/phone';
-import { cpfHash as computeCpfHash } from '../../shared/utils/cpf';
+import { cpfHash as computeCpfHash, isValidCpf, normalizeCpf } from '../../shared/utils/cpf';
+
+// Qualidade de dados do CPF (informativo + base p/ bloqueios em faturamento/TISS/TUSS).
+export async function computeCpfQuality(tenantId: string, customer: { cpfCnpj?: string | null; cpfHash?: string | null; id: string }) {
+  const cpf = normalizeCpf(customer.cpfCnpj);
+  const quality = { cpfValid: null as boolean | null, cpfDuplicate: false };
+  if (!cpf) return quality;
+  quality.cpfValid = isValidCpf(cpf);
+  if (customer.cpfHash) {
+    const dup = await prisma.customer.count({ where: { tenantId, cpfHash: customer.cpfHash, isActive: true, id: { not: customer.id } } });
+    quality.cpfDuplicate = dup > 0;
+  }
+  return quality;
+}
+
+// Bloqueio para fluxos críticos (faturamento convênio / TISS / TUSS): CPF
+// inválido OU duplicado impede a operação. CPF ausente NÃO bloqueia.
+export async function assertCpfReliableForBilling(tenantId: string, patientId: string) {
+  const patient = await prisma.customer.findFirst({ where: { id: patientId, tenantId }, select: { id: true, cpfCnpj: true, cpfHash: true } });
+  if (!patient) return;
+  const q = await computeCpfQuality(tenantId, patient as any);
+  if (q.cpfValid === false || q.cpfDuplicate) {
+    throw new AppError(422, 'CPF_UNRELIABLE', 'Este paciente possui CPF inválido ou duplicado. Corrija o cadastro antes de prosseguir.');
+  }
+}
 
 // Telefone NÃO é mais identificador único — famílias compartilham número.
 // Retorna (sem bloquear) os pacientes que já usam o telefone, para alerta no front.
@@ -206,6 +230,8 @@ export const customerService = {
     const lastOutgoing = chatMessages.find((m) => m.direction === 'OUTGOING');
     const whatsappStatus = lastOutgoing?.metadata?.flowState || (chatMessages.length > 0 ? 'active' : 'none');
 
+    const dataQuality = await computeCpfQuality(tenantId, customer as any);
+
     return {
       ...customer,
       chatMessages,
@@ -214,6 +240,7 @@ export const customerService = {
       totalAppointments,
       daysSinceLastContact,
       whatsappStatus,
+      dataQuality,
     };
   },
 

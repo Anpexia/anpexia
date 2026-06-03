@@ -1,5 +1,6 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
+import { assertCpfReliableForBilling } from '../customers/customer.service';
 
 export const conveniosService = {
   // ---- Convenios (tenant-level) ----
@@ -138,6 +139,9 @@ export const conveniosService = {
   }) {
     const patient = await prisma.customer.findFirst({ where: { id: patientId, tenantId } });
     if (!patient) throw new AppError(404, 'NOT_FOUND', 'Paciente nao encontrado');
+
+    // Faturamento convênio / TISS / TUSS exige identificação confiável.
+    await assertCpfReliableForBilling(tenantId, patientId);
 
     const pc = await prisma.patientConvenio.findFirst({ where: { patientId } });
     if (!pc) throw new AppError(400, 'NO_CONVENIO', 'Paciente nao possui convenio cadastrado');

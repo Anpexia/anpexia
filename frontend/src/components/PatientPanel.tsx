@@ -43,6 +43,7 @@ interface MedicalRecord {
 interface Customer {
   id: string;
   name: string;
+  dataQuality?: { cpfValid: boolean | null; cpfDuplicate: boolean };
   phone: string | null;
   cellPhone?: string | null;
   landlinePhone?: string | null;
@@ -852,6 +853,17 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
   return (
     <div className="bg-white rounded-xl w-full flex flex-col max-h-[85vh]">
+      {/* Alertas de qualidade de dados (informativos, não bloqueiam) */}
+      {(customer.dataQuality?.cpfValid === false || customer.dataQuality?.cpfDuplicate) && (
+        <div className="shrink-0 px-6 pt-4 space-y-1">
+          {customer.dataQuality?.cpfValid === false && (
+            <div className="text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">⚠ CPF inválido. Corrija o cadastro.</div>
+          )}
+          {customer.dataQuality?.cpfDuplicate && (
+            <div className="text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">⚠ CPF utilizado em outro paciente.</div>
+          )}
+        </div>
+      )}
       {/* Header */}
       <div className="shrink-0 p-6 border-b border-slate-200">
         <div className="flex items-center justify-between mb-4">
