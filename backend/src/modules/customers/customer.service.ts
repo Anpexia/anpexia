@@ -1,6 +1,9 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
+import { resolvePhones } from '../../shared/utils/phone';
 
+// Deduplicação pelo CELULAR (identidade de WhatsApp). Fixos podem repetir
+// (famílias compartilham linha fixa), então não bloqueiam.
 export async function checkDuplicatePhone(tenantId: string, phone: string | undefined | null, excludeId?: string) {
   if (!phone) return;
   const digits = phone.replace(/\D/g, '');
@@ -11,8 +14,11 @@ export async function checkDuplicatePhone(tenantId: string, phone: string | unde
   const where: any = {
     tenantId,
     isActive: true,
-    phone: { endsWith: suffix },
     responsavelId: null,
+    OR: [
+      { cellPhone: { endsWith: suffix } },
+      { phone: { endsWith: suffix } },
+    ],
   };
   if (excludeId) where.id = { not: excludeId };
 
@@ -36,6 +42,8 @@ interface ListParams {
 interface CreateCustomerData {
   name: string;
   phone?: string;
+  cellPhone?: string | null;
+  landlinePhone?: string | null;
   email?: string;
   cpfCnpj?: string;
   birthDate?: string;
@@ -207,16 +215,22 @@ export const customerService = {
   },
 
   async create(tenantId: string, data: CreateCustomerData) {
-    const { tagIds, birthDate, responsavelId, parentesco, usarTelResponsavel, ...rest } = data;
+    const { tagIds, birthDate, responsavelId, parentesco, usarTelResponsavel, phone, cellPhone, landlinePhone, ...rest } = data;
+
+    // Normaliza/valida celular e fixo; phone passa a espelhar cellPhone.
+    const phones = resolvePhones({ phone, cellPhone, landlinePhone });
 
     if (!responsavelId) {
-      await checkDuplicatePhone(tenantId, data.phone);
+      await checkDuplicatePhone(tenantId, phones.cellPhone);
     }
 
     const customer = await prisma.customer.create({
       data: {
         ...rest,
         tenantId,
+        phone: phones.phone,
+        cellPhone: phones.cellPhone,
+        landlinePhone: phones.landlinePhone,
         birthDate: birthDate ? new Date(birthDate) : undefined,
         address: data.address ? JSON.parse(JSON.stringify(data.address)) : undefined,
         responsavelId: responsavelId || undefined,
@@ -241,11 +255,18 @@ export const customerService = {
       throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado');
     }
 
-    const { tagIds, birthDate, responsavelId, parentesco, usarTelResponsavel, ...rest } = data;
+    const { tagIds, birthDate, responsavelId, parentesco, usarTelResponsavel, phone, cellPhone, landlinePhone, ...rest } = data;
+
+    // Recalcula os telefones com base no que veio + estado atual (campos ausentes mantêm valor).
+    const phonesProvided = phone !== undefined || cellPhone !== undefined || landlinePhone !== undefined;
+    const phones = resolvePhones(
+      { phone, cellPhone, landlinePhone },
+      { cellPhone: existing.cellPhone, landlinePhone: existing.landlinePhone },
+    );
 
     const effectiveResponsavelId = responsavelId !== undefined ? responsavelId : existing.responsavelId;
-    if (data.phone && data.phone !== existing.phone && !effectiveResponsavelId) {
-      await checkDuplicatePhone(tenantId, data.phone, id);
+    if (phonesProvided && phones.cellPhone && phones.cellPhone !== existing.cellPhone && !effectiveResponsavelId) {
+      await checkDuplicatePhone(tenantId, phones.cellPhone, id);
     }
 
     const updateData: any = {
@@ -253,6 +274,12 @@ export const customerService = {
       birthDate: birthDate ? new Date(birthDate) : undefined,
       address: data.address ? JSON.parse(JSON.stringify(data.address)) : undefined,
     };
+
+    if (phonesProvided) {
+      updateData.phone = phones.phone;
+      updateData.cellPhone = phones.cellPhone;
+      updateData.landlinePhone = phones.landlinePhone;
+    }
 
     if (responsavelId !== undefined) updateData.responsavelId = responsavelId || null;
     if (parentesco !== undefined) updateData.parentesco = parentesco || null;
@@ -381,12 +408,18 @@ export const customerService = {
     if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado');
 
     const updateData: any = { responsavelId: null, parentesco: null, usarTelResponsavel: false };
-    if (phone) updateData.phone = phone;
+    if (phone) {
+      // Promovido a titular precisa do próprio telefone — roteia p/ celular/fixo.
+      const phones = resolvePhones({ phone });
+      updateData.phone = phones.phone;
+      updateData.cellPhone = phones.cellPhone;
+      updateData.landlinePhone = phones.landlinePhone;
+    }
 
     return prisma.customer.update({
       where: { id: customerId },
       data: updateData,
-      select: { id: true, name: true, phone: true, responsavelId: true },
+      select: { id: true, name: true, phone: true, cellPhone: true, landlinePhone: true, responsavelId: true },
     });
   },
 };

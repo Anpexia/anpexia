@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { customerService, checkDuplicatePhone } from './customer.service';
 import { createCustomerSchema, updateCustomerSchema } from './customer.validators';
+import { resolvePhones } from '../../shared/utils/phone';
 import { success, created, noContent } from '../../shared/utils/response';
 import { authenticate, requireTenant } from '../../shared/middleware/auth';
 import { getPagination, paginationMeta } from '../../shared/utils/pagination';
@@ -291,13 +292,16 @@ customerRouter.post('/import-batch', async (req: Request, res: Response, next: N
           ? { cep: r.cep || '', street: r.street || '', number: r.number || '', neighborhood: r.neighborhood || '', city: r.city || '', state: r.state || '' }
           : undefined;
 
-        await checkDuplicatePhone(tenantId, r.phone || null);
+        const phones = resolvePhones({ phone: r.phone, cellPhone: r.cellPhone, landlinePhone: r.landlinePhone });
+        await checkDuplicatePhone(tenantId, phones.cellPhone);
 
         await prisma.customer.create({
           data: {
             tenantId,
             name: r.name.trim(),
-            phone: r.phone || null,
+            phone: phones.phone,
+            cellPhone: phones.cellPhone,
+            landlinePhone: phones.landlinePhone,
             email: r.email || null,
             cpfCnpj: r.cpfCnpj || null,
             birthDate,

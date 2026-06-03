@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   classifyPhone, isMobile, isLandline, isSuspectFakeNine,
   formatMobileForWhatsapp, getWhatsappPhone, toNational, isValidDDD,
+  resolvePhones,
 } from '../src/shared/utils/phone';
 
 test('classifica celular válido (11 dígitos, 9º dígito)', () => {
@@ -106,4 +107,51 @@ test('nunca injeta 9 em fixo (regressão do bug do "9")', () => {
   // Um fixo jamais deve produzir um número de WhatsApp.
   assert.equal(getWhatsappPhone({ cellPhone: null, landlinePhone: '3135351234' }).ok, false);
   assert.equal(formatMobileForWhatsapp('3135351234'), null);
+});
+
+// ---- resolvePhones (normalização de escrita) ----
+
+test('resolvePhones: UI com celular e fixo -> ambos + phone espelha celular', () => {
+  const r = resolvePhones({ cellPhone: '(31) 99999-9999', landlinePhone: '(31) 3535-1234' });
+  assert.equal(r.cellPhone, '31999999999');
+  assert.equal(r.landlinePhone, '3135351234');
+  assert.equal(r.phone, '31999999999');
+});
+
+test('resolvePhones: só fixo -> phone fica null (espelho do celular)', () => {
+  const r = resolvePhones({ landlinePhone: '3135351234' });
+  assert.equal(r.cellPhone, null);
+  assert.equal(r.landlinePhone, '3135351234');
+  assert.equal(r.phone, null);
+});
+
+test('resolvePhones: legado só phone celular -> roteia p/ cellPhone', () => {
+  const r = resolvePhones({ phone: '5531999999999' });
+  assert.equal(r.cellPhone, '31999999999');
+  assert.equal(r.landlinePhone, null);
+  assert.equal(r.phone, '31999999999');
+});
+
+test('resolvePhones: legado só phone fixo -> roteia p/ landlinePhone', () => {
+  const r = resolvePhones({ phone: '553135351234' });
+  assert.equal(r.cellPhone, null);
+  assert.equal(r.landlinePhone, '3135351234');
+  assert.equal(r.phone, null);
+});
+
+test('resolvePhones: legado phone inválido -> preserva cru, nada perdido', () => {
+  const r = resolvePhones({ phone: '319999' }); // curto demais
+  assert.equal(r.cellPhone, null);
+  assert.equal(r.landlinePhone, null);
+  assert.equal(r.phone, '319999');
+});
+
+test('resolvePhones: celular inválido explícito lança erro', () => {
+  assert.throws(() => resolvePhones({ cellPhone: '3133334444' })); // 10 díg não é celular
+});
+
+test('resolvePhones: update mantém campo ausente', () => {
+  const r = resolvePhones({ cellPhone: '31988887777' }, { cellPhone: null, landlinePhone: '3135351234' });
+  assert.equal(r.cellPhone, '31988887777');
+  assert.equal(r.landlinePhone, '3135351234'); // preservado
 });

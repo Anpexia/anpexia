@@ -5,6 +5,7 @@
  * artificial": nunca injeta um 9 em telefone fixo. Toda decisão de envio de
  * WhatsApp passa por `getWhatsappPhone()`.
  */
+import { AppError } from '../middleware/error-handler';
 
 // DDDs válidos no Brasil (Anatel).
 export const VALID_DDDS = new Set<string>([
@@ -150,4 +151,69 @@ export function getWhatsappPhone(customer: WhatsappTargetInput | null | undefine
   const hasLandline = !!(target.landlinePhone && isLandline(target.landlinePhone));
   const reason: WhatsappBlockReason = hasLandline ? 'LANDLINE_ONLY' : 'NO_CELL';
   return { ok: false, reason, message: WHATSAPP_MESSAGES[reason] };
+}
+
+// ---- Normalização de escrita (create/update/import) ----
+
+export interface ResolvePhonesInput {
+  phone?: string | null; // legado
+  cellPhone?: string | null;
+  landlinePhone?: string | null;
+}
+
+export interface ResolvedPhones {
+  cellPhone: string | null;
+  landlinePhone: string | null;
+  phone: string | null; // espelho de cellPhone (compatibilidade)
+}
+
+function emptyToNull(v: string | null | undefined): string | null {
+  if (v === undefined || v === null) return null;
+  const t = String(v).trim();
+  return t ? t : null;
+}
+
+/**
+ * Normaliza e valida os telefones para gravação. Regras:
+ *  - cellPhone deve ser celular válido; landlinePhone deve ser fixo válido.
+ *  - Compatibilidade: se vier só `phone` (cliente antigo/CSV), classifica e
+ *    roteia para o campo certo; se inválido, preserva o valor cru (nada perdido).
+ *  - phone passa a ESPELHAR o cellPhone.
+ *
+ * `existing` é usado em updates: campos ausentes no input mantêm o valor atual.
+ */
+export function resolvePhones(input: ResolvePhonesInput, existing?: { cellPhone?: string | null; landlinePhone?: string | null }): ResolvedPhones {
+  const cellProvided = input.cellPhone !== undefined;
+  const landProvided = input.landlinePhone !== undefined;
+
+  let cell = cellProvided ? emptyToNull(input.cellPhone) : (existing?.cellPhone ?? null);
+  let land = landProvided ? emptyToNull(input.landlinePhone) : (existing?.landlinePhone ?? null);
+
+  // Caminho legado: cliente mandou só `phone`.
+  if (!cellProvided && !landProvided && input.phone !== undefined) {
+    const raw = emptyToNull(input.phone);
+    if (raw) {
+      const c = classifyPhone(raw);
+      if (c.type === 'mobile') cell = c.national;
+      else if (c.type === 'landline') land = c.national;
+      else {
+        // Telefone legado fora do padrão: preserva cru, sem classificar nem perder.
+        return { cellPhone: cell, landlinePhone: land, phone: onlyDigits(raw) || raw };
+      }
+    } else {
+      cell = null;
+    }
+  }
+
+  if (cell && !isMobile(cell)) {
+    throw new AppError(400, 'INVALID_CELLPHONE', 'Telefone celular inválido. Use o formato (DD) 9XXXX-XXXX com 11 dígitos.');
+  }
+  if (land && !isLandline(land)) {
+    throw new AppError(400, 'INVALID_LANDLINE', 'Telefone fixo inválido. Use o formato (DD) XXXX-XXXX com 10 dígitos.');
+  }
+
+  cell = cell ? toNational(cell) : null;
+  land = land ? toNational(land) : null;
+
+  return { cellPhone: cell, landlinePhone: land, phone: cell };
 }

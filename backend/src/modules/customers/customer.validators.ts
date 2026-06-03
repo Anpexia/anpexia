@@ -2,7 +2,9 @@ import { z } from 'zod';
 
 export const createCustomerSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  phone: z.string().optional(),
+  phone: z.string().optional(), // legado — espelha cellPhone
+  cellPhone: z.string().optional().or(z.literal('')),
+  landlinePhone: z.string().optional().or(z.literal('')),
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   cpfCnpj: z.string().optional(),
   birthDate: z.string().optional().or(z.literal('')),
