@@ -47,6 +47,26 @@ O modelo de negocio e assinatura mensal. O dono do projeto (Angel) configura e i
 - O `.env.example` na raiz serve como referencia (sem valores reais)
 - Variaveis criticas (JWT_SECRET, JWT_REFRESH_SECRET, ENCRYPTION_KEY, DATABASE_URL) falham ruidosamente se ausentes
 
+### ENCRYPTION_KEY (criptografia de campos sensiveis)
+
+- Campos sensiveis (CPF, dados de saude, anamnese, evolucao, prescricoes, etc.)
+  sao criptografados em repouso com AES-256-GCM usando `ENCRYPTION_KEY`.
+- A chave DEVE ter **exatamente 64 caracteres hexadecimais (32 bytes)**. O backend
+  **bloqueia a inicializacao** (`src/config/env.ts`) se estiver ausente, nao-hex ou
+  com tamanho diferente — com log de erro claro.
+- **Dev e producao DEVEM usar a MESMA chave.** O banco Neon e compartilhado; uma
+  chave diferente NAO consegue ler os dados ja criptografados. Nunca gerar uma
+  chave nova para um banco que ja tem dados.
+- A chave de producao fica no Railway (lida via GraphQL `variables(...)`). O
+  `.env` local deve conter exatamente essa mesma chave. **Nunca** colocar o valor
+  real no `.env.example` nem em codigo — apenas no `.env` (gitignored).
+- Diagnostico: `cd backend && npx tsx scripts/diagnose-encryption.ts` faz uma
+  varredura **somente leitura** de todos os modelos cifrados, tenta
+  descriptografar cada campo e gera relatorio de integridade (sem alterar nada).
+- Se ao ler dados de producao a descriptografia falhar em massa, suspeitar de
+  chave local divergente — alinhar com a de producao antes de qualquer operacao
+  que regrave campos cifrados (regravar com a chave errada corrompe os dados).
+
 ## Estado atual do projeto (03/04/2026)
 
 ### Infraestrutura
