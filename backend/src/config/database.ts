@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { tenantStore } from '../shared/middleware/tenantContext';
 import { ENCRYPTED_MODELS, encryptModelFields, decryptDeep } from '../shared/utils/encryption';
-import { isConnectionError } from '../shared/utils/dbErrors';
+import { isConnectionError, withConnectionRetry } from '../shared/utils/dbErrors';
 
 // Only models that have a direct tenant_id column
 const TENANT_SCOPED_MODELS = new Set([
@@ -106,20 +106,11 @@ const prisma = basePrisma.$extends({
       // Retry transparente em erros de conexão (cold-start/queda do Neon).
       // Corrige a intermitência: 1ª tentativa pode falhar com conexão fria,
       // a seguinte (após backoff) já pega a conexão quente.
-      let result: any;
-      for (let attempt = 0; ; attempt++) {
-        try {
-          result = await query(args);
-          break;
-        } catch (err) {
-          if (attempt < RETRY_DELAYS.length && isConnectionError(err)) {
-            console.warn(`[DB] Erro de conexão em ${model ?? '?'}.${operation} — retry ${attempt + 1}/${RETRY_DELAYS.length} em ${RETRY_DELAYS[attempt]}ms: ${(err as Error).message?.slice(0, 120)}`);
-            await sleep(RETRY_DELAYS[attempt]);
-            continue;
-          }
-          throw err;
-        }
-      }
+      const result: any = await withConnectionRetry(() => query(args), {
+        delays: RETRY_DELAYS,
+        onRetry: (attempt, err) =>
+          console.warn(`[DB] Erro de conexão em ${model ?? '?'}.${operation} — retry ${attempt + 1}/${RETRY_DELAYS.length} em ${RETRY_DELAYS[attempt]}ms: ${(err as Error).message?.slice(0, 120)}`),
+      });
 
       if (result) {
         decryptDeep(result);
