@@ -24,6 +24,8 @@ interface Customer {
   landlinePhone: string | null;
   email: string | null;
   cpfCnpj: string | null;
+  documentType?: string | null;
+  documentNumber?: string | null;
   birthDate: string | null;
   insurance: string | null;
   notes: string | null;
@@ -50,7 +52,16 @@ interface Customer {
 
 type ModalMode = 'closed' | 'create' | 'detail';
 
-const emptyForm = { name: '', phone: '', cellPhone: '', landlinePhone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' }, responsavelId: '', parentesco: '', usarTelResponsavel: false };
+const emptyForm = { name: '', phone: '', cellPhone: '', landlinePhone: '', email: '', cpfCnpj: '', documentType: '', documentNumber: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' }, responsavelId: '', parentesco: '', usarTelResponsavel: false };
+
+const DOC_TYPES = [
+  { v: '', label: '—' },
+  { v: 'RG', label: 'RG' },
+  { v: 'CNH', label: 'CNH' },
+  { v: 'PASSPORT', label: 'Passaporte' },
+  { v: 'RNM', label: 'RNM/RNE' },
+  { v: 'OTHER', label: 'Outro' },
+];
 
 export function CustomersPage() {
   const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
@@ -85,6 +96,9 @@ export function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('info');
+  // Modais de unicidade
+  const [cpfDup, setCpfDup] = useState<{ id: string; name: string } | null>(null);
+  const [phoneAlert, setPhoneAlert] = useState<Array<{ id: string; name: string }> | null>(null);
 
   const [toastMsg, setToastMsg] = useState('');
 
@@ -148,11 +162,32 @@ export function CustomersPage() {
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    await doCreate(false);
+  };
+
+  // force=true pula o alerta de telefone compartilhado (usuário escolheu "Continuar").
+  const doCreate = async (force: boolean) => {
     setSaving(true);
     try {
+      // Pré-checagem NÃO bloqueante: telefone já vinculado a outro paciente?
+      if (!force) {
+        const phoneToCheck = (formData.cellPhone || formData.landlinePhone || '').replace(/\D/g, '');
+        if (phoneToCheck.length >= 8) {
+          try {
+            const { data } = await api.get('/customers/check-phone', { params: { phone: phoneToCheck } });
+            if (data.data?.shared && data.data.patients?.length) {
+              setPhoneAlert(data.data.patients);
+              setSaving(false);
+              return;
+            }
+          } catch { /* se a checagem falhar, segue o cadastro normalmente */ }
+        }
+      }
+
       const payload: any = {
         ...formData,
         birthDate: formData.birthDate || undefined, cpfCnpj: formData.cpfCnpj || undefined,
+        documentType: formData.documentType || undefined, documentNumber: formData.documentNumber || undefined,
         notes: formData.notes || undefined, origin: formData.origin || undefined,
         address: formData.address.cep || formData.address.street ? formData.address : undefined,
         responsavelId: formData.responsavelId || undefined,
@@ -160,12 +195,23 @@ export function CustomersPage() {
         usarTelResponsavel: formData.usarTelResponsavel || undefined,
       };
       await api.post('/customers', payload);
-      setModalMode('closed'); setFormData(emptyForm); setRespSelected(null); fetchCustomers();
+      setModalMode('closed'); setFormData(emptyForm); setRespSelected(null); setPhoneAlert(null); fetchCustomers();
       showToast('Paciente criado com sucesso!');
     } catch (err: any) {
-      const msg = err?.response?.data?.error?.message || 'Erro ao criar paciente. Tente novamente.';
-      showToast(msg);
+      const error = err?.response?.data?.error;
+      if (error?.code === 'CPF_DUPLICATE' && error?.details?.existingId) {
+        setCpfDup({ id: error.details.existingId, name: error.details.existingName || 'paciente' });
+      } else {
+        showToast(error?.message || 'Erro ao criar paciente. Tente novamente.');
+      }
     } finally { setSaving(false); }
+  };
+
+  const openExistingPatient = (id: string) => {
+    setCpfDup(null);
+    setSelectedCustomer({ id } as Customer);
+    setDetailTab('info');
+    setModalMode('detail');
   };
 
   const handleDelete = async (id: string) => {
@@ -439,12 +485,24 @@ export function CustomersPage() {
                   <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">CPF/CNPJ</label>
-                  <input type="text" value={formData.cpfCnpj} onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })} className={inputCls} />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">CPF <span className="text-[11px] text-slate-400">(opcional, único)</span></label>
+                  <input type="text" value={formData.cpfCnpj} onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })} className={inputCls} placeholder="000.000.000-00" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de documento</label>
+                    <select value={formData.documentType} onChange={(e) => setFormData({ ...formData, documentType: e.target.value })} className={inputCls}>
+                      {DOC_TYPES.map((d) => <option key={d.v} value={d.v}>{d.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nº do documento</label>
+                    <input type="text" value={formData.documentNumber} onChange={(e) => setFormData({ ...formData, documentNumber: e.target.value })} className={inputCls} placeholder="Opcional" />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Data de nascimento{formData.birthDate && (() => { const b = new Date(formData.birthDate + 'T00:00:00'); const now = new Date(); let y = now.getFullYear() - b.getFullYear(); let m = now.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && now.getDate() < b.getDate())) { y--; m += 12; } if (now.getDate() < b.getDate()) m--; if (m < 0) m += 12; return y >= 2 ? <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{y} anos</span> : <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{y * 12 + m} meses</span>; })()}</label>
-                  <input type="date" value={formData.birthDate} onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })} className={inputCls} />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Data de nascimento <span className="text-red-500">*</span>{formData.birthDate && (() => { const b = new Date(formData.birthDate + 'T00:00:00'); const now = new Date(); let y = now.getFullYear() - b.getFullYear(); let m = now.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && now.getDate() < b.getDate())) { y--; m += 12; } if (now.getDate() < b.getDate()) m--; if (m < 0) m += 12; return y >= 2 ? <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{y} anos</span> : <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{y * 12 + m} meses</span>; })()}</label>
+                  <input type="date" value={formData.birthDate} onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })} className={inputCls} required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Origem</label>
@@ -708,6 +766,37 @@ export function CustomersPage() {
                 <button onClick={() => setShowImport(false)} className="w-full mt-5 bg-[#1E3A5F] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-[#2A4D7A]">Fechar</button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: CPF já cadastrado */}
+      {cpfDup && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-5">
+            <h3 className="font-semibold text-slate-800 mb-1">CPF já cadastrado</h3>
+            <p className="text-sm text-slate-600 mb-4">Já existe um paciente cadastrado com este CPF{cpfDup.name ? `: ${cpfDup.name}` : ''}.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setCpfDup(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button onClick={() => openExistingPatient(cpfDup.id)} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A]">Abrir cadastro existente</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: telefone já vinculado a outro paciente (não bloqueia) */}
+      {phoneAlert && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-5">
+            <h3 className="font-semibold text-slate-800 mb-1">Telefone já cadastrado</h3>
+            <p className="text-sm text-slate-600 mb-2">Este telefone já está vinculado a outro paciente. Deseja continuar?</p>
+            <ul className="text-xs text-slate-500 mb-4 list-disc pl-5">
+              {phoneAlert.slice(0, 5).map((p) => <li key={p.id}>{p.name}</li>)}
+            </ul>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPhoneAlert(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button onClick={() => { setPhoneAlert(null); doCreate(true); }} disabled={saving} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">Continuar</button>
+            </div>
           </div>
         </div>
       )}

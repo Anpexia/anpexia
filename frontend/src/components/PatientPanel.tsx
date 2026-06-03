@@ -48,6 +48,8 @@ interface Customer {
   landlinePhone?: string | null;
   email: string | null;
   cpfCnpj: string | null;
+  documentType?: string | null;
+  documentNumber?: string | null;
   birthDate: string | null;
   insurance: string | null;
   notes: string | null;
@@ -157,7 +159,7 @@ function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel,
 function populateForm(c: Customer) {
   return {
     name: c.name, phone: c.phone || '', cellPhone: c.cellPhone || '', landlinePhone: c.landlinePhone || '', email: c.email || '',
-    cpfCnpj: c.cpfCnpj || '', birthDate: c.birthDate ? c.birthDate.split('T')[0] : '',
+    cpfCnpj: c.cpfCnpj || '', documentType: c.documentType || '', documentNumber: c.documentNumber || '', birthDate: c.birthDate ? c.birthDate.split('T')[0] : '',
     insurance: c.insurance || '', notes: c.notes || '', origin: c.origin || '', optInWhatsApp: c.optInWhatsApp,
     address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '', ...(c.address as any || {}) },
   };
@@ -199,7 +201,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loadingCustomer, setLoadingCustomer] = useState(true);
-  const [formData, setFormData] = useState({ name: '', phone: '', cellPhone: '', landlinePhone: '', email: '', cpfCnpj: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } });
+  const [formData, setFormData] = useState({ name: '', phone: '', cellPhone: '', landlinePhone: '', email: '', cpfCnpj: '', documentType: '', documentNumber: '', birthDate: '', insurance: '', notes: '', origin: '', optInWhatsApp: false, address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' } });
   const [saving, setSaving] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>(initialTab);
 
@@ -975,8 +977,25 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                 <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className={inputCls} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">CPF/CNPJ</label>
-                <input type="text" value={formData.cpfCnpj} onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })} className={inputCls} />
+                <label className="block text-sm font-medium text-slate-700 mb-1">CPF <span className="text-[11px] text-slate-400">(único)</span></label>
+                <input type="text" value={formData.cpfCnpj} onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })} className={inputCls} placeholder="000.000.000-00" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de documento</label>
+                  <select value={formData.documentType} onChange={(e) => setFormData({ ...formData, documentType: e.target.value })} className={inputCls}>
+                    <option value="">—</option>
+                    <option value="RG">RG</option>
+                    <option value="CNH">CNH</option>
+                    <option value="PASSPORT">Passaporte</option>
+                    <option value="RNM">RNM/RNE</option>
+                    <option value="OTHER">Outro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nº do documento</label>
+                  <input type="text" value={formData.documentNumber} onChange={(e) => setFormData({ ...formData, documentNumber: e.target.value })} className={inputCls} placeholder="Opcional" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Data de nascimento{formData.birthDate && (() => { const b = new Date(formData.birthDate + 'T00:00:00'); const now = new Date(); let y = now.getFullYear() - b.getFullYear(); let m = now.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && now.getDate() < b.getDate())) { y--; m += 12; } if (now.getDate() < b.getDate()) m--; if (m < 0) m += 12; return y >= 2 ? <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{y} anos</span> : <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{y * 12 + m} meses</span>; })()}</label>
