@@ -422,4 +422,19 @@ export const customerService = {
       select: { id: true, name: true, phone: true, cellPhone: true, landlinePhone: true, responsavelId: true },
     });
   },
+
+  // Fila de revisão de telefones (relatório administrativo).
+  async listPhoneReview(tenantId: string) {
+    return prisma.phoneReviewItem.findMany({
+      where: { tenantId, resolved: false },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, customerId: true, customerName: true, originalPhone: true, reason: true, createdAt: true },
+    });
+  },
+
+  async resolvePhoneReview(tenantId: string, reviewId: string) {
+    const item = await prisma.phoneReviewItem.findFirst({ where: { id: reviewId, tenantId } });
+    if (!item) throw new AppError(404, 'REVIEW_NOT_FOUND', 'Item de revisão não encontrado');
+    return prisma.phoneReviewItem.update({ where: { id: reviewId }, data: { resolved: true } });
+  },
 };

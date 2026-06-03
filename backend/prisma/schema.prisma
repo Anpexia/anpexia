@@ -273,6 +273,22 @@ model Customer {
   @@map("customers")
 }
 
+// Fila de revisão manual de telefones fora do padrão (migração celular/fixo).
+model PhoneReviewItem {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  customerId    String   @map("customer_id")
+  customerName  String   @map("customer_name")
+  originalPhone String?  @map("original_phone")
+  reason        String // motivo da inconsistência
+  resolved      Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([resolved])
+  @@map("phone_review_items")
+}
+
 model CustomerTag {
   id        String   @id @default(cuid())
   tenantId  String   @map("tenant_id")

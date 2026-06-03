@@ -41,6 +41,25 @@ customerRouter.get('/', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
+// Fila de revisão de telefones (deve vir ANTES de /:id para não colidir).
+customerRouter.get('/phone-review', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const items = await customerService.listPhoneReview(req.auth!.tenantId!);
+    return success(res, items);
+  } catch (err) {
+    next(err);
+  }
+});
+
+customerRouter.patch('/phone-review/:reviewId/resolve', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const item = await customerService.resolvePhoneReview(req.auth!.tenantId!, req.params.reviewId as string);
+    return success(res, item);
+  } catch (err) {
+    next(err);
+  }
+});
+
 customerRouter.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const customer = await customerService.getById(req.auth!.tenantId!, req.params.id as string);
