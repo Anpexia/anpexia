@@ -167,15 +167,9 @@ export async function warmupDatabase(): Promise<void> {
   }
 }
 
-// Keepalive para evitar autosuspend do Neon (reduz cold-starts).
-// .unref() para não impedir o encerramento de processos curtos (testes/scripts).
-const keepaliveTimer = setInterval(async () => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-  } catch (err) {
-    console.warn('[DB] Keepalive ping falhou:', (err as Error).message);
-  }
-}, 4 * 60 * 1000);
-keepaliveTimer.unref();
+// Keepalive periódico REMOVIDO de propósito: manter o banco acordado impede o
+// autosuspend do Neon e aumenta o consumo de créditos. Com o endpoint pooled
+// (pgbouncer) + retry automático de conexão (withConnectionRetry), os
+// cold-starts são absorvidos de forma transparente, sem custo ocioso.
 
 export default prisma;
