@@ -96,6 +96,61 @@ const entryTypeLabels: Record<string, { label: string; cls: string }> = {
 
 const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]';
 
+// Texto livre clinico append-only (multiprofissional). Mostra o historico
+// cronologico (autor, data, hora, conteudo) e um campo para adicionar um novo
+// registro imutavel. Usado tanto na Anamnese quanto na Evolucao.
+function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel, placeholder }: {
+  notes: any[];
+  value: string;
+  onChange: (v: string) => void;
+  onAdd: () => void;
+  saving: boolean;
+  addLabel: string;
+  placeholder: string;
+}) {
+  return (
+    <div className="space-y-3">
+      {notes.length === 0 ? (
+        <p className="text-sm text-slate-500 text-center py-4">Nenhum registro ainda.</p>
+      ) : (
+        <div className="space-y-2">
+          {notes.map((n) => (
+            <div key={n.id} className="border border-slate-200 rounded-lg p-3 bg-white">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-[#1E3A5F]">{n.authorName || 'Profissional'}</span>
+                <span className="text-[11px] text-slate-400">
+                  {n.createdAt ? format(new Date(n.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : ''}
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap">{n.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="border-t border-slate-200 pt-3">
+        <DictationTextarea
+          value={value}
+          onChange={onChange}
+          className={inputCls + ' resize-y'}
+          style={{ minHeight: '160px' }}
+          placeholder={placeholder}
+        />
+        <div className="flex justify-end mt-2">
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={saving || !value.trim()}
+            className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50"
+          >
+            {saving ? 'Salvando...' : addLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function populateForm(c: Customer) {
   return {
     name: c.name, phone: c.phone || '', email: c.email || '',
@@ -164,7 +219,13 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const [anamneseError, setAnamneseError] = useState<string>('');
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anamneseDataRef = useRef<any>({});
+  const anamnesisVersionRef = useRef<number>(0);
+  const anamnesePatchRef = useRef<Record<string, any>>({});
   const [anamneseTab, setAnamneseTab] = useState<'campos' | 'texto_livre'>('campos');
+  // Texto livre clinico append-only (Anamnese)
+  const [anamneseNotes, setAnamneseNotes] = useState<any[]>([]);
+  const [newAnamneseNote, setNewAnamneseNote] = useState('');
+  const [savingAnamneseNote, setSavingAnamneseNote] = useState(false);
 
   // Evolucao state
   const [evolucoes, setEvolucoes] = useState<any[]>([]);
@@ -172,6 +233,11 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const [showNewEvolucao, setShowNewEvolucao] = useState(false);
   const [evolucaoForm, setEvolucaoForm] = useState<Record<string, string>>({ subjective: '', objective: '', exams: '', returnDate: '' });
   const [savingEvolucao, setSavingEvolucao] = useState(false);
+  const [evolucaoTab, setEvolucaoTab] = useState<'estruturada' | 'texto_livre'>('estruturada');
+  // Texto livre clinico append-only (Evolucao)
+  const [evolucaoNotes, setEvolucaoNotes] = useState<any[]>([]);
+  const [newEvolucaoNote, setNewEvolucaoNote] = useState('');
+  const [savingEvolucaoNote, setSavingEvolucaoNote] = useState(false);
 
   // Prescricoes state
   const [prescricoes, setPrescricoes] = useState<any[]>([]);
@@ -377,7 +443,15 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
     } catch {}
   };
 
-  // Fetch anamnese
+  // Carrega o texto livre clinico (append-only) de um contexto
+  const fetchClinicalNotes = async (patientId: string, context: 'ANAMNESE' | 'EVOLUCAO', setter: (n: any[]) => void) => {
+    try {
+      const { data } = await api.get(`/clinical-notes/${patientId}`, { params: { context } });
+      setter(data.data || []);
+    } catch { setter([]); }
+  };
+
+  // Fetch anamnese (campos estruturados + texto livre append-only)
   const fetchAnamnese = async (patientId: string) => {
     setLoadingAnamnese(true);
     try {
@@ -385,36 +459,63 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
       if (data.data) {
         setAnamneseData(data.data.data || {});
         anamneseDataRef.current = data.data.data || {};
+        anamnesisVersionRef.current = data.data.version ?? 0;
+        anamnesePatchRef.current = {};
         setAnamnesisId(data.data.id);
         setAnamneseSaveStatus('saved');
       } else {
         setAnamneseData({});
         anamneseDataRef.current = {};
+        anamnesisVersionRef.current = 0;
+        anamnesePatchRef.current = {};
         setAnamnesisId(null);
         setAnamneseSaveStatus('idle');
       }
     } catch {
       setAnamneseData({});
       anamneseDataRef.current = {};
+      anamnesisVersionRef.current = 0;
+      anamnesePatchRef.current = {};
       setAnamnesisId(null);
       setAnamneseSaveStatus('idle');
     }
     finally { setLoadingAnamnese(false); }
+    fetchClinicalNotes(patientId, 'ANAMNESE', setAnamneseNotes);
   };
 
-  const saveAnamnese = async (dataToSave?: any) => {
+  // Salva os campos estruturados. Em update, envia apenas as chaves alteradas
+  // (patch) + version, para que o merge no backend nunca apague campos de outro
+  // profissional. O texto livre NAO passa por aqui (vai para clinical-notes).
+  const saveAnamnese = async () => {
     if (!customer) return;
-    const payload = dataToSave || anamneseDataRef.current;
     const resolvedDoctorId = doctorIdProp || user?.id;
     setSavingAnamnese(true);
     setAnamneseSaveStatus('saving');
     setAnamneseError('');
     try {
       if (anamnesisId) {
-        await api.put(`/anamnesis/${customer.id}/${anamnesisId}`, { data: payload });
+        const sendPatch = { ...anamnesePatchRef.current };
+        anamnesePatchRef.current = {};
+        try {
+          const { data } = await api.put(`/anamnesis/${customer.id}/${anamnesisId}`, { data: sendPatch, version: anamnesisVersionRef.current });
+          if (data?.data?.version != null) anamnesisVersionRef.current = data.data.version;
+        } catch (e: any) {
+          // Restaura o patch nao salvo (mantendo edicoes feitas durante a requisicao)
+          anamnesePatchRef.current = { ...sendPatch, ...anamnesePatchRef.current };
+          if (e?.response?.status === 409) {
+            // Conflito raro: ressincroniza com o servidor (que ja mesclou os dados)
+            await fetchAnamnese(customer.id);
+            showToast('Anamnese recarregada (atualizada por outro profissional).');
+            setAnamneseSaveStatus('saved');
+            return;
+          }
+          throw e;
+        }
       } else {
-        const { data } = await api.post(`/anamnesis/${customer.id}`, { doctorId: resolvedDoctorId, data: payload });
+        const { data } = await api.post(`/anamnesis/${customer.id}`, { doctorId: resolvedDoctorId, data: anamneseDataRef.current });
         setAnamnesisId(data.data?.id || data.id);
+        if (data?.data?.version != null) anamnesisVersionRef.current = data.data.version;
+        anamnesePatchRef.current = {};
       }
       setAnamneseSaveStatus('saved');
     } catch (err: any) {
@@ -433,12 +534,43 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
     const updated = { ...anamneseData, [key]: value };
     setAnamneseData(updated);
     anamneseDataRef.current = updated;
+    anamnesePatchRef.current = { ...anamnesePatchRef.current, [key]: value };
     setAnamneseSaveStatus('unsaved');
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      saveAnamnese(updated);
+      saveAnamnese();
     }, 3000);
+  };
+
+  // Adiciona um registro de texto livre da Anamnese (append-only)
+  const addAnamneseNote = async () => {
+    if (!customer) return;
+    const content = newAnamneseNote.trim();
+    if (!content) return;
+    setSavingAnamneseNote(true);
+    try {
+      await api.post(`/clinical-notes/${customer.id}`, { context: 'ANAMNESE', content });
+      setNewAnamneseNote('');
+      await fetchClinicalNotes(customer.id, 'ANAMNESE', setAnamneseNotes);
+      showToast('Registro adicionado');
+    } catch { showToast('Erro ao adicionar registro'); }
+    finally { setSavingAnamneseNote(false); }
+  };
+
+  // Adiciona um registro de texto livre da Evolucao (append-only)
+  const addEvolucaoNote = async () => {
+    if (!customer) return;
+    const content = newEvolucaoNote.trim();
+    if (!content) return;
+    setSavingEvolucaoNote(true);
+    try {
+      await api.post(`/clinical-notes/${customer.id}`, { context: 'EVOLUCAO', content });
+      setNewEvolucaoNote('');
+      await fetchClinicalNotes(customer.id, 'EVOLUCAO', setEvolucaoNotes);
+      showToast('Registro adicionado');
+    } catch { showToast('Erro ao adicionar registro'); }
+    finally { setSavingEvolucaoNote(false); }
   };
 
   useEffect(() => {
@@ -447,7 +579,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
     };
   }, []);
 
-  // Fetch evolucoes
+  // Fetch evolucoes (estruturadas + texto livre append-only)
   const fetchEvolucoes = async (patientId: string) => {
     setLoadingEvolucoes(true);
     try {
@@ -455,6 +587,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
       setEvolucoes(data.data || []);
     } catch { setEvolucoes([]); }
     finally { setLoadingEvolucoes(false); }
+    fetchClinicalNotes(patientId, 'EVOLUCAO', setEvolucaoNotes);
   };
 
   const handleAddEvolucao = async () => {
@@ -1126,17 +1259,17 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                       </div>
                     )}
 
-                    {/* Tab: Texto Livre (quadro branco) */}
+                    {/* Tab: Texto Livre (append-only, multiprofissional) */}
                     {anamneseTab === 'texto_livre' && (
-                      <div>
-                        <DictationTextarea
-                          value={anamneseData._freeText || ''}
-                          onChange={(v) => handleAnamneseFieldChange('_freeText', v)}
-                          className={inputCls + ' resize-y'}
-                          style={{ minHeight: '50vh', maxHeight: '80vh' }}
-                          placeholder="Cole aqui seus modelos prontos ou digite livremente. Todas as informacoes da anamnese podem ficar neste campo unico."
-                        />
-                      </div>
+                      <ClinicalNotesSection
+                        notes={anamneseNotes}
+                        value={newAnamneseNote}
+                        onChange={setNewAnamneseNote}
+                        onAdd={addAnamneseNote}
+                        saving={savingAnamneseNote}
+                        addLabel="Adicionar registro"
+                        placeholder="Digite um novo registro da anamnese. Ao adicionar, o texto fica salvo de forma permanente com seu nome e horario — nada e sobrescrito."
+                      />
                     )}
 
                   </>
@@ -1147,6 +1280,36 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
             {/* EVOLUCAO SECTION */}
             {prontuarioSection === 'evolucao' && (
               <div className="space-y-4">
+                {/* Tabs: Estruturada | Texto Livre */}
+                <div className="flex gap-1 border-b border-slate-200">
+                  <button
+                    onClick={() => setEvolucaoTab('estruturada')}
+                    className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${evolucaoTab === 'estruturada' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Estruturada
+                  </button>
+                  <button
+                    onClick={() => setEvolucaoTab('texto_livre')}
+                    className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${evolucaoTab === 'texto_livre' ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Texto Livre
+                  </button>
+                </div>
+
+                {evolucaoTab === 'texto_livre' && (
+                  <ClinicalNotesSection
+                    notes={evolucaoNotes}
+                    value={newEvolucaoNote}
+                    onChange={setNewEvolucaoNote}
+                    onAdd={addEvolucaoNote}
+                    saving={savingEvolucaoNote}
+                    addLabel="Registrar Evolucao"
+                    placeholder="Digite a evolucao do paciente. Ao registrar, o texto fica salvo de forma permanente com seu nome e horario — nada e sobrescrito."
+                  />
+                )}
+
+                {evolucaoTab === 'estruturada' && (
+                <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium text-slate-800">Evolucoes</h4>
                   <button onClick={() => setShowNewEvolucao(!showNewEvolucao)} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
@@ -1267,6 +1430,8 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                       </div>
                     ))}
                   </div>
+                )}
+                </div>
                 )}
               </div>
             )}
