@@ -701,6 +701,7 @@ async function handleSchedConfirm(tenantId: string, phone: string, text: string)
     }
 
     await schedulingService.bookCall({
+      customerId: customer.id, // paciente EXATO escolhido (evita re-resolver por telefone)
       name: customer.name,
       email: customer.email ?? undefined,
       phone,
