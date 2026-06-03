@@ -15,6 +15,7 @@
     "test:schema": "node --import tsx --test tests/schema.test.ts",
     "test:clinical-notes": "node --import tsx --test tests/clinicalNotes.service.test.ts",
     "test:anamnesis": "node --import tsx --test tests/anamnesis.service.test.ts",
+    "test:env": "node --import tsx --test tests/env.test.ts",
     "test:all": "node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

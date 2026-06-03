@@ -30,6 +30,21 @@ function required(name: string): string {
   return value;
 }
 
+// Valida uma chave hexadecimal de tamanho fixo (bloqueia inicialização se invalida).
+function requiredHexKey(name: string, bytes: number): string {
+  const value = required(name).trim();
+  const expectedChars = bytes * 2;
+  if (!/^[0-9a-fA-F]+$/.test(value)) {
+    console.error(`❌ ${name} inválida: deve conter apenas caracteres hexadecimais (0-9, a-f). Inicialização bloqueada.`);
+    throw new Error(`${name} inválida: formato não-hexadecimal`);
+  }
+  if (value.length !== expectedChars) {
+    console.error(`❌ ${name} inválida: deve ter ${expectedChars} caracteres hex (${bytes} bytes). Recebido: ${value.length}. Inicialização bloqueada.`);
+    throw new Error(`${name} inválida: tamanho incorreto (${value.length} != ${expectedChars})`);
+  }
+  return value;
+}
+
 export const env = {
   port: Number(process.env.PORT) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -53,8 +68,8 @@ export const env = {
   mpAccessToken: process.env.MP_ACCESS_TOKEN || '',
   mpPublicKey: process.env.MP_PUBLIC_KEY || '',
 
-  // Criptografia — obrigatória, sem fallback inseguro
-  encryptionKey: required('ENCRYPTION_KEY'),
+  // Criptografia — obrigatória, validada (32 bytes / 64 hex) no startup
+  encryptionKey: requiredHexKey('ENCRYPTION_KEY', 32),
 
   // IA (Chatbot) — Claude / Anthropic
   anthropicApiKey: required('ANTHROPIC_API_KEY'),
