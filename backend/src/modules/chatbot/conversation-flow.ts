@@ -14,6 +14,8 @@ import { schedulingService } from '../scheduling/scheduling.service';
 export type FlowState =
   | 'IDLE'
   | 'MENU'
+  // Seleção de paciente quando ≥2 vinculados ao mesmo telefone
+  | 'SELECT_PATIENT'
   // Registration (simplified)
   | 'REG_NAME'
   | 'REG_PAYMENT'
@@ -122,11 +124,8 @@ export async function handleConversationFlow(
   if (['agendar consulta', 'agendar agora', 'agendar retorno', 'quero agendar',
        'agendar nova consulta', 'btn_rebook', 'btn_book'].includes(textLower) ||
       textLower.replace(/\s+/g, '_') === 'agendar_consulta') {
-    const customer = await findCustomer(tenantId, phone);
-    if (customer) {
-      setState(tenantId, phone, 'IDLE', {}, customer.id);
-      return startSchedulingFlow(tenantId, phone);
-    }
+    const r = await resolvePatientAndSchedule(tenantId, phone, false);
+    if (r) return r;
   }
 
   const conv = getState(tenantId, phone);
@@ -139,6 +138,7 @@ export async function handleConversationFlow(
   // Route based on current state
   switch (conv.state) {
     case 'MENU': return handleMenu(tenantId, phone, text);
+    case 'SELECT_PATIENT': return handleSelectPatient(tenantId, phone, text);
     // Registration (simplified)
     case 'REG_NAME': return handleRegName(tenantId, phone, text);
     case 'REG_PAYMENT': return handleRegPayment(tenantId, phone, text);
@@ -185,13 +185,7 @@ async function showEntryMenu(tenantId: string, phone: string): Promise<FlowRespo
 async function handleMenu(tenantId: string, phone: string, text: string): Promise<FlowResponse> {
   const n = text.trim();
   if (n === '1' || n.toLowerCase().includes('agendar')) {
-    const customer = await findCustomer(tenantId, phone);
-    if (customer) {
-      setState(tenantId, phone, 'IDLE', {}, customer.id);
-      return startSchedulingFlow(tenantId, phone);
-    } else {
-      return startRegistration(tenantId, phone);
-    }
+    return (await resolvePatientAndSchedule(tenantId, phone, true))!;
   }
 
   if (n === '2' || n.toLowerCase().includes('atendente')) {
@@ -754,10 +748,10 @@ async function handleSchedConfirm(tenantId: string, phone: string, text: string)
 // Helpers
 // ============================================================
 
-async function findCustomer(tenantId: string, phone: string) {
+// Todos os pacientes ATIVOS vinculados ao telefone (família compartilha número).
+export async function findActivePatientsByPhone(tenantId: string, phone: string): Promise<Array<{ id: string; name: string; responsavelId: string | null; createdAt: Date }>> {
   const suffix = phone.replace(/\D/g, '').slice(-8);
-  // Mensagem chega de um celular: casa por cellPhone OU phone (legado/espelho).
-  const matches = await prisma.customer.findMany({
+  return prisma.customer.findMany({
     where: {
       tenantId,
       isActive: true,
@@ -769,9 +763,55 @@ async function findCustomer(tenantId: string, phone: string) {
     select: { id: true, name: true, responsavelId: true, createdAt: true },
     orderBy: { createdAt: 'asc' },
   });
+}
+
+async function findCustomer(tenantId: string, phone: string) {
+  const matches = await findActivePatientsByPhone(tenantId, phone);
   if (matches.length === 0) return null;
   // Prefer the customer who is a responsavel (has no responsavelId) — i.e. the titular
-  const titular = matches.find(c => !c.responsavelId);
+  const titular = matches.find((c) => !c.responsavelId);
   const chosen = titular || matches[0];
   return prisma.customer.findUnique({ where: { id: chosen.id } });
+}
+
+// Monta o menu "Para quem é o atendimento?" quando há vários pacientes no número.
+function buildPatientSelectionPrompt(patients: Array<{ id: string; name: string }>): FlowResponse {
+  let text = 'Identificamos mais de um paciente neste telefone.\nPara quem deseja realizar o atendimento?\n\n';
+  patients.forEach((p, i) => { text += `${i + 1} - ${p.name}\n`; });
+  text += `${patients.length + 1} - Outro paciente\n\nResponda com o número da opção.`;
+  return { type: 'text', text };
+}
+
+/**
+ * Resolve o paciente do telefone e segue para o agendamento.
+ * - 0 pacientes: registra (se registerIfNone) ou retorna null.
+ * - 1 paciente: comportamento IDÊNTICO ao atual (segue direto).
+ * - ≥2 pacientes: pergunta "para quem?" (estado SELECT_PATIENT).
+ */
+async function resolvePatientAndSchedule(tenantId: string, phone: string, registerIfNone: boolean): Promise<FlowResponse | null> {
+  const patients = await findActivePatientsByPhone(tenantId, phone);
+  if (patients.length === 0) {
+    return registerIfNone ? startRegistration(tenantId, phone) : null;
+  }
+  if (patients.length === 1) {
+    setState(tenantId, phone, 'IDLE', {}, patients[0].id);
+    return startSchedulingFlow(tenantId, phone);
+  }
+  setState(tenantId, phone, 'SELECT_PATIENT', { patientChoices: patients.map((p) => ({ id: p.id, name: p.name })) });
+  return buildPatientSelectionPrompt(patients);
+}
+
+async function handleSelectPatient(tenantId: string, phone: string, text: string): Promise<FlowResponse> {
+  const conv = getState(tenantId, phone)!;
+  const choices = (conv.data.patientChoices || []) as Array<{ id: string; name: string }>;
+  const n = parseInt(text.trim(), 10);
+
+  if (n >= 1 && n <= choices.length) {
+    setState(tenantId, phone, 'IDLE', {}, choices[n - 1].id);
+    return startSchedulingFlow(tenantId, phone);
+  }
+  if (n === choices.length + 1) {
+    return startRegistration(tenantId, phone);
+  }
+  return buildPatientSelectionPrompt(choices);
 }
