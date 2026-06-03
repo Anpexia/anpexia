@@ -40,11 +40,10 @@ async function main() {
     const wa2 = getWhatsappPhone(a as any);
     ok(wa2.ok && wa2.phone === '5531900000001', 'guard: celular libera WhatsApp formatado');
 
-    // Dedup: criar outro com o mesmo celular deve falhar
-    let dup = false;
-    try { const d = await customerService.create(tenant.id, { name: '[T] Dup', cellPhone: '31900000003' } as any); ids.push(d.id); }
-    catch (e: any) { dup = e?.code === 'DUPLICATE_PHONE' || /DUPLICATE_PHONE|cadastrado com este telefone/i.test(e?.message || ''); }
-    ok(dup, 'dedup: celular duplicado é bloqueado');
+    // Telefone NÃO é mais único: criar outro com o mesmo celular DEVE ser permitido.
+    const d = await customerService.create(tenant.id, { name: '[T] MesmoTel', birthDate: '1990-01-01', cellPhone: '31900000003' } as any);
+    ids.push(d.id);
+    ok(!!d.id, 'celular duplicado é PERMITIDO (telefone não é mais único)');
   });
 
   // Limpeza
