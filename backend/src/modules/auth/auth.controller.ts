@@ -6,6 +6,16 @@ import { authenticate } from '../../shared/middleware/auth';
 import { env } from '../../config/env';
 import { publicRateLimit } from '../../shared/middleware/rate-limit';
 import { getClientIp } from '../../services/auditLog.service';
+import { AppError } from '../../shared/middleware/error-handler';
+import { isConnectionError } from '../../shared/utils/dbErrors';
+import { log, describeError } from '../../shared/utils/logger';
+
+// Loga o resultado de uma tentativa de login (ts/email/ip/status/tempo).
+function statusOf(err: unknown): number {
+  if (err instanceof AppError) return err.statusCode;
+  if (isConnectionError(err)) return 503;
+  return 500;
+}
 
 export const authRouter = Router();
 
@@ -21,37 +31,61 @@ function refreshCookieOptions() {
 }
 
 authRouter.post('/login', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  const startedAt = Date.now();
+  const ip = getClientIp(req);
+  const email = String(req.body?.email || '').trim().toLowerCase();
   try {
     const data = loginSchema.parse(req.body);
     const deviceId = (req.body?.deviceId as string | undefined) || (req.headers['x-device-id'] as string | undefined);
-    const ip = getClientIp(req);
     const result = await authService.login(data.email, data.password, deviceId, ip, 'app', data.tenantId);
 
     res.cookie('refreshToken', result.refreshToken, refreshCookieOptions());
+    log.info('login_success', { email, ip, httpStatus: 200, durationMs: Date.now() - startedAt, context: 'app' });
 
     return success(res, {
       accessToken: result.accessToken,
       user: result.user,
     });
   } catch (err) {
+    const d = describeError(err);
+    log.warn('login_failed', {
+      email, ip, context: 'app',
+      httpStatus: statusOf(err),
+      durationMs: Date.now() - startedAt,
+      errorName: d.name,
+      errorCode: (err as any)?.code || (err instanceof AppError ? err.code : undefined),
+      errorMessage: d.message,
+    });
     next(err);
   }
 });
 
 authRouter.post('/admin/login', publicRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  const startedAt = Date.now();
+  const ip = getClientIp(req);
+  const email = String(req.body?.email || '').trim().toLowerCase();
   try {
     const data = loginSchema.parse(req.body);
     const deviceId = (req.body?.deviceId as string | undefined) || (req.headers['x-device-id'] as string | undefined);
-    const ip = getClientIp(req);
     const result = await authService.login(data.email, data.password, deviceId, ip, 'admin');
 
     res.cookie('refreshToken', result.refreshToken, refreshCookieOptions());
+    log.info('login_success', { email, ip, httpStatus: 200, durationMs: Date.now() - startedAt, context: 'admin' });
 
     return success(res, {
       accessToken: result.accessToken,
       user: result.user,
     });
   } catch (err) {
+    const d = describeError(err);
+    log.warn('login_failed', {
+      email, ip, context: 'admin',
+      httpStatus: statusOf(err),
+      durationMs: Date.now() - startedAt,
+      errorName: d.name,
+      errorCode: (err as any)?.code || (err instanceof AppError ? err.code : undefined),
+      errorMessage: d.message,
+    });
     next(err);
   }
 });
