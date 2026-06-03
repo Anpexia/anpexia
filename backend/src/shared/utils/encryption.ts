@@ -64,7 +64,7 @@ interface EncryptedModelConfig {
 }
 
 export const ENCRYPTED_MODELS: Record<string, EncryptedModelConfig> = {
-  Customer: { string: ['cpfCnpj'] },
+  Customer: { string: ['cpfCnpj', 'documentNumber'] },
   MedicalRecord: { string: ['allergies', 'medications', 'chronicDiseases', 'clinicalNotes'] },
   MedicalEntry: { string: ['content'] },
   Anamnesis: { json: ['data'] },

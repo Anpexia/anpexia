@@ -237,6 +237,9 @@ model Customer {
   landlinePhone String?   @map("landline_phone") // Fixo (somente contato) — 10 dígitos
   email         String?
   cpfCnpj       String?   @map("cpf_cnpj") // Criptografado
+  cpfHash       String?   @map("cpf_hash") // Blind index (HMAC) p/ unicidade — não reversível
+  documentType  String?   @map("document_type") // RG | CNH | PASSPORT | RNM | OTHER
+  documentNumber String?  @map("document_number") // Criptografado — documento de identidade
   birthDate     DateTime? @map("birth_date")
   address       Json? // { cep, street, number, neighborhood, city, state }
   insurance     String? // "Particular" ou "NomePlano - NumCarteirinha"
@@ -270,6 +273,7 @@ model Customer {
 
   @@index([tenantId])
   @@index([responsavelId])
+  @@index([tenantId, cpfHash])
   @@map("customers")
 }
 
