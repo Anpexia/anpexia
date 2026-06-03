@@ -756,11 +756,15 @@ async function handleSchedConfirm(tenantId: string, phone: string, text: string)
 
 async function findCustomer(tenantId: string, phone: string) {
   const suffix = phone.replace(/\D/g, '').slice(-8);
+  // Mensagem chega de um celular: casa por cellPhone OU phone (legado/espelho).
   const matches = await prisma.customer.findMany({
     where: {
       tenantId,
-      phone: { contains: suffix },
       isActive: true,
+      OR: [
+        { cellPhone: { contains: suffix } },
+        { phone: { contains: suffix } },
+      ],
     },
     select: { id: true, name: true, responsavelId: true, createdAt: true },
     orderBy: { createdAt: 'asc' },

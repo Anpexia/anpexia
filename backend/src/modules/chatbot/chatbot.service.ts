@@ -117,9 +117,10 @@ export const chatbotService = {
     const senderName = data.data.pushName || 'Cliente';
 
     const phoneForSend = remoteJid;
-    const phoneForDb = evolutionApi.ensureBrazilian9thDigit(
-      senderPhone.startsWith('55') ? senderPhone : `55${senderPhone}`
-    );
+    // Número de entrada já é um celular (a pessoa nos mandou WhatsApp). Normaliza
+    // de forma canônica; fallback preserva o número caso algo fuja do padrão.
+    const phoneForDb = evolutionApi.formatPhone(senderPhone)
+      || (senderPhone.startsWith('55') ? senderPhone : `55${senderPhone}`);
 
     const config = await prisma.chatbotConfig.findFirst({
       where: { instanceName, isActive: true },

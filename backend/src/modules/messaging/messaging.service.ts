@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { AppError } from '../../shared/middleware/error-handler';
 import { evolutionApi } from './evolution.client';
+import { getWhatsappPhone, classifyPhone } from '../../shared/utils/phone';
 
 interface CreateTemplateData {
   type: string;
@@ -66,6 +67,23 @@ export const messagingService = {
   },
 
   async sendMessage(tenantId: string, data: SendMessageData) {
+    // GUARD de WhatsApp: bloqueia envio para fixo / sem celular, com mensagem amigável.
+    if (data.customerId) {
+      const customer = await prisma.customer.findFirst({
+        where: { id: data.customerId, tenantId },
+        select: {
+          phone: true, cellPhone: true, landlinePhone: true, usarTelResponsavel: true,
+          responsavel: { select: { phone: true, cellPhone: true, landlinePhone: true } },
+        },
+      });
+      const wa = getWhatsappPhone(customer);
+      if (!wa.ok) {
+        throw new AppError(422, 'WHATSAPP_BLOCKED', wa.message!);
+      }
+    } else if (classifyPhone(data.phone).type !== 'mobile') {
+      throw new AppError(422, 'WHATSAPP_BLOCKED', 'O número informado não é um celular válido e não pode receber mensagens pelo WhatsApp.');
+    }
+
     // Registrar a mensagem como pendente
     const message = await prisma.messageSent.create({
       data: {

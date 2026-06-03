@@ -3,6 +3,7 @@ import prisma from '../config/database';
 import { evolutionApi } from '../modules/messaging/evolution.client';
 import { env } from '../config/env';
 import { sendReminder48h, sendReminder2h } from '../modules/scheduling/scheduling.notifications';
+import { getWhatsappPhone } from '../shared/utils/phone';
 
 const TAG = '[CRON]';
 
@@ -109,27 +110,32 @@ async function sendAppointmentReminders() {
         confirmationSentAt: null, // Only send once
       },
       include: {
-        customer: { select: { name: true, phone: true, usarTelResponsavel: true, responsavel: { select: { name: true, phone: true } } } },
+        customer: { select: { name: true, phone: true, cellPhone: true, landlinePhone: true, usarTelResponsavel: true, responsavel: { select: { name: true, phone: true, cellPhone: true, landlinePhone: true } } } },
       },
     });
 
     for (const call of upcomingIn48h) {
       const cust = call.customer;
-      const usesResponsavel = cust?.usarTelResponsavel && cust?.responsavel?.phone;
-      const targetPhone = usesResponsavel ? cust!.responsavel!.phone! : call.phone;
+      const usesResponsavel = !!(cust?.usarTelResponsavel && cust?.responsavel);
       const targetName = usesResponsavel ? cust!.responsavel!.name : call.name;
       const patientName = usesResponsavel ? call.name : undefined;
 
-      await sendReminder48h({
-        id: call.id,
-        name: targetName,
-        patientName,
-        phone: targetPhone,
-        date: call.date,
-        leadId: call.leadId,
-        tenantId: call.tenantId,
-        doctorId: call.doctorId,
-      });
+      // Resolve o celular via guard central (trata dependentes). Sem celular = pula WhatsApp.
+      const wa = cust ? getWhatsappPhone(cust as any) : { ok: true, phone: call.phone } as any;
+      if (wa.ok) {
+        await sendReminder48h({
+          id: call.id,
+          name: targetName,
+          patientName,
+          phone: wa.phone!,
+          date: call.date,
+          leadId: call.leadId,
+          tenantId: call.tenantId,
+          doctorId: call.doctorId,
+        });
+      } else {
+        console.log(`${TAG} 48h reminder WhatsApp pulado (${wa.reason}) para ${call.name}`);
+      }
       await prisma.scheduledCall.update({
         where: { id: call.id },
         data: { confirmationSentAt: now },
@@ -161,27 +167,31 @@ async function sendAppointmentReminders() {
         reminderSentAt: null, // Only send once
       },
       include: {
-        customer: { select: { name: true, phone: true, usarTelResponsavel: true, responsavel: { select: { name: true, phone: true } } } },
+        customer: { select: { name: true, phone: true, cellPhone: true, landlinePhone: true, usarTelResponsavel: true, responsavel: { select: { name: true, phone: true, cellPhone: true, landlinePhone: true } } } },
       },
     });
 
     for (const call of upcomingIn2h) {
       const cust2 = call.customer;
-      const usesResp2 = cust2?.usarTelResponsavel && cust2?.responsavel?.phone;
-      const targetPhone2 = usesResp2 ? cust2!.responsavel!.phone! : call.phone;
+      const usesResp2 = !!(cust2?.usarTelResponsavel && cust2?.responsavel);
       const targetName2 = usesResp2 ? cust2!.responsavel!.name : call.name;
       const patientName2 = usesResp2 ? call.name : undefined;
-
-      await sendReminder2h({
-        id: call.id,
-        name: targetName2,
-        patientName: patientName2,
-        phone: targetPhone2,
-        date: call.date,
-        leadId: call.leadId,
-        tenantId: call.tenantId,
-        doctorId: call.doctorId,
-      });
+      const wa2 = cust2 ? getWhatsappPhone(cust2 as any) : { ok: true, phone: call.phone } as any;
+      if (wa2.ok) {
+        await sendReminder2h({
+          id: call.id,
+          name: targetName2,
+          patientName: patientName2,
+          phone: wa2.phone!,
+          date: call.date,
+          leadId: call.leadId,
+          tenantId: call.tenantId,
+          doctorId: call.doctorId,
+        });
+      } else {
+        console.log(`${TAG} 2h reminder WhatsApp pulado (${wa2.reason}) para ${call.name}`);
+      }
+      // Marca como processado sempre (evita reprocessar quem não tem celular).
       await prisma.scheduledCall.update({
         where: { id: call.id },
         data: { reminderSentAt: now },

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { env } from '../../config/env';
+import { onlyDigits, classifyPhone } from '../../shared/utils/phone';
 
 const api = axios.create({
   baseURL: env.evolutionApiUrl,
@@ -113,34 +114,36 @@ export const evolutionApi = {
   },
 
   // ============================================================
-  // Helper: format phone number
+  // Helper: format phone number (PONTO ÚNICO de validação de envio)
   // ============================================================
-  formatPhone(phone: string): string {
-    if (phone.includes('@')) {
-      const num = phone.split('@')[0].replace(/\D/g, '');
-      return this.ensureBrazilian9thDigit(num);
+  // Só permite CELULAR. Nunca injeta um "9" em telefone fixo. Retorna null para
+  // fixo/inválido (WhatsApp não funciona neles) — os métodos de envio pulam o
+  // envio nesse caso. A decisão amigável (mensagem ao usuário) usa
+  // getWhatsappPhone() antes de chegar aqui.
+  formatPhone(phone: string): string | null {
+    const d = onlyDigits(phone.includes('@') ? phone.split('@')[0] : phone);
+    // Número nacional (sem DDI 55).
+    let nat = d.startsWith('55') && (d.length === 12 || d.length === 13) ? d.slice(2) : d;
+    // Legado: celular antigo de 10 dígitos (sem o 9) — 3º dígito 6-9 → insere o 9.
+    if (nat.length === 10 && nat[2] >= '6' && nat[2] <= '9') {
+      nat = nat.slice(0, 2) + '9' + nat.slice(2);
     }
-    const cleaned = phone.replace(/\D/g, '');
-    const withCountry = cleaned.startsWith('55') ? cleaned : `55${cleaned}`;
-    return this.ensureBrazilian9thDigit(withCountry);
-  },
-
-  ensureBrazilian9thDigit(phone: string): string {
-    if (!phone.startsWith('55')) return phone;
-    // Brazilian mobile: 55 + 2-digit DDD + 9 + 8 digits = 13 digits
-    // If 12 digits (missing the 9), insert it after DDD
-    if (phone.length === 12) {
-      return phone.slice(0, 4) + '9' + phone.slice(4);
-    }
-    return phone;
+    const c = classifyPhone(nat);
+    if (c.type === 'mobile') return '55' + c.national;
+    return null;
   },
 
   // ============================================================
   // Send plain text message
   // ============================================================
   async sendText(instanceName: string, phone: string, text: string) {
+    const number = this.formatPhone(phone);
+    if (!number) {
+      console.warn(`[EVOLUTION] Envio ignorado: numero nao e celular valido para WhatsApp (${phone})`);
+      return { skipped: true, reason: 'NON_MOBILE' };
+    }
     const { data } = await api.post(`/message/sendText/${instanceName}`, {
-      number: this.formatPhone(phone),
+      number,
       text,
     });
     return data;
@@ -157,8 +160,13 @@ export const evolutionApi = {
     title?: string,
     footer?: string,
   ) {
+    const number = this.formatPhone(phone);
+    if (!number) {
+      console.warn(`[EVOLUTION] Envio (buttons) ignorado: numero nao e celular valido (${phone})`);
+      return { skipped: true, reason: 'NON_MOBILE' };
+    }
     const { data } = await api.post(`/message/sendButtons/${instanceName}`, {
-      number: this.formatPhone(phone),
+      number,
       buttonMessage: {
         title: title || '',
         description: body,
@@ -188,8 +196,13 @@ export const evolutionApi = {
     title?: string,
     footer?: string,
   ) {
+    const number = this.formatPhone(phone);
+    if (!number) {
+      console.warn(`[EVOLUTION] Envio (list) ignorado: numero nao e celular valido (${phone})`);
+      return { skipped: true, reason: 'NON_MOBILE' };
+    }
     const { data } = await api.post(`/message/sendList/${instanceName}`, {
-      number: this.formatPhone(phone),
+      number,
       listMessage: {
         title: title || '',
         description: body,
