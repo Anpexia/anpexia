@@ -3,7 +3,7 @@ import { Plus, Search, X, Eye, Pencil, Trash2, Upload, ChevronRight, AlertTriang
 import { format } from 'date-fns';
 import Papa from 'papaparse';
 import api from '../services/api';
-import { PatientPanel, type DetailTab } from '../components/PatientPanel';
+import { PatientPanel, PatientPanelModal, type DetailTab } from '../components/PatientPanel';
 import { useCepLookup, formatarCep } from '../hooks/useCepLookup';
 import { maskPhone, whatsappIndicator } from '../utils/phone';
 
@@ -613,16 +613,14 @@ export function CustomersPage() {
 
       {/* Patient Detail Modal (PatientPanel) */}
       {modalMode === 'detail' && selectedCustomer && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-3xl my-8">
-            <PatientPanel
-              customerId={selectedCustomer.id}
-              onClose={() => setModalMode('closed')}
-              initialTab={detailTab}
-              onPatientUpdated={fetchCustomers}
-            />
-          </div>
-        </div>
+        <PatientPanelModal>
+          <PatientPanel
+            customerId={selectedCustomer.id}
+            onClose={() => setModalMode('closed')}
+            initialTab={detailTab}
+            onPatientUpdated={fetchCustomers}
+          />
+        </PatientPanelModal>
       )}
 
       {/* Import CSV Modal */}

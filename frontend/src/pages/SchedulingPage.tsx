@@ -4,7 +4,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addM
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { PatientPanel } from '../components/PatientPanel';
+import { PatientPanel, PatientPanelModal } from '../components/PatientPanel';
 
 interface DoctorHorario {
   ativo: boolean;
@@ -2653,16 +2653,14 @@ export function SchedulingPage() {
 
       {/* Patient Panel Modal */}
       {patientPanelId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-3xl my-8">
-            <PatientPanel
-              customerId={patientPanelId}
-              onClose={() => setPatientPanelId(null)}
-              initialTab="info"
-              onPatientUpdated={() => { fetchAppointments(); setAgendaRefresh(r => r + 1); }}
-            />
-          </div>
-        </div>
+        <PatientPanelModal>
+          <PatientPanel
+            customerId={patientPanelId}
+            onClose={() => setPatientPanelId(null)}
+            initialTab="info"
+            onPatientUpdated={() => { fetchAppointments(); setAgendaRefresh(r => r + 1); }}
+          />
+        </PatientPanelModal>
       )}
 
       {/* Book Modal */}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, Plus, Trash2, Paperclip, File, Eye } from 'lucide-react';
 import { format } from 'date-fns';
@@ -189,6 +189,31 @@ export interface PatientPanelProps {
   onPatientUpdated?: () => void;
   /** Doctor performing the attendance — used as author of anamnesis */
   doctorId?: string;
+}
+
+// ==================== Modal shell (tamanho centralizado) ====================
+
+/**
+ * Shell unico do prontuario. Concentra largura, altura, responsividade e o
+ * recorte do scroll interno num so lugar, para que TODOS os pontos de abertura
+ * (Pacientes, Agenda, Fila) usem exatamente o mesmo tamanho e comportamento.
+ *
+ * - Mobile: ocupa toda a area disponivel (tela cheia, sem cantos).
+ * - Tablet: ~92vw x 92vh.
+ * - Desktop: ~85vw x 90vh, com teto de 1600px de largura.
+ *
+ * O scroll interno fica por conta do proprio PatientPanel (cabecalho, abas e
+ * rodape sao `shrink-0`; so a area de conteudo rola). Aqui o container apenas
+ * define o tamanho e recorta o overflow com `overflow-hidden`.
+ */
+export function PatientPanelModal({ children }: { children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none bg-white shadow-2xl sm:h-[92vh] sm:w-[92vw] sm:rounded-2xl lg:h-[90vh] lg:w-[85vw] lg:max-w-[1600px]">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 // ==================== Component ====================
@@ -852,7 +877,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const summary = computeSummary(customer);
 
   return (
-    <div className="bg-white rounded-xl w-full flex flex-col max-h-[85vh]">
+    <div className="flex h-full min-h-0 w-full flex-col bg-white">
       {/* Alertas de qualidade de dados (informativos, não bloqueiam) */}
       {(customer.dataQuality?.cpfValid === false || customer.dataQuality?.cpfDuplicate) && (
         <div className="shrink-0 px-6 pt-4 space-y-1">
