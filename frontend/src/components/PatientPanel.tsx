@@ -189,6 +189,9 @@ export interface PatientPanelProps {
   onPatientUpdated?: () => void;
   /** Doctor performing the attendance — used as author of anamnesis */
   doctorId?: string;
+  /** Acoes extras especificas do contexto de abertura (ex.: "Finalizar Atendimento" na Fila),
+   *  renderizadas no cabecalho fixo ao lado do botao fechar — sem duplicar layout. */
+  headerExtra?: ReactNode;
 }
 
 // ==================== Modal shell (tamanho centralizado) ====================
@@ -218,7 +221,7 @@ export function PatientPanelModal({ children }: { children: ReactNode }) {
 
 // ==================== Component ====================
 
-export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', onPatientUpdated, doctorId: doctorIdProp }: PatientPanelProps) {
+export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', onPatientUpdated, doctorId: doctorIdProp, headerExtra }: PatientPanelProps) {
   const { user } = useAuth();
   const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
   const numberInputRef = useCallback((node: HTMLInputElement | null) => { if (node) node.dataset.numberInput = 'true'; }, []);
@@ -900,9 +903,12 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
               ))}
             </div>
           </div>
-          {onClose && (
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {headerExtra}
+            {onClose && (
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            )}
+          </div>
         </div>
 
         {/* Summary Cards */}

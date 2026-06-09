@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, UserCheck, Phone, Stethoscope, RefreshCw, Play, CheckCircle2, X, AlertTriangle, History, DoorOpen } from 'lucide-react';
+import { Clock, UserCheck, Phone, Stethoscope, RefreshCw, Play, CheckCircle2, AlertTriangle, History, DoorOpen } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { PatientPanel } from '../components/PatientPanel';
+import { PatientPanel, PatientPanelModal } from '../components/PatientPanel';
 
 interface QueueItem {
   id: string;
@@ -532,23 +532,23 @@ export function FilaPage() {
         </div>
       )}
 
-      {/* Patient Panel Popup */}
+      {/* Patient Panel Popup — mesmo prontuario unico de Pacientes/Agenda.
+          A acao "Finalizar Atendimento" (especifica da Fila) vai no headerExtra,
+          dentro do cabecalho fixo do proprio PatientPanel — sem layout paralelo. */}
       {attendingItem && attendingItem.customer?.id && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-4 relative flex flex-col max-h-[calc(100vh-2rem)]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800">
-                  Atendimento — {attendingItem.customer?.name || attendingItem.name}
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Agendado: {formatTime(attendingItem.date)}
-                  {attendingItem.calledAt && ` · Chamado: ${formatTime(attendingItem.calledAt)}`}
-                  {attendingItem.doctor && ` · Dr(a). ${attendingItem.doctor.name}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
+        <PatientPanelModal>
+          <PatientPanel
+            customerId={attendingItem.customer.id}
+            initialTab="prontuario"
+            onClose={() => setAttendingItem(null)}
+            onPatientUpdated={() => fetchQueue()}
+            doctorId={attendingItem.doctorId || undefined}
+            headerExtra={
+              <>
+                <span className="hidden xl:inline text-xs text-slate-500 whitespace-nowrap">
+                  Agendado {formatTime(attendingItem.date)}
+                  {attendingItem.doctor ? ` · Dr(a). ${attendingItem.doctor.name}` : ''}
+                </span>
                 {attendingItem.status === 'in_attendance' && (
                   <button
                     onClick={handleFinishAttendance}
@@ -559,25 +559,10 @@ export function FilaPage() {
                     Finalizar Atendimento
                   </button>
                 )}
-                <button
-                  onClick={() => setAttendingItem(null)}
-                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-            {/* PatientPanel */}
-            <div className="overflow-y-auto flex-1 p-6">
-              <PatientPanel
-                customerId={attendingItem.customer.id}
-                initialTab="prontuario"
-                onPatientUpdated={() => fetchQueue()}
-                doctorId={attendingItem.doctorId || undefined}
-              />
-            </div>
-          </div>
-        </div>
+              </>
+            }
+          />
+        </PatientPanelModal>
       )}
 
       {/* Warning popup when attending item has no customer linked */}
