@@ -1309,12 +1309,12 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
                     {/* Tab: Campos (modo tradicional) */}
                     {anamneseTab === 'campos' && (
-                      <div className="space-y-3">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3">
                         {getSegmentConfig(user?.tenant?.segment).anamnese.map(field => (
                           <div key={field.key}>
                             <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
                             {field.type === 'textarea' ? (
-                              <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => handleAnamneseFieldChange(field.key, v)} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
+                              <DictationTextarea value={anamneseData[field.key] || ''} onChange={(v) => handleAnamneseFieldChange(field.key, v)} className={inputCls + ' h-28 resize-y'} placeholder={field.placeholder} />
                             ) : (
                               <input type={field.type === 'number' ? 'number' : 'text'} value={anamneseData[field.key] || ''} onChange={(e) => handleAnamneseFieldChange(field.key, e.target.value)} className={inputCls} placeholder={field.placeholder} />
                             )}
