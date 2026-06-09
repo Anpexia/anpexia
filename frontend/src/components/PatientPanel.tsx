@@ -138,8 +138,7 @@ function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel,
         <DictationTextarea
           value={value}
           onChange={onChange}
-          className={inputCls + ' resize-y'}
-          style={{ minHeight: '160px' }}
+          className={inputCls + ' resize-y min-h-[42vh]'}
           placeholder={placeholder}
         />
         <div className="flex justify-end mt-2">
