@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, MessageSquare, Heart, Clock, Send, User, Activity, Download, FileText, Shield, Upload, Plus, Trash2, Paperclip, File, Eye } from 'lucide-react';
+import { X, Calendar, Heart, User, Download, FileText, Shield, Upload, Plus, Trash2, Paperclip, File, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
@@ -162,19 +162,6 @@ function populateForm(c: Customer) {
     cpfCnpj: c.cpfCnpj || '', documentType: c.documentType || '', documentNumber: c.documentNumber || '', birthDate: c.birthDate ? c.birthDate.split('T')[0] : '',
     insurance: c.insurance || '', notes: c.notes || '', origin: c.origin || '', optInWhatsApp: c.optInWhatsApp,
     address: { cep: '', street: '', number: '', neighborhood: '', city: '', state: '', ...(c.address as any || {}) },
-  };
-}
-
-function computeSummary(c: Customer) {
-  const calls = c.scheduledCalls || [];
-  const now = new Date();
-  const past = calls.filter((a) => new Date(a.date) < now && a.status !== 'cancelled').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const future = calls.filter((a) => new Date(a.date) >= now && (a.status === 'scheduled' || a.status === 'confirmed')).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const completed = calls.filter((a) => a.status === 'completed');
-  return {
-    lastAppt: past[0]?.date || c.lastAppointment || null,
-    nextAppt: future[0]?.date || c.nextAppointment || null,
-    total: completed.length || c.totalAppointments || 0,
   };
 }
 
@@ -876,8 +863,6 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
     );
   }
 
-  const summary = computeSummary(customer);
-
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-white">
       {/* Alertas de qualidade de dados (informativos, não bloqueiam) */}
@@ -892,8 +877,8 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
         </div>
       )}
       {/* Header */}
-      <div className="shrink-0 p-6 border-b border-slate-200">
-        <div className="flex items-center justify-between mb-4">
+      <div className="shrink-0 px-6 py-4 border-b border-slate-200">
+        <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-slate-800 text-lg">{customer.name}</h3>
             <div className="flex gap-1 mt-1">
@@ -907,43 +892,6 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
             {onClose && (
               <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             )}
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div className="bg-slate-50 rounded-lg p-3 text-center">
-            <Calendar size={16} className="mx-auto text-[#1E3A5F] mb-1" />
-            <p className="text-xs text-slate-500">Proxima</p>
-            <p className="text-sm font-semibold text-slate-800">
-              {summary.nextAppt ? format(new Date(summary.nextAppt), 'dd/MM') : '-'}
-            </p>
-          </div>
-          <div className="bg-slate-50 rounded-lg p-3 text-center">
-            <Clock size={16} className="mx-auto text-slate-500 mb-1" />
-            <p className="text-xs text-slate-500">Ultima</p>
-            <p className="text-sm font-semibold text-slate-800">
-              {summary.lastAppt ? format(new Date(summary.lastAppt), 'dd/MM') : '-'}
-            </p>
-          </div>
-          <div className="bg-slate-50 rounded-lg p-3 text-center">
-            <Activity size={16} className="mx-auto text-emerald-600 mb-1" />
-            <p className="text-xs text-slate-500">Total</p>
-            <p className="text-sm font-semibold text-slate-800">{summary.total}</p>
-          </div>
-          <div className="bg-slate-50 rounded-lg p-3 text-center">
-            <MessageSquare size={16} className="mx-auto text-green-600 mb-1" />
-            <p className="text-xs text-slate-500">WhatsApp</p>
-            <p className="text-sm font-semibold text-slate-800">
-              {customer.whatsappStatus === 'active' ? 'Ativo' : customer.whatsappStatus === 'none' ? '-' : customer.whatsappStatus || '-'}
-            </p>
-          </div>
-          <div className="bg-slate-50 rounded-lg p-3 text-center">
-            <Send size={16} className="mx-auto text-amber-500 mb-1" />
-            <p className="text-xs text-slate-500">Ult. contato</p>
-            <p className="text-sm font-semibold text-slate-800">
-              {customer.daysSinceLastContact != null ? `${customer.daysSinceLastContact}d` : '-'}
-            </p>
           </div>
         </div>
       </div>
