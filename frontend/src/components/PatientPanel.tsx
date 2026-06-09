@@ -1545,7 +1545,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                           <span className="text-xs font-medium text-slate-500">Medicamento {idx + 1}</span>
                           <button type="button" onClick={() => setPrescricaoItems(prescricaoItems.filter((_: any, i: number) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                           <input type="text" placeholder="Nome" value={item.name || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, name: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
                           <input type="text" placeholder="Dosagem" value={item.dosage || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, dosage: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
                           <input type="text" placeholder="Posologia" value={item.posologia || ''} onChange={(e) => { const updated = [...prescricaoItems]; updated[idx] = { ...item, posologia: e.target.value }; setPrescricaoItems(updated); }} className={inputCls} />
@@ -1614,7 +1614,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                      <DictationTextarea value={prescricaoOculos.observacoes} onChange={(v) => setPrescricaoOculos({ ...prescricaoOculos, observacoes: v })} className={inputCls + ' h-16 resize-none'} />
+                      <DictationTextarea value={prescricaoOculos.observacoes} onChange={(v) => setPrescricaoOculos({ ...prescricaoOculos, observacoes: v })} className={inputCls + ' h-20 resize-y'} />
                     </div>
                   </div>
                 )}
@@ -1719,7 +1719,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Motivo</label>
-                  <DictationTextarea value={atestadoForm.reason} onChange={(v) => setAtestadoForm({ ...atestadoForm, reason: v })} className={inputCls + ' h-16 resize-none'} placeholder="Motivo do atestado..." />
+                  <DictationTextarea value={atestadoForm.reason} onChange={(v) => setAtestadoForm({ ...atestadoForm, reason: v })} className={inputCls + ' h-20 resize-y'} placeholder="Motivo do atestado..." />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">CID-10 (opcional)</label>
@@ -1737,7 +1737,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes</label>
-                  <DictationTextarea value={atestadoForm.observations} onChange={(v) => setAtestadoForm({ ...atestadoForm, observations: v })} className={inputCls + ' h-16 resize-none'} />
+                  <DictationTextarea value={atestadoForm.observations} onChange={(v) => setAtestadoForm({ ...atestadoForm, observations: v })} className={inputCls + ' h-20 resize-y'} />
                 </div>
               </div>
             )}
