@@ -4,7 +4,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addM
 import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { PatientPanel, PatientPanelModal } from '../components/PatientPanel';
+import { PatientPanel, PatientPanelModal, type AttendanceSummary } from '../components/PatientPanel';
 
 interface DoctorHorario {
   ativo: boolean;
@@ -466,6 +466,17 @@ export function SchedulingPage() {
 
   // Patient panel
   const [patientPanelId, setPatientPanelId] = useState<string | null>(null);
+  const [patientPanelAppt, setPatientPanelAppt] = useState<Appointment | null>(null);
+
+  // Resumo do atendimento para o cabecalho do prontuario (consome dados ja carregados do agendamento).
+  const buildAttendance = (a: Appointment): AttendanceSummary => {
+    let procedureLabel: string | null = null;
+    if (a.isReturn) procedureLabel = 'Retorno';
+    else if (a.procedures?.length) procedureLabel = a.procedures.map(p => p.tussProcedure.description).join(', ');
+    else if (a.privateProcedureCalls?.length) procedureLabel = a.privateProcedureCalls.map(p => p.privateProcedure.name).join(', ');
+    const convenioNome = a.convenio?.nome ?? (a.convenioId ? conveniosLookup[a.convenioId]?.nome ?? null : null);
+    return { paymentType: a.paymentType, convenioNome, procedureLabel };
+  };
 
   // Toast
   const [toastMsg, setToastMsg] = useState('');
@@ -1676,7 +1687,7 @@ export function SchedulingPage() {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               {a.customerId ? (
-                <button onClick={() => setPatientPanelId(a.customerId!)} className="font-medium text-[#2563EB] hover:underline text-left">
+                <button onClick={() => { setPatientPanelId(a.customerId!); setPatientPanelAppt(a); }} className="font-medium text-[#2563EB] hover:underline text-left">
                   {a.customer?.name || a.name}
                 </button>
               ) : (
@@ -2200,7 +2211,7 @@ export function SchedulingPage() {
                               )}
                               <span className="text-sm text-slate-500">{format(new Date(a.date), 'dd/MM HH:mm')}</span>
                               {a.customerId ? (
-                                <button onClick={() => setPatientPanelId(a.customerId!)} className="text-sm font-medium text-[#2563EB] hover:underline truncate text-left">
+                                <button onClick={() => { setPatientPanelId(a.customerId!); setPatientPanelAppt(a); }} className="text-sm font-medium text-[#2563EB] hover:underline truncate text-left">
                                   {a.customer?.name || a.name}
                                 </button>
                               ) : (
@@ -2549,7 +2560,7 @@ export function SchedulingPage() {
                                       <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium text-[#1E3A5F] w-12">{format(new Date(a.date), 'HH:mm')}</span>
                                         {a.customerId ? (
-                                          <button onClick={() => setPatientPanelId(a.customerId!)} className="text-sm text-[#2563EB] hover:underline truncate max-w-[120px] text-left">{a.customer?.name || a.name}</button>
+                                          <button onClick={() => { setPatientPanelId(a.customerId!); setPatientPanelAppt(a); }} className="text-sm text-[#2563EB] hover:underline truncate max-w-[120px] text-left">{a.customer?.name || a.name}</button>
                                         ) : (
                                           <span className="text-sm text-slate-700 truncate max-w-[120px]">{a.name}</span>
                                         )}
@@ -2656,8 +2667,9 @@ export function SchedulingPage() {
         <PatientPanelModal>
           <PatientPanel
             customerId={patientPanelId}
-            onClose={() => setPatientPanelId(null)}
+            onClose={() => { setPatientPanelId(null); setPatientPanelAppt(null); }}
             initialTab="info"
+            attendance={patientPanelAppt ? buildAttendance(patientPanelAppt) : undefined}
             onPatientUpdated={() => { fetchAppointments(); setAgendaRefresh(r => r + 1); }}
           />
         </PatientPanelModal>

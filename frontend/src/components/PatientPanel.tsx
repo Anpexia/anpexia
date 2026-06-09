@@ -198,6 +198,19 @@ function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel,
   );
 }
 
+/** Idade em anos a partir da data de nascimento (ex.: "42 anos"). Null se ausente/invalida. */
+function calcAge(birthDate?: string | null): string | null {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  if (isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  if (age < 0) return null;
+  return `${age} ano${age !== 1 ? 's' : ''}`;
+}
+
 function populateForm(c: Customer) {
   return {
     name: c.name, phone: c.phone || '', cellPhone: c.cellPhone || '', landlinePhone: c.landlinePhone || '', email: c.email || '',
@@ -208,6 +221,17 @@ function populateForm(c: Customer) {
 }
 
 // ==================== Props ====================
+
+/** Resumo do atendimento exibido no cabecalho (idade vem do customer; o resto do agendamento).
+ *  Pacientes nao passa (mostra so a idade). Agenda e Fila passam o atendimento atual. */
+export interface AttendanceSummary {
+  /** 'CONVENIO' | 'PARTICULAR' (do ScheduledCall.paymentType). */
+  paymentType?: string | null;
+  /** Nome do convenio do atendimento (quando paymentType === 'CONVENIO'). */
+  convenioNome?: string | null;
+  /** Procedimento agendado ja derivado (Retorno / TUSS / particular). */
+  procedureLabel?: string | null;
+}
 
 export interface PatientPanelProps {
   customerId: string;
@@ -220,6 +244,8 @@ export interface PatientPanelProps {
   /** Acoes extras especificas do contexto de abertura (ex.: "Finalizar Atendimento" na Fila),
    *  renderizadas no cabecalho fixo ao lado do botao fechar — sem duplicar layout. */
   headerExtra?: ReactNode;
+  /** Resumo do atendimento (Agenda/Fila) para o cabecalho. Pacientes omite (so idade). */
+  attendance?: AttendanceSummary;
 }
 
 // ==================== Modal shell (tamanho centralizado) ====================
@@ -249,7 +275,7 @@ export function PatientPanelModal({ children }: { children: ReactNode }) {
 
 // ==================== Component ====================
 
-export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', onPatientUpdated, doctorId: doctorIdProp, headerExtra }: PatientPanelProps) {
+export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', onPatientUpdated, doctorId: doctorIdProp, headerExtra, attendance }: PatientPanelProps) {
   const { user } = useAuth();
   const { buscarCep, loading: cepLoading, erro: cepErro } = useCepLookup();
   const numberInputRef = useCallback((node: HTMLInputElement | null) => { if (node) node.dataset.numberInput = 'true'; }, []);
@@ -957,6 +983,18 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-slate-800 text-lg">{customer.name}</h3>
+            {(() => {
+              const idade = calcAge(customer.birthDate);
+              const tipo = attendance
+                ? (attendance.paymentType === 'CONVENIO'
+                    ? `Convenio${attendance.convenioNome ? ' ' + attendance.convenioNome : ''}`
+                    : 'Particular')
+                : null;
+              const parts = [idade, tipo, attendance?.procedureLabel].filter(Boolean);
+              return parts.length > 0 ? (
+                <p className="mt-0.5 text-sm text-slate-500">{parts.join('  •  ')}</p>
+              ) : null;
+            })()}
             <div className="flex gap-1 mt-1">
               {customer.tags?.map((t) => (
                 <span key={t.tag.id} className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: t.tag.color + '20', color: t.tag.color }}>{t.tag.name}</span>
