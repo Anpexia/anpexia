@@ -34,3 +34,18 @@ evolutionsRouter.post('/patient-evolution/:patientId', async (req: Request, res:
     next(err);
   }
 });
+
+// Edita uma evolucao estruturada. Permitido SOMENTE ao autor (doctorId), senao 403.
+evolutionsRouter.put('/patient-evolution/:patientId/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const evolution = await evolutionsService.update(
+      req.auth!.tenantId!,
+      req.params.id as string,
+      req.auth!.userId,
+      { ...req.body },
+    );
+    return success(res, evolution);
+  } catch (err) {
+    next(err);
+  }
+});

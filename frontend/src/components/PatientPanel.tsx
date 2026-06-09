@@ -294,6 +294,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
   const [loadingEvolucoes, setLoadingEvolucoes] = useState(false);
   const [showNewEvolucao, setShowNewEvolucao] = useState(false);
   const [evolucaoForm, setEvolucaoForm] = useState<Record<string, string>>({ subjective: '', objective: '', exams: '', returnDate: '' });
+  const [editingEvolucaoId, setEditingEvolucaoId] = useState<string | null>(null);
   const [savingEvolucao, setSavingEvolucao] = useState(false);
   const [evolucaoTab, setEvolucaoTab] = useState<'estruturada' | 'texto_livre'>('estruturada');
   // Texto livre clinico append-only (Evolucao)
@@ -670,15 +671,32 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
   const handleAddEvolucao = async () => {
     if (!customer) return;
+    const isEdit = !!editingEvolucaoId;
     setSavingEvolucao(true);
     try {
-      await api.post(`/patient-evolution/${customer.id}`, evolucaoForm);
+      if (isEdit) {
+        await api.put(`/patient-evolution/${customer.id}/${editingEvolucaoId}`, evolucaoForm);
+      } else {
+        await api.post(`/patient-evolution/${customer.id}`, evolucaoForm);
+      }
       setEvolucaoForm({});
       setShowNewEvolucao(false);
+      setEditingEvolucaoId(null);
       await fetchEvolucoes(customer.id);
-      showToast('Evolucao registrada!');
-    } catch { showToast('Erro ao salvar evolucao'); }
+      showToast(isEdit ? 'Evolucao atualizada!' : 'Evolucao registrada!');
+    } catch (err: any) {
+      showToast(err?.response?.status === 403 ? 'Somente o autor pode editar esta evolucao' : 'Erro ao salvar evolucao');
+    }
     finally { setSavingEvolucao(false); }
+  };
+
+  // Abre o formulario ja preenchido para o autor editar a evolucao que criou.
+  const startEditEvolucao = (ev: any) => {
+    const { id, tenantId, patientId, doctorId, createdAt, updatedAt, updatedById, ...fields } = ev;
+    void id; void tenantId; void patientId; void doctorId; void createdAt; void updatedAt; void updatedById;
+    setEvolucaoForm({ ...fields });
+    setEditingEvolucaoId(ev.id);
+    setShowNewEvolucao(true);
   };
 
   // Fetch prescricoes
@@ -1391,7 +1409,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                 <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium text-slate-800">Evolucoes</h4>
-                  <button onClick={() => setShowNewEvolucao(!showNewEvolucao)} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
+                  <button onClick={() => { setEditingEvolucaoId(null); setEvolucaoForm({}); setShowNewEvolucao(v => !v); }} className="flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#1E3A5F]">
                     <Plus size={16} /> Nova Evolucao
                   </button>
                 </div>
@@ -1460,9 +1478,9 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                     </div>
 
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setShowNewEvolucao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                      <button type="button" onClick={() => { setShowNewEvolucao(false); setEditingEvolucaoId(null); setEvolucaoForm({}); }} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
                       <button type="button" onClick={handleAddEvolucao} disabled={savingEvolucao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
-                        {savingEvolucao ? 'Salvando...' : 'Registrar'}
+                        {savingEvolucao ? 'Salvando...' : (editingEvolucaoId ? 'Salvar alteracoes' : 'Registrar')}
                       </button>
                     </div>
                   </div>
@@ -1483,9 +1501,9 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                       ))}
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setShowNewEvolucao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+                      <button type="button" onClick={() => { setShowNewEvolucao(false); setEditingEvolucaoId(null); setEvolucaoForm({}); }} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
                       <button type="button" onClick={handleAddEvolucao} disabled={savingEvolucao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
-                        {savingEvolucao ? 'Salvando...' : 'Registrar'}
+                        {savingEvolucao ? 'Salvando...' : (editingEvolucaoId ? 'Salvar alteracoes' : 'Registrar')}
                       </button>
                     </div>
                   </div>
@@ -1499,8 +1517,14 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                   <div className="space-y-3">
                     {evolucoes.map((ev: any) => (
                       <div key={ev.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50/50 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-[#1E3A5F]">{format(new Date(ev.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}</span>
+                        <div className="flex items-center justify-between mb-2 gap-2">
+                          <span className="text-xs font-medium text-[#1E3A5F]">
+                            {format(new Date(ev.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}
+                            {ev.updatedAt && <span className="text-slate-400 font-normal"> · editado {format(new Date(ev.updatedAt), "dd/MM 'as' HH:mm", { locale: ptBR })}</span>}
+                          </span>
+                          {ev.doctorId && ev.doctorId === user?.id && editingEvolucaoId !== ev.id && (
+                            <button type="button" onClick={() => startEditEvolucao(ev)} className="text-[11px] font-medium text-[#1E3A5F] hover:underline shrink-0">Editar</button>
+                          )}
                         </div>
                         <div className="space-y-2 text-sm">
                           {getSegmentConfig(user?.tenant?.segment).evolucao.map(field => (
