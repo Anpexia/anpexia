@@ -495,6 +495,8 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
       include: {
         customer: { select: { id: true, name: true, phone: true, birthDate: true } },
         doctor: { select: { id: true, name: true, salas: true } },
+        procedures: { include: { tussProcedure: { select: { description: true } } } },
+        privateProcedureCalls: { include: { privateProcedure: { select: { name: true } } } },
       },
       orderBy: { date: 'asc' },
     });
@@ -509,10 +511,19 @@ router.get('/queue', authenticate, requireTenant, async (req: Request, res: Resp
       for (const c of convenios) convenioMap[c.id] = c.nome;
     }
 
-    const result = queue.map(q => ({
-      ...q,
-      convenioNome: q.convenioId ? convenioMap[q.convenioId] || null : null,
-    }));
+    const result = queue.map(q => {
+      // Procedimento agendado: Retorno > TUSS (convenio) > particular. Mantem o shape do item (sem expor os arrays).
+      const { procedures, privateProcedureCalls, ...rest } = q;
+      let procedureLabel: string | null = null;
+      if (q.isReturn) procedureLabel = 'Retorno';
+      else if (procedures.length) procedureLabel = procedures.map(p => p.tussProcedure.description).join(', ');
+      else if (privateProcedureCalls.length) procedureLabel = privateProcedureCalls.map(p => p.privateProcedure.name).join(', ');
+      return {
+        ...rest,
+        convenioNome: q.convenioId ? convenioMap[q.convenioId] || null : null,
+        procedureLabel,
+      };
+    });
 
     return success(res, result);
   } catch (err) { next(err); }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Clock, UserCheck, Phone, Stethoscope, RefreshCw, Play, CheckCircle2, AlertTriangle, History, DoorOpen } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { PatientPanel, PatientPanelModal } from '../components/PatientPanel';
+import { PatientPanel, PatientPanelModal, type AttendanceSummary } from '../components/PatientPanel';
 
 interface QueueItem {
   id: string;
@@ -16,6 +16,7 @@ interface QueueItem {
   customerId: string | null;
   paymentType?: string | null;
   convenioNome?: string | null;
+  procedureLabel?: string | null;
   customer: { id: string; name: string; phone: string; birthDate?: string | null } | null;
   doctor: { id: string; name: string; salas?: Record<string, { manha: string | null; tarde: string | null }> | null } | null;
   isEncaixe?: boolean;
@@ -543,6 +544,11 @@ export function FilaPage() {
             onClose={() => setAttendingItem(null)}
             onPatientUpdated={() => fetchQueue()}
             doctorId={attendingItem.doctorId || undefined}
+            attendance={{
+              paymentType: attendingItem.paymentType,
+              convenioNome: attendingItem.convenioNome,
+              procedureLabel: attendingItem.procedureLabel,
+            } as AttendanceSummary}
             headerExtra={
               <>
                 <span className="hidden xl:inline text-xs text-slate-500 whitespace-nowrap">
