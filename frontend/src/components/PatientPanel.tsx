@@ -105,7 +105,7 @@ const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm fo
 // Texto livre clinico append-only (multiprofissional). Mostra o historico
 // cronologico (autor, data, hora, conteudo) e um campo para adicionar um novo
 // registro imutavel. Usado tanto na Anamnese quanto na Evolucao.
-function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel, placeholder }: {
+function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel, placeholder, currentUserId, onEdit }: {
   notes: any[];
   value: string;
   onChange: (v: string) => void;
@@ -113,24 +113,66 @@ function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel,
   saving: boolean;
   addLabel: string;
   placeholder: string;
+  /** Usuário logado — só o autor do registro pode editá-lo. */
+  currentUserId?: string;
+  /** Persiste a edição (PUT) e recarrega a lista. */
+  onEdit: (noteId: string, content: string) => Promise<void>;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const startEdit = (n: any) => { setEditingId(n.id); setEditText(n.content || ''); };
+  const cancelEdit = () => { setEditingId(null); setEditText(''); };
+  const saveEdit = async (id: string) => {
+    if (!editText.trim()) return;
+    setSavingEdit(true);
+    try {
+      await onEdit(id, editText.trim());
+      setEditingId(null);
+      setEditText('');
+    } finally { setSavingEdit(false); }
+  };
+
   return (
     <div className="space-y-3">
       {notes.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-4">Nenhum registro ainda.</p>
       ) : (
         <div className="space-y-2">
-          {notes.map((n) => (
-            <div key={n.id} className="border border-slate-200 rounded-lg p-3 bg-white">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-[#1E3A5F]">{n.authorName || 'Profissional'}</span>
-                <span className="text-[11px] text-slate-400">
-                  {n.createdAt ? format(new Date(n.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : ''}
-                </span>
+          {notes.map((n) => {
+            const canEdit = !!currentUserId && n.authorId === currentUserId;
+            const isEditing = editingId === n.id;
+            return (
+              <div key={n.id} className="border border-slate-200 rounded-lg p-3 bg-white">
+                <div className="flex items-center justify-between mb-1 gap-2">
+                  <span className="text-xs font-semibold text-[#1E3A5F]">{n.authorName || 'Profissional'}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] text-slate-400">
+                      {n.createdAt ? format(new Date(n.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : ''}
+                      {n.updatedAt ? ` · editado ${format(new Date(n.updatedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}` : ''}
+                    </span>
+                    {canEdit && !isEditing && (
+                      <button type="button" onClick={() => startEdit(n)} className="text-[11px] font-medium text-[#1E3A5F] hover:underline">Editar</button>
+                    )}
+                  </div>
+                </div>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <DictationTextarea value={editText} onChange={setEditText} className={inputCls + ' resize-y min-h-[20vh]'} />
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={cancelEdit} className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-600 hover:bg-slate-50">Cancelar</button>
+                      <button type="button" onClick={() => saveEdit(n.id)} disabled={savingEdit || !editText.trim()} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-xs rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
+                        {savingEdit ? 'Salvando...' : 'Salvar'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{n.content}</p>
+                )}
               </div>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap">{n.content}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -591,6 +633,22 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
       showToast('Registro adicionado');
     } catch { showToast('Erro ao adicionar registro'); }
     finally { setSavingEvolucaoNote(false); }
+  };
+
+  // Edita um registro de texto livre. So o autor consegue (backend valida e retorna 403 caso contrario).
+  const editClinicalNote = async (context: 'ANAMNESE' | 'EVOLUCAO', noteId: string, content: string, setter: (n: any[]) => void) => {
+    if (!customer) return;
+    try {
+      await api.put(`/clinical-notes/${customer.id}/${noteId}`, { content });
+      await fetchClinicalNotes(customer.id, context, setter);
+      showToast('Registro atualizado');
+    } catch (err: any) {
+      const msg = err?.response?.status === 403
+        ? 'Somente o autor pode editar este registro'
+        : 'Erro ao atualizar registro';
+      showToast(msg);
+      throw err;
+    }
   };
 
   useEffect(() => {
@@ -1286,6 +1344,8 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                         saving={savingAnamneseNote}
                         addLabel="Adicionar registro"
                         placeholder="Digite um novo registro da anamnese. Ao adicionar, o texto fica salvo de forma permanente com seu nome e horario — nada e sobrescrito."
+                        currentUserId={user?.id}
+                        onEdit={(noteId, content) => editClinicalNote('ANAMNESE', noteId, content, setAnamneseNotes)}
                       />
                     )}
 
@@ -1322,6 +1382,8 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                     saving={savingEvolucaoNote}
                     addLabel="Registrar Evolucao"
                     placeholder="Digite a evolucao do paciente. Ao registrar, o texto fica salvo de forma permanente com seu nome e horario — nada e sobrescrito."
+                    currentUserId={user?.id}
+                    onEdit={(noteId, content) => editClinicalNote('EVOLUCAO', noteId, content, setEvolucaoNotes)}
                   />
                 )}
 

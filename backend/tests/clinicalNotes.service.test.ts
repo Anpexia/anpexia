@@ -14,7 +14,7 @@ function makeFakePrisma(patients: Array<{ id: string; tenantId: string }>) {
     },
     clinicalNote: {
       async create({ data }: any) {
-        const row = { id: `note_${++seq}`, createdAt: new Date(Date.now() + seq), ...data };
+        const row = { id: `note_${++seq}`, createdAt: new Date(Date.now() + seq), updatedById: null, updatedAt: null, ...data };
         notes.push(row);
         return row;
       },
@@ -27,6 +27,21 @@ function makeFakePrisma(patients: Array<{ id: string; tenantId: string }>) {
         );
         if (orderBy?.createdAt === 'asc') rows = rows.sort((a, b) => +a.createdAt - +b.createdAt);
         return rows;
+      },
+      async findFirst({ where }: any) {
+        return (
+          notes.find(
+            (n) =>
+              n.id === where.id &&
+              (where.tenantId === undefined || n.tenantId === where.tenantId),
+          ) || null
+        );
+      },
+      async update({ where, data }: any) {
+        const row = notes.find((n) => n.id === where.id);
+        if (!row) throw new Error('not found');
+        Object.assign(row, data);
+        return row;
       },
     },
   };
@@ -146,4 +161,77 @@ test('rejeita conteúdo vazio e contexto inválido', async () => {
   const { svc } = setup();
   await assert.rejects(() => svc.create(TENANT, PATIENT, DR_A, 'ANAMNESE', '   '));
   await assert.rejects(() => svc.create(TENANT, PATIENT, DR_A, 'OUTRO', 'x'));
+});
+
+// ---- Edição pelo autor (nova regra de negócio) ----
+
+// EDIT 1 — Autor edita o próprio registro → permitido, autor/data originais preservados
+test('EDIT 1: autor edita o próprio registro (texto livre)', async () => {
+  const { svc, notes } = setup();
+  const note = await svc.create(TENANT, PATIENT, DR_A, 'ANAMNESE', 'Paciente relata cefaleia.');
+  const createdAtBefore = note.createdAt;
+
+  const edited = await svc.update(TENANT, note.id, DR_A, 'Paciente relata cefaleia intensa.');
+
+  assert.equal(edited.content, 'Paciente relata cefaleia intensa.');
+  assert.equal(edited.authorId, 'drA');             // autor original preservado
+  assert.equal(edited.authorName, 'Dr. João');      // nome original preservado
+  assert.equal(+edited.createdAt, +createdAtBefore); // data de criação preservada
+  assert.equal(edited.updatedById, 'drA');          // quem editou
+  assert.ok(edited.updatedAt instanceof Date);      // data de edição registrada
+  assert.equal(notes.length, 1);                    // não cria novo registro
+});
+
+// EDIT 2 — Médico B NÃO pode editar registro do Médico A → 403
+test('EDIT 2: não-autor é bloqueado (403)', async () => {
+  const { svc } = setup();
+  const note = await svc.create(TENANT, PATIENT, DR_A, 'EVOLUCAO', 'Evolução do Dr. João.');
+  await assert.rejects(
+    () => svc.update(TENANT, note.id, DR_B, 'Tentativa de edição indevida.'),
+    (err: any) => err.statusCode === 403 && err.code === 'NOT_AUTHOR',
+  );
+  // Conteúdo permanece intacto
+  const list = await svc.list(TENANT, PATIENT, 'EVOLUCAO');
+  assert.equal(list[0].content, 'Evolução do Dr. João.');
+});
+
+// EDIT 3 — Editar várias vezes preserva autor/criação; só muda updatedAt/conteúdo
+test('EDIT 3: edições múltiplas preservam autoria e histórico', async () => {
+  const { svc } = setup();
+  const note = await svc.create(TENANT, PATIENT, DR_A, 'ANAMNESE', 'v1');
+  const created = note.createdAt;
+  await svc.update(TENANT, note.id, DR_A, 'v2');
+  const final = await svc.update(TENANT, note.id, DR_A, 'v3');
+  assert.equal(final.content, 'v3');
+  assert.equal(final.authorId, 'drA');
+  assert.equal(+final.createdAt, +created);
+});
+
+// EDIT 4 — Edição com conteúdo vazio é rejeitada
+test('EDIT 4: rejeita edição com conteúdo vazio', async () => {
+  const { svc } = setup();
+  const note = await svc.create(TENANT, PATIENT, DR_A, 'ANAMNESE', 'algo');
+  await assert.rejects(() => svc.update(TENANT, note.id, DR_A, '   '));
+});
+
+// EDIT 5 — Edição inexistente → 404
+test('EDIT 5: registro inexistente → 404', async () => {
+  const { svc } = setup();
+  await assert.rejects(
+    () => svc.update(TENANT, 'note_inexistente', DR_A, 'x'),
+    (err: any) => err.statusCode === 404,
+  );
+});
+
+// EDIT 6 — Auditoria da edição registra editor, autor original e antes/depois
+test('EDIT 6: auditoria da edição registra editor e conteúdo antes/depois', async () => {
+  const { svc, auditCalls } = setup();
+  const note = await svc.create(TENANT, PATIENT, DR_A, 'ANAMNESE', 'antes');
+  await svc.update(TENANT, note.id, DR_A, 'depois');
+  const a = auditCalls.find((c) => c.action === 'UPDATE_CLINICALNOTE');
+  assert.ok(a, 'deve haver auditoria de UPDATE');
+  assert.equal(a.userId, 'drA');
+  assert.equal(a.metadata.originalAuthorId, 'drA');
+  assert.equal(a.metadata.contentBefore, 'antes');
+  assert.equal(a.metadata.contentAfter, 'depois');
 });

@@ -41,3 +41,20 @@ clinicalNotesRouter.post('/clinical-notes/:patientId', async (req: Request, res:
     next(err);
   }
 });
+
+// Edita um registro de texto livre. Permitido SOMENTE ao autor original (senão 403).
+clinicalNotesRouter.put('/clinical-notes/:patientId/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { content } = req.body;
+    const note = await clinicalNotesService.update(
+      req.auth!.tenantId!,
+      req.params.id as string,
+      { id: req.auth!.userId, email: req.auth!.email, role: req.auth!.role },
+      content,
+      { ip: getClientIp(req) },
+    );
+    return success(res, note);
+  } catch (err) {
+    next(err);
+  }
+});

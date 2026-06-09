@@ -28,6 +28,8 @@ export interface ClinicalNotesPrisma {
   clinicalNote: {
     create(args: any): Promise<any>;
     findMany(args: any): Promise<any[]>;
+    findFirst(args: any): Promise<any>;
+    update(args: any): Promise<any>;
   };
 }
 
@@ -131,6 +133,64 @@ export function makeClinicalNotesService(deps: ClinicalNotesDeps) {
             context: ctx,
             authorName: authorName ?? null,
             content: text,
+            contentLength: text.length,
+          },
+        });
+      }
+
+      return note;
+    },
+
+    /**
+     * Edita um registro de texto livre. SOMENTE o autor original pode editar
+     * (correção/complemento). Preserva autor e data de criação; grava
+     * updatedBy/updatedAt e audita o conteúdo antes/depois.
+     */
+    async update(
+      tenantId: string,
+      noteId: string,
+      editor: ClinicalNoteAuthor,
+      content: string,
+      meta?: { ip?: string | null },
+    ) {
+      const text = typeof content === 'string' ? content.trim() : '';
+      if (!text) {
+        throw new AppError(400, 'EMPTY_CONTENT', 'O conteúdo do registro não pode ser vazio');
+      }
+
+      const existing = await prisma.clinicalNote.findFirst({ where: { id: noteId, tenantId } });
+      if (!existing) {
+        throw new AppError(404, 'CLINICALNOTE_NOT_FOUND', 'Registro não encontrado');
+      }
+      // Regra de negócio: apenas o autor do registro pode editá-lo.
+      if (existing.authorId !== editor.id) {
+        throw new AppError(403, 'NOT_AUTHOR', 'Somente o autor do registro pode editá-lo');
+      }
+
+      const before = existing.content;
+
+      const note = await prisma.clinicalNote.update({
+        where: { id: noteId },
+        // authorId/authorName e createdAt NÃO são tocados — autor e data originais preservados.
+        data: { content: text, updatedById: editor.id, updatedAt: new Date() },
+      });
+
+      if (audit) {
+        await audit({
+          userId: editor.id,
+          userEmail: editor.email ?? null,
+          userRole: editor.role ?? null,
+          tenantId,
+          action: 'UPDATE_CLINICALNOTE',
+          entity: 'ClinicalNote',
+          entityId: note.id,
+          ipAddress: meta?.ip ?? null,
+          metadata: {
+            context: existing.context,
+            originalAuthorId: existing.authorId,
+            originalAuthorName: existing.authorName ?? null,
+            contentBefore: before,
+            contentAfter: text,
             contentLength: text.length,
           },
         });

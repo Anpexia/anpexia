@@ -1172,7 +1172,10 @@ model PatientEvolution {
   acuity_oe     String?  @map("acuity_oe")
   notes         String?
   data          Json?
-  createdAt     DateTime @default(now()) @map("created_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  // Auditoria de edição pelo autor: nulos enquanto o registro nunca foi editado.
+  updatedById   String?   @map("updated_by")
+  updatedAt     DateTime? @map("updated_at")
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   patient Customer @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -1185,20 +1188,24 @@ model PatientEvolution {
 // ==========================================
 // TEXTO LIVRE CLÍNICO (append-only, multiprofissional)
 // ==========================================
-// Armazena os textos livres de Anamnese e Evolução em registros
-// imutáveis (nunca UPDATE/overwrite). Cada salvamento gera um novo
-// registro. O campo `context` separa ANAMNESE de EVOLUCAO — os dados
-// permanecem totalmente isolados entre os dois módulos.
+// Armazena os textos livres de Anamnese e Evolução. Cada salvamento gera um
+// novo registro (append-only entre autores). Exceção: o PRÓPRIO autor pode
+// editar o registro que criou (correções/complementos), preservando autor e
+// data originais e gravando updatedBy/updatedAt. O campo `context` separa
+// ANAMNESE de EVOLUCAO — os dados permanecem isolados entre os dois módulos.
 
 model ClinicalNote {
-  id         String   @id @default(cuid())
-  tenantId   String   @map("tenant_id")
-  patientId  String   @map("patient_id")
-  authorId   String   @map("author_id")
-  authorName String?  @map("author_name")
-  context    String // ANAMNESE | EVOLUCAO
-  content    String
-  createdAt  DateTime @default(now()) @map("created_at")
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  patientId   String    @map("patient_id")
+  authorId    String    @map("author_id")
+  authorName  String?   @map("author_name")
+  context     String // ANAMNESE | EVOLUCAO
+  content     String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  // Auditoria de edição pelo autor: nulos enquanto o registro nunca foi editado.
+  updatedById String?   @map("updated_by")
+  updatedAt   DateTime? @map("updated_at")
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   patient Customer @relation(fields: [patientId], references: [id], onDelete: Cascade)
