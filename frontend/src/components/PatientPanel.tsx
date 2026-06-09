@@ -1186,7 +1186,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
               <div className="space-y-6">
                 <div className="bg-slate-50 rounded-lg p-4">
                   <h4 className="font-medium text-slate-800 mb-3">Dados clinicos</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Tipo sanguineo</label>
                       <select value={medForm.bloodType} onChange={(e) => setMedForm({ ...medForm, bloodType: e.target.value })} className={inputCls}>
@@ -1196,19 +1196,19 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Alergias</label>
-                      <DictationTextarea value={medForm.allergies} onChange={(v) => setMedForm({ ...medForm, allergies: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Dipirona, Latex..." />
+                      <DictationTextarea value={medForm.allergies} onChange={(v) => setMedForm({ ...medForm, allergies: v })} className={inputCls + ' h-24 resize-y'} placeholder="Ex: Dipirona, Latex..." />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Medicamentos em uso</label>
-                      <DictationTextarea value={medForm.medications} onChange={(v) => setMedForm({ ...medForm, medications: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Losartana 50mg..." />
+                      <DictationTextarea value={medForm.medications} onChange={(v) => setMedForm({ ...medForm, medications: v })} className={inputCls + ' h-24 resize-y'} placeholder="Ex: Losartana 50mg..." />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Doencas cronicas</label>
-                      <DictationTextarea value={medForm.chronicDiseases} onChange={(v) => setMedForm({ ...medForm, chronicDiseases: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: Hipertensao, Diabetes..." />
+                      <DictationTextarea value={medForm.chronicDiseases} onChange={(v) => setMedForm({ ...medForm, chronicDiseases: v })} className={inputCls + ' h-24 resize-y'} placeholder="Ex: Hipertensao, Diabetes..." />
                     </div>
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-2 xl:col-span-4">
                       <label className="block text-xs font-medium text-slate-600 mb-1">Observacoes clinicas</label>
-                      <DictationTextarea value={medForm.clinicalNotes} onChange={(v) => setMedForm({ ...medForm, clinicalNotes: v })} className={inputCls + ' h-20 resize-none'} placeholder="Anotacoes gerais do medico..." />
+                      <DictationTextarea value={medForm.clinicalNotes} onChange={(v) => setMedForm({ ...medForm, clinicalNotes: v })} className={inputCls + ' h-32 resize-y'} placeholder="Anotacoes gerais do medico..." />
                     </div>
                   </div>
                 </div>
