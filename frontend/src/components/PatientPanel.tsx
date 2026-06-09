@@ -1402,7 +1402,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Biomicroscopia</label>
-                      <DictationTextarea value={evolucaoForm.objective || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, objective: v })} className={inputCls + ' h-16 resize-none'} placeholder="Palpebras, conjuntiva, cornea, CA, cristalino..." />
+                      <DictationTextarea value={evolucaoForm.objective || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, objective: v })} className={inputCls + ' h-24 resize-y'} placeholder="Palpebras, conjuntiva, cornea, CA, cristalino..." />
                     </div>
 
                     <div>
@@ -1415,17 +1415,17 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Mapeamento de Retina (AO)</label>
-                      <DictationTextarea value={evolucaoForm.fundoscopy || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, fundoscopy: v })} className={inputCls + ' h-16 resize-none'} placeholder="Achados do fundo de olho..." />
+                      <DictationTextarea value={evolucaoForm.fundoscopy || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, fundoscopy: v })} className={inputCls + ' h-24 resize-y'} placeholder="Achados do fundo de olho..." />
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">Hipótese Diagnóstica</label>
-                        <DictationTextarea value={evolucaoForm.diagnosis || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, diagnosis: v })} className={inputCls + ' h-16 resize-none'} placeholder="Ex: BAV OD, Glaucoma suspeito..." />
+                        <DictationTextarea value={evolucaoForm.diagnosis || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, diagnosis: v })} className={inputCls + ' h-24 resize-y'} placeholder="Ex: BAV OD, Glaucoma suspeito..." />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">Conduta</label>
-                        <DictationTextarea value={evolucaoForm.plan || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, plan: v })} className={inputCls + ' h-16 resize-none'} placeholder="Prescricao de colirios, orientacoes, encaminhamentos..." />
+                        <DictationTextarea value={evolucaoForm.plan || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, plan: v })} className={inputCls + ' h-24 resize-y'} placeholder="Prescricao de colirios, orientacoes, encaminhamentos..." />
                       </div>
                     </div>
 
@@ -1436,12 +1436,12 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Queixa / Subjetivo</label>
-                      <DictationTextarea value={evolucaoForm.subjective || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, subjective: v })} className={inputCls + ' h-16 resize-none'} placeholder="Queixas visuais, sintomas, relato do paciente..." />
+                      <DictationTextarea value={evolucaoForm.subjective || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, subjective: v })} className={inputCls + ' h-24 resize-y'} placeholder="Queixas visuais, sintomas, relato do paciente..." />
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Exames Solicitados</label>
-                      <DictationTextarea value={evolucaoForm.exams || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, exams: v })} className={inputCls + ' h-16 resize-none'} placeholder="OCT, campo visual, paquimetria, topografia, retinografia..." />
+                      <DictationTextarea value={evolucaoForm.exams || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, exams: v })} className={inputCls + ' h-24 resize-y'} placeholder="OCT, campo visual, paquimetria, topografia, retinografia..." />
                     </div>
 
                     <div className="flex gap-2">
@@ -1455,16 +1455,18 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
 
                 {showNewEvolucao && user?.tenant?.segment !== 'CLINICA_OFTALMOLOGICA' && (
                   <div className="p-4 border border-[#BFDBFE] bg-[#EFF6FF]/50 rounded-lg space-y-3">
-                    {getSegmentConfig(user?.tenant?.segment).evolucao.map(field => (
-                      <div key={field.key}>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
-                        {field.type === 'textarea' ? (
-                          <DictationTextarea value={evolucaoForm[field.key] || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, [field.key]: v })} className={inputCls + ' h-24 resize-none'} placeholder={field.placeholder} />
-                        ) : (
-                          <input type={field.type === 'number' ? 'number' : 'text'} value={evolucaoForm[field.key] || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, [field.key]: e.target.value })} className={inputCls} placeholder={field.placeholder} />
-                        )}
-                      </div>
-                    ))}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3">
+                      {getSegmentConfig(user?.tenant?.segment).evolucao.map(field => (
+                        <div key={field.key} className={field.type === 'textarea' ? '' : 'lg:col-span-1'}>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
+                          {field.type === 'textarea' ? (
+                            <DictationTextarea value={evolucaoForm[field.key] || ''} onChange={(v) => setEvolucaoForm({ ...evolucaoForm, [field.key]: v })} className={inputCls + ' h-28 resize-y'} placeholder={field.placeholder} />
+                          ) : (
+                            <input type={field.type === 'number' ? 'number' : 'text'} value={evolucaoForm[field.key] || ''} onChange={(e) => setEvolucaoForm({ ...evolucaoForm, [field.key]: e.target.value })} className={inputCls} placeholder={field.placeholder} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setShowNewEvolucao(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
                       <button type="button" onClick={handleAddEvolucao} disabled={savingEvolucao} className="px-4 py-1.5 bg-[#1E3A5F] text-white text-sm rounded-lg hover:bg-[#2A4D7A] disabled:opacity-50">
