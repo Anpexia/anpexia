@@ -6,6 +6,7 @@ import { InventoryPage } from './pages/InventoryPage';
 import { MessagesPage } from './pages/MessagesPage';
 import { SchedulingPage } from './pages/SchedulingPage';
 import { ScriptsPage } from './pages/ScriptsPage';
+import { ModelosPage } from './pages/ModelosPage';
 import { FinancialPage } from './pages/FinancialPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ConveniosPage } from './pages/ConveniosPage';
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="agendamentos" element={<SchedulingPage />} />
         <Route path="fila" element={<FilaPage />} />
         <Route path="scripts" element={<ScriptsPage />} />
+        <Route path="modelos" element={<ModelosPage />} />
         <Route path="financeiro" element={<FinancialPage />} />
         <Route path="equipe" element={<TeamPage />} />
         <Route path="assinatura" element={<AssinaturaPage />} />

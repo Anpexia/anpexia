@@ -967,6 +967,29 @@ model Script {
   @@map("scripts")
 }
 
+// ==========================================
+// MODELOS DE CONDUTA (templates de texto do médico)
+// ==========================================
+// Biblioteca PRIVADA de cada médico: modelos de texto reutilizáveis inseridos
+// com 1 clique nos campos de texto livre (anamnese/evolução/prontuário). Isolado
+// por tenant (clínica) E por ownerId (User.id do médico dono). Um médico NUNCA vê
+// nem edita modelos de outro. Conteúdo em texto puro (não é dado de paciente).
+// Sem @relation p/ não alterar Tenant/User; FKs garantidas via SQL aditivo.
+model ConductaTemplate {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  ownerId   String   @map("owner_id") // User.id do médico dono
+  title     String
+  content   String
+  context   String? // ANAMNESE | EVOLUCAO | GERAL (opcional, só para filtrar)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, ownerId])
+  @@map("conducta_templates")
+}
+
 model ScheduleConfig {
   id            String   @id @default(cuid())
   availableDays Int[]    @map("available_days") // 0=Dom, 1=Seg, ... 6=Sab

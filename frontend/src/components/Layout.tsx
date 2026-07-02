@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { LayoutDashboard, Users, Package, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, Package, Calendar, LogOut, Menu, X, BookOpen, DollarSign, UsersRound, PenLine, UserCircle, Settings, ClipboardList, FileText } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../hooks/useAuth';
 import { useInactivityLogout } from '../hooks/useInactivityLogout';
@@ -14,18 +14,25 @@ const allNavItems = [
   { path: '/agendamentos', label: 'Agendamentos', icon: Calendar },
   { path: '/fila', label: 'Fila', icon: ClipboardList },
   { path: '/scripts', label: 'Scripts', icon: BookOpen },
+  { path: '/modelos', label: 'Modelos de Conduta', icon: FileText },
   { path: '/assinatura', label: 'Assinatura', icon: PenLine },
   { path: '/equipe', label: 'Equipe', icon: UsersRound },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
   { path: '/perfil', label: 'Meu Perfil', icon: UserCircle },
 ];
 
+// "Modelos de Conduta" é exclusivo de quem atende (médicos/profissionais de saúde).
+// Dono, gerente e super-admin NÃO têm esse menu — por isso é filtrado das roles
+// que herdam "todos os itens".
+const DOCTOR_ONLY_PATHS = ['/modelos'];
+const allExceptDoctorOnly = allNavItems.map(i => i.path).filter(p => !DOCTOR_ONLY_PATHS.includes(p));
+
 const defaultRoleAllowedPaths: Record<string, string[]> = {
-  SUPER_ADMIN: allNavItems.map(i => i.path),
-  OWNER: allNavItems.map(i => i.path),
-  MANAGER: allNavItems.map(i => i.path),
-  DOCTOR: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
-  HEALTH_PROFESSIONAL: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
+  SUPER_ADMIN: allExceptDoctorOnly,
+  OWNER: allExceptDoctorOnly,
+  MANAGER: allExceptDoctorOnly,
+  DOCTOR: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/modelos', '/perfil'],
+  HEALTH_PROFESSIONAL: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/modelos', '/perfil'],
   NURSE: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
   RECEPTIONIST: ['/pacientes', '/agendamentos', '/fila', '/scripts', '/perfil'],
   FINANCIAL: ['/financeiro', '/perfil'],

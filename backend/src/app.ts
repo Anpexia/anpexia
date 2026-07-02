@@ -124,6 +124,7 @@ async function loadRoutes() {
     const { seedDefaultAutomations } = await import('./modules/sales/crm.service');
     const onboardingRouter = (await import('./modules/onboarding/onboarding.controller')).default;
     const { scriptsRouter } = await import('./modules/scripts/scripts.controller');
+    const { conductaTemplatesRouter } = await import('./modules/conductaTemplates/conductaTemplates.controller');
     const { supplierRouter } = await import('./modules/suppliers/supplier.controller');
     const { demoRouter } = await import('./modules/demo/demo.controller');
     const { demoJFRouter } = await import('./modules/demo-jf/demo-jf.controller');
@@ -189,6 +190,7 @@ async function loadRoutes() {
 
     app.use('/api/v1/onboarding', onboardingRouter);
     app.use('/api/v1/scripts', scriptsRouter);
+    app.use('/api/v1/conducta-templates', conductaTemplatesRouter);
     app.use('/api/v1/suppliers', supplierRouter);
     app.use('/api/v1/demo', demoRouter);
     app.use('/api/v1/demo-jf', demoJFRouter);
