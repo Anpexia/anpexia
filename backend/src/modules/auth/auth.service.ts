@@ -17,6 +17,12 @@ import {
   verifyTOTPCode,
 } from '../../services/twofa.service';
 import { logAction } from '../../services/auditLog.service';
+import {
+  LOGIN_MAX_ATTEMPTS,
+  LOGIN_LOCKOUT_MINUTES,
+  isLockActive,
+  effectivePriorAttempts,
+} from './lockout';
 
 interface RegisterData {
   name: string;
@@ -107,20 +113,23 @@ export const authService = {
       throw new AppError(403, 'PASSWORD_NOT_DEFINED', 'Defina sua senha antes de fazer login. Verifique seu email.');
     }
 
-    // Account lockout: 5 failed attempts → 15 min lock
-    const MAX_ATTEMPTS = 5;
-    const LOCKOUT_MINUTES = 15;
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+    // Account lockout: 5 failed attempts → 15 min lock.
+    // After the lock expires, the counter decays to zero (fresh 5 attempts).
+    const MAX_ATTEMPTS = LOGIN_MAX_ATTEMPTS;
+    const LOCKOUT_MINUTES = LOGIN_LOCKOUT_MINUTES;
+    const now = new Date();
+    if (isLockActive(user.lockedUntil, now)) {
+      const minutesLeft = Math.ceil((user.lockedUntil!.getTime() - now.getTime()) / 60000);
       throw new AppError(423, 'ACCOUNT_LOCKED', `Conta bloqueada por excesso de tentativas. Tente novamente em ${minutesLeft} minuto(s).`);
     }
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
-      const attempts = (user.failedLoginAttempts || 0) + 1;
-      const lockData: any = { failedLoginAttempts: attempts };
+      const attempts = effectivePriorAttempts(user.failedLoginAttempts, user.lockedUntil, now) + 1;
+      // Always clear any stale (expired) lock; re-lock only when the threshold is hit again.
+      const lockData: any = { failedLoginAttempts: attempts, lockedUntil: null };
       if (attempts >= MAX_ATTEMPTS) {
-        lockData.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+        lockData.lockedUntil = new Date(now.getTime() + LOCKOUT_MINUTES * 60 * 1000);
       }
       await prisma.user.update({ where: { id: user.id }, data: lockData });
       await logAction({
