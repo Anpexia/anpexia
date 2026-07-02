@@ -105,7 +105,9 @@ const inputCls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm fo
 // Texto livre clinico append-only (multiprofissional). Mostra o historico
 // cronologico (autor, data, hora, conteudo) e um campo para adicionar um novo
 // registro imutavel. Usado tanto na Anamnese quanto na Evolucao.
-function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel, placeholder, currentUserId, onEdit }: {
+const NOTE_DRAFT_PREFIX = 'anpexia_note_draft:';
+
+function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel, placeholder, currentUserId, onEdit, draftKey }: {
   notes: any[];
   value: string;
   onChange: (v: string) => void;
@@ -117,10 +119,41 @@ function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel,
   currentUserId?: string;
   /** Persiste a edição (PUT) e recarrega a lista. */
   onEdit: (noteId: string, content: string) => Promise<void>;
+  /** Chave do rascunho local (usuário+paciente+seção). Sem ela, o rascunho fica desativado. */
+  draftKey?: string;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [draftRecovered, setDraftRecovered] = useState(false);
+  const draftInitRef = useRef<string | null>(null);
+  const draftHadContentRef = useRef(false);
+
+  // Rascunho local (localStorage): o texto digitado na caixa fica preservado
+  // mesmo sem clicar em "Adicionar" — sobrevive a refresh/fechamento/queda de
+  // internet. NÃO cria registro; só guarda o rascunho até o médico registrar.
+  // Restaura ao abrir a seção deste paciente.
+  useEffect(() => {
+    if (!draftKey) return;
+    draftInitRef.current = draftKey;
+    let saved = '';
+    try { saved = localStorage.getItem(NOTE_DRAFT_PREFIX + draftKey) || ''; } catch { /* private mode */ }
+    // Carrega o rascunho DESTE paciente/seção (o do paciente anterior já foi
+    // persistido na sua própria chave, então não se perde nada ao trocar).
+    if (saved) { onChange(saved); setDraftRecovered(true); draftHadContentRef.current = true; }
+    else { if (value) onChange(''); setDraftRecovered(false); draftHadContentRef.current = false; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  // Persiste a cada alteração (instantâneo). Ao esvaziar (após registrar), limpa.
+  useEffect(() => {
+    if (!draftKey || draftInitRef.current !== draftKey) return;
+    const key = NOTE_DRAFT_PREFIX + draftKey;
+    try {
+      if (value && value.trim()) { localStorage.setItem(key, value); draftHadContentRef.current = true; }
+      else if (draftHadContentRef.current) { localStorage.removeItem(key); draftHadContentRef.current = false; setDraftRecovered(false); }
+    } catch { /* quota/private mode — ignora */ }
+  }, [value, draftKey]);
 
   const startEdit = (n: any) => { setEditingId(n.id); setEditText(n.content || ''); };
   const cancelEdit = () => { setEditingId(null); setEditText(''); };
@@ -183,6 +216,15 @@ function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel,
           className={inputCls + ' resize-y min-h-[42vh]'}
           placeholder={placeholder}
         />
+        {draftKey && value.trim() && (
+          <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+            <span>
+              {draftRecovered ? 'Rascunho recuperado — continue de onde parou. ' : 'Rascunho salvo automaticamente. '}
+              Ainda não é um registro — clique em "{addLabel}" para gravar.
+            </span>
+          </p>
+        )}
         <div className="flex justify-end mt-2">
           <button
             type="button"
@@ -1401,6 +1443,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                         addLabel="Adicionar registro"
                         placeholder="Digite um novo registro da anamnese. Ao adicionar, o texto fica salvo de forma permanente com seu nome e horario — nada e sobrescrito."
                         currentUserId={user?.id}
+                        draftKey={user?.id && customer?.id ? `${user.id}:${customer.id}:ANAMNESE` : undefined}
                         onEdit={(noteId, content) => editClinicalNote('ANAMNESE', noteId, content, setAnamneseNotes)}
                       />
                     )}
@@ -1439,6 +1482,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                     addLabel="Registrar Evolucao"
                     placeholder="Digite a evolucao do paciente. Ao registrar, o texto fica salvo de forma permanente com seu nome e horario — nada e sobrescrito."
                     currentUserId={user?.id}
+                    draftKey={user?.id && customer?.id ? `${user.id}:${customer.id}:EVOLUCAO` : undefined}
                     onEdit={(noteId, content) => editClinicalNote('EVOLUCAO', noteId, content, setEvolucaoNotes)}
                   />
                 )}
