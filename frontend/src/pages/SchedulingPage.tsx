@@ -371,6 +371,17 @@ export function SchedulingPage() {
   const isProviderRole = user?.role === 'DOCTOR' || user?.role === 'HEALTH_PROFESSIONAL';
   const canSeeAllAgendas = user?.role === 'OWNER' || user?.role === 'MANAGER' || user?.role === 'RECEPTIONIST' || user?.role === 'SUPER_ADMIN';
   const [filterDoctorId, setFilterDoctorId] = useState<string>('');
+  // Usuários que veem todos os médicos DEVEM escolher um antes de ver a agenda —
+  // evita agenda misturada e garante que o clique num horário livre já saiba o médico.
+  // (Com 1 médico só, auto-seleciona; ver useEffect abaixo. Médicos já são auto-filtrados.)
+  const mustSelectDoctor = canSeeAllAgendas && !filterDoctorId && doctors.length > 1;
+  const doctorGate = (
+    <div className="bg-red-50 border-2 border-red-300 rounded-xl p-8 text-center">
+      <AlertTriangle size={32} className="mx-auto text-red-500 mb-2" />
+      <p className="text-red-700 font-bold text-base">Selecione um médico para ver a agenda.</p>
+      <p className="text-red-600 text-sm mt-1">A agenda é exibida por médico para evitar erros de agendamento. Escolha um médico no seletor acima.</p>
+    </div>
+  );
 
   const DAY_KEYS_SCHED = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
   const getRoomName = (a: Appointment): string | null => {
@@ -597,6 +608,13 @@ export function SchedulingPage() {
     }
   }, [isProviderRole, canSeeAllAgendas, user?.id]);
 
+  // Clínica com um único médico: seleciona automaticamente (sem exigir escolha manual).
+  useEffect(() => {
+    if (canSeeAllAgendas && doctors.length === 1 && !filterDoctorId) {
+      setFilterDoctorId(doctors[0].id);
+    }
+  }, [canSeeAllAgendas, doctors, filterDoctorId]);
+
   useEffect(() => { fetchAppointments(); fetchDates(); fetchDoctors(); fetchRooms(); fetchConveniosLookup(); fetchBookPrivProcedures(); }, [fetchAppointments, fetchDates, fetchDoctors, fetchRooms, fetchConveniosLookup, fetchBookPrivProcedures]);
 
   useEffect(() => { if (view === 'list') fetchAgenda(agendaDate, agendaMode); }, [view, agendaDate, agendaMode, fetchAgenda, agendaRefresh]);
@@ -650,8 +668,10 @@ export function SchedulingPage() {
     setSelectedDate(date);
     setLoadingSlots(true);
     try {
+      // Horários do médico selecionado no filtro da agenda (no Calendário só se vê
+      // por médico — o gate garante isso). Assim os horários batem com o médico.
       const params: any = {};
-      if (bookForm.doctorId) params.doctorId = bookForm.doctorId;
+      if (filterDoctorId) params.doctorId = filterDoctorId;
       const { data } = await api.get(`/scheduling/available-slots/${date}`, { params });
       setSlots(data.data);
     } catch {} finally { setLoadingSlots(false); }
@@ -729,8 +749,12 @@ export function SchedulingPage() {
 
   const openBookWithSlot = (date: string, time: string) => {
     setEditingCallId(null);
-    setBookForm({ name: '', cellPhone: '', landlinePhone: '', email: '', date, time, notes: '', customerId: '', doctorId: '' });
-    bookDoctorRef.current = '';
+    // Aproveita o médico já selecionado no filtro da agenda: abre o modal com
+    // médico + data + horário prontos. Sincroniza a ref p/ o effect não zerar data/horário.
+    const doctorId = filterDoctorId || '';
+    setBookForm({ name: '', cellPhone: '', landlinePhone: '', email: '', date, time, notes: '', customerId: '', doctorId });
+    bookDoctorRef.current = doctorId;
+    setBookCalMonth(startOfMonth(new Date(date + 'T12:00:00')));
     setSelectedBookCustomer(null);
     setCustomerSearch('');
     resetPaymentState();
@@ -1896,7 +1920,7 @@ export function SchedulingPage() {
             onChange={e => setFilterDoctorId(e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-w-[220px]"
           >
-            <option value="">Todos os medicos</option>
+            <option value="">Selecione um medico</option>
             {doctors.map(d => (
               <option key={d.id} value={d.id}>{d.name}{d.especialidade ? ` — ${d.especialidade}` : ''}</option>
             ))}
@@ -1909,7 +1933,8 @@ export function SchedulingPage() {
       ) : (
         <>
           {/* List View — Agenda Modes */}
-          {view === 'list' && (
+          {view === 'list' && mustSelectDoctor && doctorGate}
+          {view === 'list' && !mustSelectDoctor && (
             <div className="space-y-4">
               {/* Mode selector + navigation */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-wrap items-center gap-3">
@@ -2459,7 +2484,8 @@ export function SchedulingPage() {
           )}
 
           {/* Calendar View */}
-          {view === 'calendar' && (
+          {view === 'calendar' && mustSelectDoctor && doctorGate}
+          {view === 'calendar' && !mustSelectDoctor && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Monthly calendar — spans 2 cols */}
               <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
