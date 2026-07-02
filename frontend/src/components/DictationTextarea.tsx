@@ -131,6 +131,7 @@ export function DictationTextarea({ value, onChange, className = '', placeholder
         <ConductaTemplatePicker
           onSelect={insertTemplate}
           onClose={() => setShowTemplates(false)}
+          initialContent={value}
         />
       )}
     </div>
