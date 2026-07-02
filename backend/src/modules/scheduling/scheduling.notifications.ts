@@ -1,8 +1,32 @@
 import prisma from '../../config/database';
 import { evolutionApi } from '../messaging/evolution.client';
 import { env } from '../../config/env';
+import { getWhatsappPhone, formatMobileForWhatsapp } from '../../shared/utils/phone';
 
 const TAG = '[SCHEDULING-NOTIFY]';
+
+/**
+ * Resolve o número de WhatsApp de um agendamento. Fonte oficial é o Customer
+ * (getWhatsappPhone trata dependentes e bloqueia fixo/sem-celular). Sem customer
+ * (lead avulso), só envia se o snapshot for um celular válido. Retorna null quando
+ * não há destino válido — o envio é simplesmente PULADO (não é erro).
+ */
+async function resolveWhatsAppTarget(input: { customerId?: string | null; phone?: string | null }): Promise<string | null> {
+  if (input.customerId) {
+    const customer = await prisma.customer.findUnique({
+      where: { id: input.customerId },
+      select: {
+        cellPhone: true, landlinePhone: true, phone: true, usarTelResponsavel: true,
+        responsavel: { select: { cellPhone: true, landlinePhone: true, phone: true } },
+      },
+    });
+    if (customer) {
+      const target = getWhatsappPhone(customer as any);
+      return target.ok ? target.phone! : null;
+    }
+  }
+  return input.phone ? formatMobileForWhatsapp(input.phone) : null;
+}
 
 async function resolveInstance(tenantId?: string | null): Promise<string | null> {
   if (tenantId) {
@@ -52,6 +76,7 @@ export async function sendBookingConfirmation(call: {
   id: string;
   name: string;
   phone: string;
+  customerId?: string | null;
   date: Date;
   duration: number;
   leadId?: string | null;
@@ -71,14 +96,17 @@ export async function sendBookingConfirmation(call: {
     `\n\nVoce recebera um lembrete antes da consulta.`;
 
   if (isWhatsAppConfigured()) {
-    const instance = await resolveInstance(call.tenantId);
-    if (instance) {
+    const target = await resolveWhatsAppTarget({ customerId: call.customerId, phone: call.phone });
+    const instance = target ? await resolveInstance(call.tenantId) : null;
+    if (target && instance) {
       try {
-        await evolutionApi.sendText(instance, call.phone, body);
-        console.log(`${TAG} Booking confirmation sent to ${call.phone}`);
+        await evolutionApi.sendText(instance, target, body);
+        console.log(`${TAG} Booking confirmation sent to ${target}`);
       } catch (err) {
         console.error(`${TAG} Failed to send booking confirmation:`, err);
       }
+    } else if (!target) {
+      console.log(`${TAG} Confirmacao sem WhatsApp (paciente sem celular valido) — call ${call.id}`);
     }
   }
 
@@ -101,6 +129,7 @@ export async function sendCancellationNotice(call: {
   id: string;
   name: string;
   phone: string;
+  customerId?: string | null;
   date: Date;
   leadId?: string | null;
   tenantId?: string | null;
@@ -111,11 +140,12 @@ export async function sendCancellationNotice(call: {
   const body = `Sua consulta de ${dateStr} as ${timeStr} foi cancelada.\n\nQuando quiser reagendar, e so mandar mensagem novamente!`;
 
   if (isWhatsAppConfigured()) {
-    const instance = await resolveInstance(call.tenantId);
-    if (instance) {
+    const target = await resolveWhatsAppTarget({ customerId: call.customerId, phone: call.phone });
+    const instance = target ? await resolveInstance(call.tenantId) : null;
+    if (target && instance) {
       try {
-        await evolutionApi.sendText(instance, call.phone, body);
-        console.log(`${TAG} Cancellation notice sent to ${call.phone}`);
+        await evolutionApi.sendText(instance, target, body);
+        console.log(`${TAG} Cancellation notice sent to ${target}`);
       } catch (err) {
         console.error(`${TAG} Failed to send cancellation notice:`, err);
       }
@@ -285,6 +315,7 @@ export async function handleAppointmentReply(phone: string, message: string, ten
       id: activeCall.id,
       name: activeCall.name,
       phone: activeCall.phone,
+      customerId: activeCall.customerId,
       date: activeCall.date,
       leadId: activeCall.leadId,
       tenantId: activeCall.tenantId,

@@ -1,9 +1,18 @@
 import { z } from 'zod';
 
+// Regra de telefone: pelo menos um entre cellPhone, landlinePhone ou phone legado.
+// (o chatbot do WhatsApp continua enviando só `phone`, tratado como celular.)
+const hasAtLeastOnePhone = (d: { phone?: string | null; cellPhone?: string | null; landlinePhone?: string | null }) =>
+  !!(d.cellPhone?.trim() || d.landlinePhone?.trim() || d.phone?.trim());
+const atLeastOnePhoneMsg = 'Informe pelo menos um telefone de contato: WhatsApp/celular ou telefone fixo.';
+
 export const bookCallSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   email: z.string().email('Email inválido').optional().nullable(),
-  phone: z.string().min(10, 'Telefone deve ter pelo menos 10 dígitos'),
+  // phone legado é opcional (compatibilidade/chatbot). Os campos oficiais são cellPhone/landlinePhone.
+  phone: z.string().optional().nullable(),
+  cellPhone: z.string().optional().nullable(),
+  landlinePhone: z.string().optional().nullable(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD'),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:MM').optional(),
   notes: z.string().max(500).optional().nullable(),
@@ -15,7 +24,7 @@ export const bookCallSchema = z.object({
   isReturn: z.boolean().optional(),
   originalCallId: z.string().optional().nullable(),
   isEncaixe: z.boolean().optional(),
-});
+}).refine(hasAtLeastOnePhone, { message: atLeastOnePhoneMsg, path: ['cellPhone'] });
 
 export const linkProceduresSchema = z.object({
   procedures: z.array(z.object({
@@ -59,7 +68,10 @@ export const replaceProceduresSchema = z.object({
 
 export const editCallSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').optional(),
-  phone: z.string().min(10, 'Telefone deve ter pelo menos 10 dígitos').optional(),
+  // Edição parcial: telefones opcionais (não obriga preencher nenhum aqui).
+  phone: z.string().optional().nullable(),
+  cellPhone: z.string().optional().nullable(),
+  landlinePhone: z.string().optional().nullable(),
   email: z.string().email('Email inválido').optional().nullable(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').optional(),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:MM').optional(),

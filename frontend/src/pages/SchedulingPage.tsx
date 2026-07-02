@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { PatientPanel, PatientPanelModal, type AttendanceSummary } from '../components/PatientPanel';
+import { maskPhone, whatsappIndicator } from '../utils/phone';
 
 interface DoctorHorario {
   ativo: boolean;
@@ -98,7 +99,7 @@ interface Appointment {
   convenioId: string | null;
   checkinAt: string | null;
   calledAt: string | null;
-  customer: { id: string; name: string; phone: string; email: string | null } | null;
+  customer: { id: string; name: string; phone: string; cellPhone?: string | null; landlinePhone?: string | null; email: string | null } | null;
   doctor: { id: string; name: string; salas?: Record<string, { manha: string | null; tarde: string | null }> | null } | null;
   convenio?: { id: string; nome: string } | null;
   procedures?: CallProcedure[];
@@ -116,6 +117,8 @@ interface CustomerSearch {
   id: string;
   name: string;
   phone: string | null;
+  cellPhone?: string | null;
+  landlinePhone?: string | null;
   email: string | null;
 }
 
@@ -330,7 +333,7 @@ export function SchedulingPage() {
   // New / Edit appointment
   const [showBookModal, setShowBookModal] = useState(false);
   const [editingCallId, setEditingCallId] = useState<string | null>(null);
-  const [bookForm, setBookForm] = useState({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
+  const [bookForm, setBookForm] = useState({ name: '', cellPhone: '', landlinePhone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
   const [saving, setSaving] = useState(false);
   // Payment type for new appointment
   const [bookPaymentType, setBookPaymentType] = useState<'PARTICULAR' | 'CONVENIO'>('PARTICULAR');
@@ -726,7 +729,7 @@ export function SchedulingPage() {
 
   const openBookWithSlot = (date: string, time: string) => {
     setEditingCallId(null);
-    setBookForm({ name: '', phone: '', email: '', date, time, notes: '', customerId: '', doctorId: '' });
+    setBookForm({ name: '', cellPhone: '', landlinePhone: '', email: '', date, time, notes: '', customerId: '', doctorId: '' });
     bookDoctorRef.current = '';
     setSelectedBookCustomer(null);
     setCustomerSearch('');
@@ -737,7 +740,7 @@ export function SchedulingPage() {
 
   const openBook = () => {
     setEditingCallId(null);
-    setBookForm({ name: '', phone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
+    setBookForm({ name: '', cellPhone: '', landlinePhone: '', email: '', date: '', time: '', notes: '', customerId: '', doctorId: '' });
     bookDoctorRef.current = '';
     setSelectedBookCustomer(null);
     setCustomerSearch('');
@@ -752,9 +755,15 @@ export function SchedulingPage() {
     const dateStr = spDate.toISOString().slice(0, 10);
     const timeStr = spDate.toISOString().slice(11, 16);
     setEditingCallId(a.id);
+    // Prefill: prioriza os campos oficiais do Customer; senão classifica o snapshot
+    // do agendamento (11 díg = celular, 10 = fixo).
+    const snapDigits = (a.phone || '').replace(/\D/g, '');
+    const custCell = a.customer?.cellPhone || (snapDigits.length === 11 ? a.phone : '');
+    const custLand = a.customer?.landlinePhone || (snapDigits.length === 10 ? a.phone : '');
     setBookForm({
       name: a.name,
-      phone: a.phone,
+      cellPhone: custCell ? maskPhone(custCell) : '',
+      landlinePhone: custLand ? maskPhone(custLand) : '',
       email: a.email || '',
       date: dateStr,
       time: timeStr,
@@ -831,10 +840,14 @@ export function SchedulingPage() {
 
   const selectCustomerForBooking = (c: CustomerSearch) => {
     setSelectedBookCustomer(c);
+    // Preenche os dois campos com os telefones oficiais do paciente (celular/fixo).
+    const cell = c.cellPhone || (((c.phone || '').replace(/\D/g, '').length === 11) ? c.phone : '') || '';
+    const land = c.landlinePhone || '';
     setBookForm(prev => ({
       ...prev,
       name: c.name,
-      phone: c.phone || '',
+      cellPhone: cell ? maskPhone(cell) : '',
+      landlinePhone: land ? maskPhone(land) : '',
       email: c.email || '',
       customerId: c.id,
     }));
@@ -863,6 +876,12 @@ export function SchedulingPage() {
       showToast('Selecione o horario da consulta');
       return;
     }
+    const cellDigits = bookForm.cellPhone.replace(/\D/g, '');
+    const landDigits = bookForm.landlinePhone.replace(/\D/g, '');
+    if (!cellDigits && !landDigits) {
+      showToast('Informe pelo menos um telefone de contato: WhatsApp/celular ou telefone fixo.');
+      return;
+    }
     if (bookPaymentType === 'CONVENIO' && !bookConvenioId) {
       showToast('Selecione o convenio do paciente');
       return;
@@ -876,7 +895,8 @@ export function SchedulingPage() {
       if (editingCallId) {
         const payload: any = {
           name: bookForm.name,
-          phone: bookForm.phone,
+          cellPhone: bookForm.cellPhone || null,
+          landlinePhone: bookForm.landlinePhone || null,
           email: bookForm.email || null,
           date: bookForm.date,
           time: bookForm.time || undefined,
@@ -900,7 +920,8 @@ export function SchedulingPage() {
       } else {
         const payload: any = {
           name: bookForm.name,
-          phone: bookForm.phone,
+          cellPhone: bookForm.cellPhone || undefined,
+          landlinePhone: bookForm.landlinePhone || undefined,
           email: bookForm.email || undefined,
           date: bookForm.date,
           time: bookForm.time || undefined,
@@ -1962,7 +1983,7 @@ export function SchedulingPage() {
                                     ) : (
                                       <button
                                         onClick={() => {
-                                          const bf = { name: '', phone: '', email: '', date: dateStr, time: row.time, notes: '', customerId: '', doctorId: filterDoctorId || '' };
+                                          const bf = { name: '', cellPhone: '', landlinePhone: '', email: '', date: dateStr, time: row.time, notes: '', customerId: '', doctorId: filterDoctorId || '' };
                                           setBookForm(bf);
                                           bookDoctorRef.current = filterDoctorId || '';
                                           setSelectedBookCustomer(null);
@@ -2073,7 +2094,7 @@ export function SchedulingPage() {
                                     ) : (
                                       <button
                                         onClick={() => {
-                                          const bf = { name: '', phone: '', email: '', date: dayStr, time: row.time, notes: '', customerId: '', doctorId: filterDoctorId || '' };
+                                          const bf = { name: '', cellPhone: '', landlinePhone: '', email: '', date: dayStr, time: row.time, notes: '', customerId: '', doctorId: filterDoctorId || '' };
                                           setBookForm(bf);
                                           bookDoctorRef.current = filterDoctorId || '';
                                           setSelectedBookCustomer(null);
@@ -2831,8 +2852,33 @@ export function SchedulingPage() {
                 <input type="text" value={bookForm.name} onChange={(e) => setBookForm({ ...bookForm, name: e.target.value })} className={inputCls} required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone *</label>
-                <input type="tel" value={bookForm.phone} onChange={(e) => setBookForm({ ...bookForm, phone: e.target.value })} className={inputCls} required />
+                <label className="block text-sm font-medium text-slate-700 mb-1">WhatsApp / Celular</label>
+                <input
+                  type="tel"
+                  value={bookForm.cellPhone}
+                  onChange={(e) => setBookForm({ ...bookForm, cellPhone: maskPhone(e.target.value) })}
+                  className={inputCls}
+                  placeholder="(00) 00000-0000"
+                  maxLength={16}
+                />
+                <p className="mt-1 text-xs text-slate-500">Usado para confirmações e lembretes automáticos por WhatsApp.</p>
+                {(bookForm.cellPhone || bookForm.landlinePhone) && (() => {
+                  const ind = whatsappIndicator(bookForm.cellPhone, bookForm.landlinePhone);
+                  return <p className={`mt-1 text-xs ${ind.cls}`}>{ind.icon} {ind.label}</p>;
+                })()}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone fixo</label>
+                <input
+                  type="tel"
+                  value={bookForm.landlinePhone}
+                  onChange={(e) => setBookForm({ ...bookForm, landlinePhone: maskPhone(e.target.value) })}
+                  className={inputCls}
+                  placeholder="(00) 0000-0000"
+                  maxLength={15}
+                />
+                <p className="mt-1 text-xs text-slate-500">Apenas contato cadastral — não recebe notificações por WhatsApp.</p>
+                <p className="mt-1 text-xs text-slate-400">Informe pelo menos um: WhatsApp/celular ou telefone fixo.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>

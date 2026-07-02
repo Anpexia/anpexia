@@ -10,6 +10,7 @@ import {
   ReplaceProceduresInput,
 } from './scheduling.validators';
 import { sendBookingConfirmation, sendCancellationNotice } from './scheduling.notifications';
+import { resolveAppointmentPhones, fillEmptyCustomerPhones } from './scheduling.phones';
 
 // Tag embedded in FinancialTransaction.notes so we can find and revert entries
 // tied to a specific scheduled call. Format: [AGENDAMENTO:{scheduledCallId}]
@@ -492,28 +493,54 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
   // Build datetime — interpret time as São Paulo (UTC-3)
   const callDate = new Date(`${data.date}T${time}:00${SP_OFFSET}`);
 
-  // Find or link existing lead by phone (leads are global, no tenantId)
-  let lead = await prisma.lead.findFirst({ where: { phone: data.phone } });
+  // Normaliza/valida os telefones do agendamento (mesma lógica do cadastro).
+  // `resolved` = campos oficiais do Customer; `snapshot` = ScheduledCall.phone (celular || fixo).
+  const { resolved, snapshot } = resolveAppointmentPhones({
+    phone: data.phone,
+    cellPhone: data.cellPhone,
+    landlinePhone: data.landlinePhone,
+  });
+  const effectivePhone = snapshot;
 
-  // Auto-link to customer by phone (last 8 digits match) — scoped to tenant, only active
-  const phoneSuffix = data.phone.replace(/\D/g, '').slice(-8);
-  const customerWhere: any = { phone: { contains: phoneSuffix }, isActive: true };
+  // Find or link existing lead by phone (leads are global, no tenantId)
+  let lead = effectivePhone ? await prisma.lead.findFirst({ where: { phone: effectivePhone } }) : null;
+
+  // Auto-link to customer by phone (last 8 digits match) — scoped to tenant, only active.
+  // Casa em phone legado, celular OU fixo (senão paciente só-fixo, com phone=null,
+  // seria duplicado ao reagendar).
+  const phoneSuffix = effectivePhone.replace(/\D/g, '').slice(-8);
+  const customerWhere: any = {
+    isActive: true,
+    OR: [
+      { phone: { contains: phoneSuffix } },
+      { cellPhone: { contains: phoneSuffix } },
+      { landlinePhone: { contains: phoneSuffix } },
+    ],
+  };
   if (tenantId) customerWhere.tenantId = tenantId;
 
   let customer = data.customerId
     ? await prisma.customer.findFirst({ where: { id: data.customerId, isActive: true, ...(tenantId ? { tenantId } : {}) } })
-    : await prisma.customer.findFirst({ where: customerWhere, orderBy: { createdAt: 'desc' } });
+    : (phoneSuffix ? await prisma.customer.findFirst({ where: customerWhere, orderBy: { createdAt: 'desc' } }) : null);
 
-  // Auto-create customer if not found and we have a tenantId
   if (!customer && tenantId) {
+    // Auto-create: grava os telefones nos campos corretos do Customer.
     customer = await prisma.customer.create({
       data: {
         tenantId,
         name: data.name,
-        phone: data.phone,
         email: data.email ?? undefined,
+        cellPhone: resolved.cellPhone,
+        landlinePhone: resolved.landlinePhone,
+        phone: resolved.phone, // legado (espelha o celular; null quando só há fixo)
       },
     });
+  } else if (customer) {
+    // Paciente existente: preenche APENAS o campo vazio correspondente; nunca sobrescreve.
+    const patch = fillEmptyCustomerPhones(resolved, customer);
+    if (Object.keys(patch).length > 0) {
+      customer = await prisma.customer.update({ where: { id: customer.id }, data: patch });
+    }
   }
 
   // Return appointment validations
@@ -558,7 +585,7 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
         tenantId: resolvedTenantId ?? undefined,
         name: data.name,
         email: data.email ?? undefined,
-        phone: data.phone,
+        phone: effectivePhone, // snapshot de compatibilidade (celular || fixo)
         date: callDate,
         duration: durationMin,
         status: 'scheduled',
@@ -617,11 +644,13 @@ async function bookCall(data: BookCallInput, tenantId?: string | null) {
     return scheduledCall;
   });
 
-  // Send immediate WhatsApp confirmation (non-blocking)
+  // Send immediate WhatsApp confirmation (non-blocking).
+  // Alvo resolvido via customer (getWhatsappPhone); fixo-só é pulado sem erro.
   sendBookingConfirmation({
     id: call.id,
     name: data.name,
-    phone: data.phone,
+    phone: effectivePhone,
+    customerId: customer?.id ?? null,
     date: callDate,
     duration: durationMin,
     leadId: lead?.id,
@@ -1111,6 +1140,7 @@ async function cancelCall(id: string, tenantId?: string) {
     id: call.id,
     name: call.name,
     phone: call.phone,
+    customerId: call.customerId,
     date: call.date,
     leadId: call.leadId,
     tenantId: call.tenantId,
@@ -1300,11 +1330,38 @@ async function editCall(id: string, tenantId: string, data: EditCallInput) {
     if (!proc) throw new AppError(400, 'INVALID_PROCEDURE', 'Procedimento nao pertence a este tenant');
   }
 
+  // Telefones: se algum campo veio no payload, normaliza/valida e prepara o
+  // snapshot + o patch de preenchimento (só-vazio) do Customer vinculado.
+  const phoneProvided = data.cellPhone !== undefined || data.landlinePhone !== undefined || data.phone !== undefined;
+  let snapshotPhone: string | undefined;
+  let customerPhonePatch: { cellPhone?: string; landlinePhone?: string; phone?: string } | undefined;
+  if (phoneProvided) {
+    const { resolved, snapshot } = resolveAppointmentPhones({
+      phone: data.phone,
+      cellPhone: data.cellPhone,
+      landlinePhone: data.landlinePhone,
+    });
+    if (snapshot) snapshotPhone = snapshot;
+    if (call.customerId) {
+      const existingCustomer = await prisma.customer.findUnique({
+        where: { id: call.customerId },
+        select: { cellPhone: true, landlinePhone: true, phone: true },
+      });
+      if (existingCustomer) {
+        const patch = fillEmptyCustomerPhones(resolved, existingCustomer);
+        if (Object.keys(patch).length > 0) customerPhonePatch = patch;
+      }
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
-    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (snapshotPhone !== undefined) updateData.phone = snapshotPhone;
     if (data.email !== undefined) updateData.email = data.email;
+    if (customerPhonePatch && call.customerId) {
+      await tx.customer.update({ where: { id: call.customerId }, data: customerPhonePatch });
+    }
     if (callDate) {
       updateData.date = callDate;
       updateData.duration = durationMin;
