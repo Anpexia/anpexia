@@ -857,9 +857,17 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
     finally { setLoadingDocs(false); }
   };
 
+  const MAX_DOC_BYTES = 10 * 1024 * 1024; // 10 MB por arquivo
+  const MAX_PATIENT_DOC_BYTES = 50 * 1024 * 1024; // 50 MB por paciente
+
   const handleUploadDoc = async (file: File) => {
     if (!customer) return;
-    if (file.size > 4 * 1024 * 1024) { showToast('Arquivo muito grande (max 4MB)'); return; }
+    if (file.size > MAX_DOC_BYTES) { showToast('Arquivo muito grande (maximo 10 MB por documento).'); return; }
+    const usedBytes = documents.reduce((s: number, d: any) => s + (d.fileSize || 0), 0);
+    if (usedBytes + file.size > MAX_PATIENT_DOC_BYTES) {
+      showToast('Limite de 50 MB de documentos por paciente atingido. Exclua algum arquivo para adicionar novos.');
+      return;
+    }
     setUploadingDoc(true);
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -880,7 +888,9 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
       setDocCategory('OUTRO');
       await fetchDocuments(customer.id);
       showToast('Documento salvo!');
-    } catch { showToast('Erro ao enviar documento'); }
+    } catch (err: any) {
+      showToast(err?.response?.data?.error?.message || 'Erro ao enviar documento');
+    }
     finally { setUploadingDoc(false); }
   };
 
@@ -1929,9 +1939,27 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
               <label className={`flex flex-col items-center justify-center py-4 cursor-pointer rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors ${uploadingDoc ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={24} className="text-slate-400 mb-1" />
                 <span className="text-sm text-slate-600 font-medium">{uploadingDoc ? 'Enviando...' : 'Clique para enviar arquivo'}</span>
-                <span className="text-xs text-slate-400 mt-0.5">PDF, imagem ou documento (max 4MB)</span>
+                <span className="text-xs text-slate-400 mt-0.5">PDF, imagem ou documento (max 10 MB por arquivo)</span>
                 <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" onChange={e => { if (e.target.files?.[0]) handleUploadDoc(e.target.files[0]); e.target.value = ''; }} disabled={uploadingDoc} />
               </label>
+              {(() => {
+                const usedBytes = documents.reduce((s: number, d: any) => s + (d.fileSize || 0), 0);
+                const usedMb = usedBytes / (1024 * 1024);
+                const pct = Math.min(100, (usedBytes / MAX_PATIENT_DOC_BYTES) * 100);
+                const full = usedBytes >= MAX_PATIENT_DOC_BYTES;
+                return (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-500">Armazenamento deste paciente</span>
+                      <span className={full ? 'text-red-600 font-medium' : 'text-slate-500'}>{usedMb.toFixed(1)} MB de 50 MB</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className={`h-full ${full ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-[#1E3A5F]'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    {full && <p className="text-xs text-red-600 mt-1">Limite atingido — exclua um arquivo para adicionar novos.</p>}
+                  </div>
+                );
+              })()}
             </div>
 
             {loadingDocs ? (

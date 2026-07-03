@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { customerService, findSharedPhonePatients, checkDuplicateCpf } from './customer.service';
 import { createCustomerSchema, updateCustomerSchema } from './customer.validators';
+import { checkDocumentLimits } from './documentLimits';
 import { resolvePhones } from '../../shared/utils/phone';
 import { cpfHash as computeCpfHash } from '../../shared/utils/cpf';
 import { success, created, noContent } from '../../shared/utils/response';
@@ -253,10 +254,24 @@ customerRouter.get('/:id/documents/:docId', async (req: Request, res: Response, 
 
 customerRouter.post('/:id/documents', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { fileName, fileType, fileSize, fileData, category, description } = req.body;
+    const { fileName, fileType, fileData, category, description } = req.body;
     if (!fileName || !fileType || !fileData) {
       return res.status(400).json({ success: false, error: { message: 'fileName, fileType e fileData sao obrigatorios' } });
     }
+
+    // Limites de armazenamento (tamanho REAL calculado do base64 no servidor,
+    // não confia no fileSize enviado pelo cliente).
+    const actualBytes = Buffer.byteLength(String(fileData), 'base64');
+    const agg = await prisma.patientDocument.aggregate({
+      _sum: { fileSize: true },
+      where: { customerId: req.params.id as string, tenantId: req.auth!.tenantId! },
+    });
+    const usedBytes = agg._sum.fileSize || 0;
+    const limitErr = checkDocumentLimits(actualBytes, usedBytes);
+    if (limitErr) {
+      return res.status(limitErr.status).json({ success: false, error: { code: limitErr.code, message: limitErr.message } });
+    }
+
     const user = await prisma.user.findUnique({ where: { id: req.auth!.userId }, select: { name: true } });
     const doc = await prisma.patientDocument.create({
       data: {
@@ -264,7 +279,7 @@ customerRouter.post('/:id/documents', async (req: Request, res: Response, next: 
         customerId: req.params.id as string,
         fileName,
         fileType,
-        fileSize: fileSize || 0,
+        fileSize: actualBytes,
         fileData,
         category: category || 'OUTRO',
         description: description || null,

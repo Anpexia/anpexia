@@ -85,7 +85,8 @@ app.use(
 );
 
 // --- 3) Parsers e logging ---
-app.use(express.json({ limit: '5mb' }));
+// 15mb para acomodar upload de documentos de até 10MB (base64 infla ~33%).
+app.use(express.json({ limit: '15mb' }));
 app.use(cookieParser());
 app.use(morgan('dev'));
 
