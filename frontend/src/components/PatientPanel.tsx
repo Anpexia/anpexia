@@ -183,7 +183,7 @@ function ClinicalNotesSection({ notes, value, onChange, onAdd, saving, addLabel,
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[11px] text-slate-400">
                       {n.createdAt ? format(new Date(n.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : ''}
-                      {n.updatedAt ? ` · editado ${format(new Date(n.updatedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}` : ''}
+                      {/* Edição do autor é transparente: não exibimos "editado em..." (auditoria fica no backend). */}
                     </span>
                     {canEdit && !isEditing && (
                       <button type="button" onClick={() => startEdit(n)} className="text-[11px] font-medium text-[#1E3A5F] hover:underline">Editar</button>
@@ -1612,7 +1612,7 @@ export function PatientPanel({ customerId, onClose, initialTab = 'prontuario', o
                         <div className="flex items-center justify-between mb-2 gap-2">
                           <span className="text-xs font-medium text-[#1E3A5F]">
                             {format(new Date(ev.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}
-                            {ev.updatedAt && <span className="text-slate-400 font-normal"> · editado {format(new Date(ev.updatedAt), "dd/MM 'as' HH:mm", { locale: ptBR })}</span>}
+                            {/* Edição do autor é transparente: não exibimos "editado em..." (auditoria fica no backend). */}
                           </span>
                           {ev.doctorId && ev.doctorId === user?.id && editingEvolucaoId !== ev.id && (
                             <button type="button" onClick={() => startEditEvolucao(ev)} className="text-[11px] font-medium text-[#1E3A5F] hover:underline shrink-0">Editar</button>
