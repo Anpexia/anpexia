@@ -3638,7 +3638,7 @@ export function SchedulingPage() {
       {/* Stock-only Modal (PARTICULAR "Realizado") */}
       {stockOnlyCall && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold text-slate-800">Confirmar materiais e finalizar</h3>
               <button onClick={() => setStockOnlyCall(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
@@ -3910,7 +3910,7 @@ export function SchedulingPage() {
       {/* Add Procedure Modal (post-attendance) — multiple procedures with doctor */}
       {addProcCallId && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
+          <div className="bg-white rounded-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-800">Adicionar procedimento(s)</h3>
               <button onClick={() => { setAddProcCallId(null); setAddProcRows([{ procedureId: '', doctorId: '' }]); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>

@@ -366,7 +366,7 @@ export function ScriptsPage() {
       {/* Create/Edit Script Modal */}
       {(modalMode === 'create-script' || modalMode === 'edit-script') && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-lg p-6 my-8">
+          <div className="bg-white rounded-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-800">{modalMode === 'create-script' ? 'Novo script' : 'Editar script'}</h3>
               <button onClick={() => setModalMode('closed')} className="text-slate-400 hover:text-slate-500"><X size={20} /></button>

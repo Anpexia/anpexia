@@ -1048,7 +1048,7 @@ export function InventoryPage() {
       {/* Supplier Step Popup */}
       {supplierStepOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-md p-6 my-8">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Truck size={18} /> Configurar fornecedor</h3>
               <button onClick={() => { setSupplierStepOpen(false); setScannedCode(''); }} className="text-slate-400 hover:text-slate-500"><X size={20} /></button>
@@ -1230,7 +1230,7 @@ export function InventoryPage() {
       {/* Detail Modal */}
       {modalMode === 'detail' && selectedProduct && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-2xl p-6 my-8">
+          <div className="bg-white rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="font-semibold text-slate-800 text-lg">{selectedProduct.name}</h3>
